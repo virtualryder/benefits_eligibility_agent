@@ -1,6 +1,6 @@
-# Benefits Eligibility Agent — Depth Evidence (runtime trace + red-team)
+# Benefits Eligibility Agent — Depth Evidence (runtime trace, red-team, real OAuth connector)
 
-*Captured live against the deployed benefits agent (account 864217980669, us-east-1) with Cedar in **ENFORCE**, 2026-07-17. This note is the "it actually runs as a governed agent, and it holds under attack" evidence pack — the two highest-credibility proofs beyond the happy-path governance demo. Account id shown here is the live deploy; the public repo scrubs it to a placeholder.*
+*Captured live against the deployed benefits agent (account 864217980669, us-east-1) with Cedar in **ENFORCE**, 2026-07-17. This note is the "it actually runs as a governed agent, it holds under attack, and it authenticates to a real dependency" evidence pack — the three highest-credibility proofs beyond the happy-path governance demo. Account id shown here is the live deploy; the public repo scrubs it to a placeholder.*
 
 ---
 
@@ -100,6 +100,44 @@ The harness is part of the reusable template (`lib/engine/redteam.sh`) and runs 
 
 ---
 
-## Why these two matter for adoption
+## Item 3 — Real connector via AgentCore Identity outbound auth (retires the "it's a stub" caveat)
+
+The template shipped system-of-record connectors as **labeled stubs**. This replaces the stub for benefits with a **real, authenticated** call to an external OAuth2-protected system of record — and, critically, the outbound credential is minted by **AgentCore Identity**, so the tool holds no secret.
+
+### Architecture
+
+- **The dependency is genuinely OAuth-protected.** A mock income-verification system of record (EIV-style, `ben-sor-api`) is fronted by an API Gateway HTTP API and requires a valid **Cognito machine-to-machine (client_credentials)** access token with scope `benefits-sor/read`. Unauthenticated calls are rejected.
+- **AgentCore Identity holds the secret, not the tool.** An **OAuth2 credential provider** (`ben-sor-oauth`, `CustomOauth2`) stores the M2M client id/secret in the AgentCore Identity **token vault**. The `verify_income` tool has *no* client secret in its code or env.
+- **The tool mints the outbound token at call time** via the Identity data plane (2-legged / M2M):
+  `get_workload_access_token(workloadName)` → `get_resource_oauth2_token(..., oauth2Flow="M2M")` → an OAuth2 access token, which it presents to the system of record as `Authorization: Bearer …`.
+- **Still fully governed.** `verify_income` is a Cedar-authorized Gateway tool like every other; deny-by-default covers it with no new policy.
+
+### Proof (live)
+
+```
+bash agents/benefits-eligibility/connector/prove_connector.sh agents/benefits-eligibility
+
+-- 1. the system of record REALLY requires OAuth (no token / bad token are rejected) --
+  PASS | SOR rejects no-token (401) and bad-token (401) — the dependency is genuinely OAuth-protected
+-- 2. governed tool: caseworker calls verify_income; AgentCore Identity mints the outbound token --
+  PASS | verify_income returned authoritative income via the OAuth-protected SOR (token minted by Identity)
+  PASS | the tool holds NO client secret (it lives in the Identity token vault)
+-- 3. deny-by-default extends to the new connector (outsider denied) --
+  PASS | outsider call to verify_income DENIED (Cedar deny-by-default, no new policy needed)
+=== CONNECTOR PROOF: 4 passed, 0 failed ===  CONNECTOR PROOF: PASS
+```
+
+Tool result (through the governed gateway):
+
+```json
+{ "verified": true, "tool_holds_secret": false, "monthly_income_reported": 2500, "case_id": "CASE-2026-0700",
+  "connector": { "system_of_record": "MOCK-EIV",
+    "outbound_auth": "AgentCore Identity OAuth2 credential provider (ben-sor-oauth), client_credentials/M2M",
+    "token_minted_by_identity": true, "tool_holds_secret": false } }
+```
+
+What this demonstrates for an adopter: swapping the mock system of record for a real one (EIV, The Work Number, a state benefits SoR) is a **configuration change** — point the credential provider at the real IdP/token endpoint and the tool at the real API. The governance (Cedar authorization, audit, deny-by-default) and the **secret-handling posture (secret in the Identity token vault, never in the tool)** are already in place. One honest hardening note: the mock SoR validates the token's claims (issuer, client_id, scope, expiry); JWKS/RS256 signature verification is the obvious production add.
+
+## Why these three matter for adoption
 
 The happy-path demo proves the controls work when everything cooperates. These two prove the harder claims a security-minded reviewer actually asks: the thing **runs as an autonomous agent** (not a scripted sequence of API calls) and produces court-defensible evidence, **and it stays governed when the agent is adversarial**. Together they move the story from "governed tools" to "a governed agent you can put in front of an ATO reviewer."
