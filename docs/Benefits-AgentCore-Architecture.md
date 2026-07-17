@@ -59,7 +59,17 @@ AWS now ships, in Amazon Bedrock AgentCore, the governance primitives a regulate
 
 ## 6. The eligibility rules engine (deterministic, illustrative)
 
-`assess_eligibility` is a **deterministic rules engine**, not a model. It applies the public Federal Poverty Guidelines and a SNAP-style gross-income test to the de-identified decision fields and returns a determination (ELIGIBLE / INELIGIBLE / NEEDS_REVIEW) and the **processing clock** (EXPEDITED 7-day vs. STANDARD 30-day). It fails closed if the case is not marked de-identified. The thresholds shipped here are illustrative federal defaults (poverty guideline base, per-additional-member increment, 130% gross-income limit, expedited income/resource triggers) — the customer configures the authoritative rules per program, state, and benefit year. This is the eligibility counterpart to the PV agent's seriousness/reporting-clock step: a transparent, auditable, non-model determination that a caseworker can defend at a fair hearing.
+`assess_eligibility` is a **deterministic rules engine**, not a model. It applies the **authoritative 2026 HHS Federal Poverty Guidelines** ($15,960 base, +$5,680 per additional person — Federal Register 2026‑00755) and a SNAP-style gross-income test (130% FPL, 7 CFR 273.9) to the de-identified decision fields, and returns a determination (ELIGIBLE / INELIGIBLE / NEEDS_REVIEW) and the **processing clock** (EXPEDITED 7-day vs. STANDARD 30-day). Every determination now **stamps the FPL source and year** into its output, so the basis is traceable to a named, authoritative source in the audit — not a magic number. It fails closed if the case is not marked de-identified. Alaska/Hawaii and program/state variations remain a per-program configuration item. This is the eligibility counterpart to the PV agent's seriousness/reporting-clock step: a transparent, auditable, non-model determination that a caseworker can defend at a fair hearing.
+
+## 6a. Deeper caseload workflows (step two)
+
+Beyond intake and adjudication, the agent adds the workflows a real caseload needs — each a **new governed tool with its own Cedar control**, following one rule: the higher-risk the action, the stronger the governance.
+
+- **`redetermine`** — changed-circumstances re-determination. It re-runs the rules on new facts, classifies the change, and on an **ADVERSE** result (a reduction or termination) flags that **timely, adequate advance written notice** and a fair-hearing right are required *before* the action takes effect (*Goldberg v. Kelly*). Fail-closed (`mask_before_redetermine`).
+- **`detect_overpayment`** — deterministic overpayment math over a recovery period. Recovery and any referral remain human decisions. Fail-closed (`mask_before_overpayment`).
+- **`refer_fraud`** — a **consequential, human-only** action. The agent can **never** refer a case as suspected fraud; `refer_fraud` is forbidden outright by `no_self_fraud_referral`, exactly mirroring `no_self_commit`.
+
+The point for an adopter: the governance model scales to new workflows with no new plumbing — a tool body plus a deny-by-default forbid — and each new forbid fires *by name* in ENFORCE.
 
 ## 7. Cedar policy model for benefits (illustrative)
 
