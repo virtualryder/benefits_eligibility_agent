@@ -52,11 +52,27 @@ SSM and validates the caseworker's Cognito JWT.
 ## Tests — proven live in ENFORCE
 
 `bash lib/engine/demo.sh agents/benefits-eligibility` exercises the full governed workflow against the
-deployed system with Cedar in **ENFORCE**, and reports `21 passed, 0 failed / GOVERNANCE DEMO: PASS`:
-deny-by-default (caseworker ALLOW / outsider DENY), fail-closed PII masking, both mask-before forbids
-firing *by name*, the eligibility determination + processing clock, a real guarded Bedrock notice, the
-immutable WORM audit (write-once + duplicate rejection), `no_self_commit`, and the human sign-off gate
-(separation of duties + single-use token).
+deployed system with Cedar in **ENFORCE**, and reports `28 passed, 0 failed / GOVERNANCE DEMO: PASS`:
+deny-by-default (caseworker ALLOW / outsider DENY), fail-closed PII masking, the mask-before forbids
+firing *by name*, the eligibility determination + processing clock (with the authoritative 2026 HHS
+poverty guidelines and provenance), a real guarded Bedrock notice, the immutable WORM audit (write-once +
+duplicate rejection), `no_self_commit`, and the human sign-off gate (separation of duties + single-use
+token).
+
+### Deeper caseload workflows (each a governed tool + its own Cedar control)
+
+The higher-risk the action, the stronger the governance. Beyond intake/adjudication, the agent adds:
+
+- **`redetermine`** — changed-circumstances re-determination that classifies the change and, on an
+  **ADVERSE** result (a reduction or termination), flags that **timely advance due-process notice** is
+  required (*Goldberg v. Kelly*) before the action takes effect. Fail-closed (`mask_before_redetermine`).
+- **`detect_overpayment`** — deterministic overpayment calculation over a recovery period; recovery and
+  any referral remain human decisions. Fail-closed (`mask_before_overpayment`).
+- **`refer_fraud`** — a **consequential, human-only** action: the agent can **never** refer a case as
+  suspected fraud. Forbidden by Cedar `no_self_fraud_referral` — the same deny-by-default pattern as
+  `no_self_commit`, showing the model scales to every new high-risk action.
+
+All three are proven live in the 28-check demo.
 
 ## Deploy / prove / run / tear down
 
@@ -66,7 +82,7 @@ tool bodies + Cedar policies; the engine, control library, and runtime are reuse
 
 ```bash
 bash lib/engine/deploy.sh  agents/benefits-eligibility   # spine: engine -> gateway -> targets -> policies -> ENFORCE
-bash lib/engine/demo.sh    agents/benefits-eligibility   # 21-check governance proof
+bash lib/engine/demo.sh    agents/benefits-eligibility   # 28-check governance proof
 # Runtime (from a fresh venv):
 bash lib/runtime/setup_venv.sh
 bash lib/runtime/_obs_setup.sh  agents/benefits-eligibility
@@ -86,8 +102,8 @@ lib/engine/     manifest-driven engine: render.py + deploy/demo/destroy + deploy
 lib/controls/   shared control tools: mask_pii, write_audit, request/approve/finalize sign-off, mcp_client
 lib/runtime/    generic Strands agent on AgentCore Runtime (agent.py + Dockerfile + toolkit helpers)
 agents/benefits-eligibility/
-                manifest.yaml (single source of truth) + tools/ (intake, assess_eligibility, benefits_core) + demo_extra.sh
-policies/       the four Cedar policies (rendered from the manifest), human-readable + a README
+                manifest.yaml (single source of truth) + tools/ (intake, assess_eligibility, redetermine, overpayment, benefits_core) + demo_extra.sh
+policies/       the seven Cedar policies (rendered from the manifest), human-readable + a README
 docs/           architecture note + Word guides (regulatory-adherence, SA runbook, maintenance)
 ```
 

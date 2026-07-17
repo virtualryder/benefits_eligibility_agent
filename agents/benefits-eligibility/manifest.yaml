@@ -86,6 +86,36 @@ tools:
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
         required: [deidentified]
 
+  - target: redetermine
+    lambda: ben-redetermine
+    handler: redetermine.py
+    kind: domain
+    mcp_tools:
+      - name: redetermine
+        description: "Changed-circumstances re-determination on de-identified facts; classifies the change (ADVERSE / FAVORABLE / NO_CHANGE) and flags whether advance due-process notice is required. Case must be masked first."
+        input:
+          household_size: { type: integer, description: "New household size." }
+          monthly_income: { type: number, description: "New gross monthly income." }
+          categorical_eligibility: { type: boolean, description: "True if receives SSI/TANF/GA." }
+          prior_determination: { type: string, description: "The prior determination (e.g. 'ELIGIBLE')." }
+          prior_eligible: { type: boolean, description: "Prior eligibility, if known (overrides prior_determination)." }
+          deidentified: { type: boolean, description: "True if masked by mask_pii." }
+        required: [deidentified]
+
+  - target: overpayment
+    lambda: ben-overpayment
+    handler: overpayment.py
+    kind: domain
+    mcp_tools:
+      - name: detect_overpayment
+        description: "Deterministic overpayment calculation on de-identified benefit amounts (prior vs corrected monthly benefit over N months). Recovery/referral remain human decisions. Case must be masked first."
+        input:
+          prior_monthly_benefit: { type: number, description: "Amount received per month." }
+          corrected_monthly_benefit: { type: number, description: "Corrected monthly entitlement." }
+          months: { type: integer, description: "Number of months in the overpayment period." }
+          deidentified: { type: boolean, description: "True if masked by mask_pii." }
+        required: [deidentified]
+
   - target: ben-core
     lambda: ben-core-tools
     handler: benefits_core.py
@@ -102,6 +132,10 @@ tools:
         description: "Commit a benefits determination; agent must never call this directly."
         input: { case_id: { type: string, description: "Case id." } }
         required: [case_id]
+      - name: refer_fraud
+        description: "Refer a case as suspected fraud; a HUMAN-only decision — the agent must never call this."
+        input: { fraud_case_id: { type: string, description: "Case id to refer." } }
+        required: [fraud_case_id]
 
   - target: write-audit
     lambda: ben-write-audit
@@ -131,10 +165,13 @@ tools:
         required: [icsr_id, requester]
 
 policies:
-  - { name: caseworker_permit, kind: permit, role_group: benefits_caseworker }
-  - { name: mask_before_assess, kind: forbid, action: assess_eligibility, unless_deidentified: true }
-  - { name: mask_before_draft,  kind: forbid, action: draft_notice,       unless_deidentified: true }
-  - { name: no_self_commit,     kind: forbid, action: finalize_determination }
+  - { name: caseworker_permit,        kind: permit, role_group: benefits_caseworker }
+  - { name: mask_before_assess,       kind: forbid, action: assess_eligibility, unless_deidentified: true }
+  - { name: mask_before_redetermine,  kind: forbid, action: redetermine,        unless_deidentified: true }
+  - { name: mask_before_overpayment,  kind: forbid, action: detect_overpayment, unless_deidentified: true }
+  - { name: mask_before_draft,        kind: forbid, action: draft_notice,       unless_deidentified: true }
+  - { name: no_self_commit,           kind: forbid, action: finalize_determination }
+  - { name: no_self_fraud_referral,   kind: forbid, action: refer_fraud }
 
 workflow:
   entrypoint: agent.py

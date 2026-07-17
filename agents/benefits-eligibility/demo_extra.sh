@@ -40,3 +40,23 @@ if echo "$A2" | grep -q '"stored": *false' && echo "$A2" | grep -qi 'append-only
 
 echo "  -- forbid: no self-commit --"
 check "caseworker finalize_determination" DENY "$(call "$REV" "$T_FINAL" '{"case_id":"CASE-2026-0002"}')"
+
+echo "  == STEP TWO: deeper caseload workflows =="
+T_REDET="redetermine___redetermine"
+T_OVERPAY="overpayment___detect_overpayment"
+T_FRAUD="ben-core___refer_fraud"
+
+echo "  -- changed-circumstances re-determination (adverse -> due-process advance notice) --"
+check "caseworker redetermine (UN-masked)" DENY "$(call "$REV" "$T_REDET" '{"household_size":3,"monthly_income":6000,"prior_determination":"ELIGIBLE","deidentified":false}')"
+REDET_OUT="$(call "$REV" "$T_REDET" '{"household_size":3,"monthly_income":6000,"prior_determination":"ELIGIBLE","deidentified":true}')"
+check "caseworker redetermine (de-identified)" ALLOW "$REDET_OUT"
+if echo "$REDET_OUT" | grep -q 'ADVERSE' && echo "$REDET_OUT" | grep -q '"advance_notice_required": *true'; then echo "  PASS | adverse change detected -> advance due-process notice required (Goldberg)"; pass=$((pass+1)); else echo "  FAIL | redetermine -> $REDET_OUT"; fail=$((fail+1)); fi
+
+echo "  -- overpayment detection (deterministic) --"
+check "caseworker detect_overpayment (UN-masked)" DENY "$(call "$REV" "$T_OVERPAY" '{"prior_monthly_benefit":500,"corrected_monthly_benefit":300,"months":6,"deidentified":false}')"
+OVER_OUT="$(call "$REV" "$T_OVERPAY" '{"prior_monthly_benefit":500,"corrected_monthly_benefit":300,"months":6,"deidentified":true}')"
+check "caseworker detect_overpayment (de-identified)" ALLOW "$OVER_OUT"
+if echo "$OVER_OUT" | grep -q 'OVERPAYMENT' && echo "$OVER_OUT" | grep -qE '"overpayment_amount": *1200'; then echo "  PASS | overpayment computed deterministically (1200 over 6 months)"; pass=$((pass+1)); else echo "  FAIL | overpayment -> $OVER_OUT"; fail=$((fail+1)); fi
+
+echo "  -- forbid: no self fraud-referral (human-only) --"
+check "caseworker refer_fraud" DENY "$(call "$REV" "$T_FRAUD" '{"fraud_case_id":"CASE-2026-0002"}')"

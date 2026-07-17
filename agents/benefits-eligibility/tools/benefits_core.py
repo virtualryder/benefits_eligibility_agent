@@ -61,6 +61,12 @@ def _draft(e):
 
 def handler(event, context):
     e = _coerce(event)
+    if "fraud_case_id" in e:
+        # refer_fraud is a consequential, HUMAN-ONLY action. The agent can never refer a case as suspected
+        # fraud; a qualified investigator/official does. Forbidden to the agent by Cedar (no_self_fraud_referral)
+        # and refused here too (defense in depth).
+        return {"error": "refused: a fraud referral is a human-only decision; the agent cannot refer",
+                "fraud_case_id": e.get("fraud_case_id"), "referred": False}
     if "case_id" in e and "case" not in e:
         # finalize_determination is never a real inline call — the human sign-off gate owns it.
         return {"error": "refused: finalize_determination must go through the human sign-off gate",

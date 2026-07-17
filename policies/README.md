@@ -14,8 +14,11 @@ after the gateway is created.
 |---|---|---|
 | `caseworker_permit` | permit | Only a member of the `benefits_caseworker` Cognito group may use any tool. Everything else is denied by default. |
 | `mask_before_assess` | forbid | `assess_eligibility` cannot run on data that hasn't been de-identified (`deidentified == true`). |
+| `mask_before_redetermine` | forbid | `redetermine` (changed-circumstances re-determination) cannot run on un-masked data. |
+| `mask_before_overpayment` | forbid | `detect_overpayment` cannot run on un-masked data. |
 | `mask_before_draft` | forbid | `draft_notice` cannot run on un-masked data — the model only sees de-identified text. |
 | `no_self_commit` | forbid | The agent can never call `finalize_determination`; committing a determination is reachable **only** through the human sign-off gate. |
+| `no_self_fraud_referral` | forbid | The agent can never call `refer_fraud`; a suspected-fraud referral is a human-only decision. |
 
 Two rules of the engine make this airtight:
 
