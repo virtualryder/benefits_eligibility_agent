@@ -7,13 +7,17 @@ import json
 # rules are a per-program/per-state CONFIGURATION item (customer engagement) — these are the widely
 # used federal defaults and are labeled illustrative.
 #
-# Federal Poverty Guidelines (illustrative, 48 contiguous states): 1-person ~$15,650/yr, +$5,500 per
-# additional person. SNAP gross-income limit = 130% FPL; expedited service = very low income + minimal
-# liquid resources -> 7-day clock (vs. 30-day standard). Confirm current figures for the intended year.
+# Federal Poverty Guidelines: AUTHORITATIVE 2026 figures for the 48 contiguous states + DC, from the
+# HHS annual update (Federal Register 2026-00755, published 2026-01-15): 1-person $15,960/yr, +$5,680
+# per additional person. SNAP gross-income limit = 130% FPL (7 CFR 273.9). These are the authoritative
+# federal defaults for the 2026 benefit year; Alaska/Hawaii and program/state variations remain a
+# per-program CONFIGURATION item. Refresh annually from the HHS/ASPE poverty guidelines.
 
-FPL_BASE = 15650      # annual, 1-person household (illustrative)
-FPL_PER_ADD = 5500    # annual, each additional household member (illustrative)
-GROSS_LIMIT_PCT = 130 # SNAP gross monthly income limit as % of FPL
+FPL_SOURCE = "HHS 2026 Poverty Guidelines (Federal Register 2026-00755); SNAP gross limit 130% FPL (7 CFR 273.9)"
+FPL_YEAR = 2026
+FPL_BASE = 15960      # annual, 1-person household (48 states + DC, 2026 — authoritative)
+FPL_PER_ADD = 5680    # annual, each additional household member (2026 — authoritative)
+GROSS_LIMIT_PCT = 130 # SNAP gross monthly income limit as % of FPL (7 CFR 273.9)
 EXPEDITED_INCOME = 150     # expedited: gross monthly income under this ...
 EXPEDITED_RESOURCES = 100  # ... AND liquid resources at/under this
 
@@ -73,7 +77,7 @@ def handler(event, context):
     processing = "EXPEDITED" if expedited else "STANDARD"
     processing_days = 7 if expedited else 30
 
-    notes = ["FPL and thresholds are illustrative federal defaults; configure per program/state/year"]
+    notes = ["FPL uses the authoritative 2026 HHS guidelines; AK/HI and program/state variations are configurable"]
     if determination == "ELIGIBLE" and not categorical:
         notes.append("gross-income test only; net-income test and verification remain for caseworker review")
 
@@ -87,7 +91,9 @@ def handler(event, context):
         "income_pct_fpl": income_pct_fpl,
         "household_size": hh,
         "deidentified_input": True,
-        "assessed_by": "rules:FPL/SNAP-gross(illustrative)",
+        "assessed_by": "rules:FPL/SNAP-gross(2026 authoritative)",
+        "fpl_source": FPL_SOURCE,
+        "fpl_year": FPL_YEAR,
         "reason": reason,
         "notes": notes,
     }
