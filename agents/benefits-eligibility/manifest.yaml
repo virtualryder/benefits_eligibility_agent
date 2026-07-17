@@ -1,0 +1,153 @@
+# benefits-eligibility/manifest.yaml
+# SLG flagship: a governed public-benefits eligibility & adjudication agent, built on the same
+# governed-hero-agent pattern as the pharmacovigilance agent. The agent screens and recommends; a
+# caseworker makes and commits the determination at the human sign-off gate. render.py turns this
+# manifest into the deploy inputs.
+
+agent:
+  slug: benefits-eligibility
+  title: Benefits Eligibility and Adjudication
+  industry: SLG
+  region: us-east-1
+  prefix: ben
+
+identity:                          # stable, long-lived (own lifecycle)
+  pool_name: ben-eligibility
+  client_name: ben-gw
+  reviewer_group: benefits_caseworker
+  users:                           # placeholder passwords — override via env / rotate before shared use
+    - { name: caseworker, password: "ChangeMe-Reviewer1!", in_group: true }
+    - { name: approver,   password: "ChangeMe-Approver1!", in_group: true }
+    - { name: outsider,   password: "ChangeMe-Outsider1!", in_group: false }
+
+engine:
+  name: ben_eligibility_authz
+  description: Deny-by-default Cedar authz for the benefits eligibility agent
+
+gateway:
+  name: ben-eligibility-gw
+  description: Benefits eligibility governed tool gateway
+  ssm_discovery_param: /ben-eligibility/gateway-url
+
+guardrail:
+  name: ben-eligibility-guardrail
+  description: "Fail-closed output control for benefits notices: PII anonymize + prompt-attack"
+  pii_anonymize: [NAME, AGE, EMAIL, PHONE, US_SOCIAL_SECURITY_NUMBER, ADDRESS]
+  prompt_attack: HIGH
+
+controls:
+  fail_closed_masking: true
+  worm_audit: true
+  human_signoff_gate: true
+
+audit:
+  object_lock_mode: GOVERNANCE
+  retention_days: 1
+
+model:
+  draft_model_id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+runtime:
+  name: benefits_runtime_agent
+
+tools:
+  - target: intake-application
+    lambda: ben-intake-application
+    handler: intake_application.py
+    kind: domain
+    mcp_tools:
+      - name: intake_application
+        description: "Extract the non-PII decision fields (household size, monthly income, liquid resources, categorical flag) from a raw benefits application."
+        input: { application: { type: string, description: "Raw benefits application text or JSON." } }
+        required: [application]
+
+  - target: mask-pii
+    lambda: ben-mask-pii
+    handler: mask_pii.py
+    kind: control
+    mcp_tools:
+      - name: mask_pii
+        description: "Fail-closed PII de-identification of an application (name, SSN, address, DOB, etc.); sets deidentified=true only if masking succeeded."
+        input: { case: { type: string, description: "Application text that may contain PII." } }
+        required: [case]
+
+  - target: assess-eligibility
+    lambda: ben-assess-eligibility
+    handler: assess_eligibility.py
+    kind: domain
+    mcp_tools:
+      - name: assess_eligibility
+        description: "Deterministic income-based eligibility + processing-clock determination (expedited vs standard) on de-identified decision fields; case must be masked first (deidentified true)."
+        input:
+          household_size: { type: integer, description: "Number of people in the household." }
+          monthly_income: { type: number, description: "Gross monthly household income." }
+          liquid_resources: { type: number, description: "Liquid resources (cash/savings)." }
+          categorical_eligibility: { type: boolean, description: "True if the household receives SSI/TANF/GA." }
+          deidentified: { type: boolean, description: "True if masked by mask_pii." }
+        required: [deidentified]
+
+  - target: ben-core
+    lambda: ben-core-tools
+    handler: benefits_core.py
+    kind: domain
+    guardrailed: true
+    mcp_tools:
+      - name: draft_notice
+        description: "Draft a de-identified benefits determination notice; case must be masked first."
+        input:
+          case: { type: string, description: "De-identified case + determination JSON/text." }
+          deidentified: { type: boolean, description: "True if masked by mask_pii." }
+        required: [case, deidentified]
+      - name: finalize_determination
+        description: "Commit a benefits determination; agent must never call this directly."
+        input: { case_id: { type: string, description: "Case id." } }
+        required: [case_id]
+
+  - target: write-audit
+    lambda: ben-write-audit
+    handler: write_audit.py
+    kind: control
+    mcp_tools:
+      - name: write_audit
+        description: "Append a tamper-evident audit record (append-only ledger + WORM copy); returns stored=false if the exact record already exists."
+        input:
+          icsr_id: { type: string, description: "Case/record id." }
+          action: { type: string, description: "Governed action being recorded." }
+          phase: { type: string, description: "INTENT or COMMITTED." }
+          actor: { type: string, description: "Who acted." }
+          payload: { type: string, description: "Evidence payload (JSON string)." }
+        required: [icsr_id, action, phase]
+
+  - target: request-signoff
+    lambda: ben-request-signoff
+    handler: request_signoff.py
+    kind: control
+    mcp_tools:
+      - name: request_signoff
+        description: "Request caseworker sign-off before committing a determination; starts a separation-of-duties approval workflow. The agent can never commit directly."
+        input:
+          icsr_id: { type: string, description: "Case/record id." }
+          requester: { type: string, description: "The caseworker requesting the commit." }
+        required: [icsr_id, requester]
+
+policies:
+  - { name: caseworker_permit, kind: permit, role_group: benefits_caseworker }
+  - { name: mask_before_assess, kind: forbid, action: assess_eligibility, unless_deidentified: true }
+  - { name: mask_before_draft,  kind: forbid, action: draft_notice,       unless_deidentified: true }
+  - { name: no_self_commit,     kind: forbid, action: finalize_determination }
+
+workflow:
+  entrypoint: agent.py
+  consequential_action: finalize_determination
+  steps:
+    - "intake_application - extract the non-PII decision fields from the raw application."
+    - "mask_pii - de-identify the raw application; use the returned masked_case for the notice and audit."
+    - "assess_eligibility - on the extracted fields with deidentified true, determine eligibility and the processing clock (expedited vs standard)."
+    - "draft_notice - draft the determination notice, passing the masked case and deidentified true."
+    - "write_audit - record an INTENT audit entry for the determination."
+    - "request_signoff - request caseworker sign-off to commit (a DIFFERENT qualified person must approve)."
+
+honesty_boundary:
+  stubbed: [verify_income, connect_system_of_record]
+  connectors: "state benefits system / eligibility system integration is customer engagement work"
+  not_certified: true
