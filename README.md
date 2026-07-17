@@ -118,3 +118,8 @@ human-gate workflow, the WORM audit design, the IaC, the tests. The adopter owns
 caseworker role mapping; validated connectors to the state benefits system of record; the authoritative
 program rules/thresholds and their legal review; computer-system validation; and production authorization
 to operate (StateRAMP / ATO). `verify_income` and system-of-record connectors ship as labeled stubs.
+
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).
