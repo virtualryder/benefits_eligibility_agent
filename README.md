@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
+> **Continuous validation.** CI runs render + unit + eval on every push. An **opt-in** end-to-end job (`.github/workflows/e2e.yml`, manual `workflow_dispatch`) deploys the spine to a sandbox AWS account, proves it live with the demo in ENFORCE, and tears it down — see the workflow header for one-time setup.
+
+
 A **governed** public-benefits eligibility & adjudication agent for State & Local Government. It
 intakes an application, de-identifies PII, determines eligibility and the processing clock, drafts a
 determination notice, and **pauses at a human sign-off gate** — a caseworker makes and commits the
