@@ -85,12 +85,16 @@ tool bodies + Cedar policies; the engine, control library, and runtime are reuse
 ```bash
 bash lib/engine/deploy.sh  agents/benefits-eligibility   # spine: engine -> gateway -> targets -> policies -> ENFORCE
 bash lib/engine/demo.sh    agents/benefits-eligibility   # 28-check governance proof
+bash lib/engine/redteam.sh agents/benefits-eligibility   # adversarial proof: governance holds under attack
 # Runtime (from a fresh venv):
 bash lib/runtime/setup_venv.sh
 bash lib/runtime/_obs_setup.sh  agents/benefits-eligibility
 bash lib/runtime/_configure.sh  agents/benefits-eligibility
 bash lib/runtime/_launch.sh     agents/benefits-eligibility
 bash lib/runtime/_invoke.sh     agents/benefits-eligibility caseworker   # or: bash invoke_demo.sh (with sample data)
+# Optional depth add-on — the governed OAuth connector (real outbound auth via AgentCore Identity, no stored secret):
+bash lib/connector/deploy_connector.sh agents/benefits-eligibility   # mock OAuth SoR (MOCK SoR) + Identity provider + verify_source
+bash lib/connector/prove_connector.sh  agents/benefits-eligibility   # proves OAuth + RS256/JWKS signature check + no secret + deny-by-default
 bash lib/engine/destroy.sh agents/benefits-eligibility   # zero-residual teardown (identity preserved)
 ```
 
@@ -103,10 +107,11 @@ placeholder defaults (`ChangeMe-*1!`) — rotate before shared use. Region/accou
 lib/engine/     manifest-driven engine: render.py + deploy/demo/destroy + deploy_identity + signoff.asl.tmpl
 lib/controls/   shared control tools: mask_pii, write_audit, request/approve/finalize sign-off, mcp_client
 lib/runtime/    generic Strands agent on AgentCore Runtime (agent.py + Dockerfile + toolkit helpers)
+lib/connector/  reusable governed OAuth connector: verify_source (token via AgentCore Identity, no stored secret) + deploy/prove scripts + RS256/JWKS-verified mock SoR
 agents/benefits-eligibility/
                 manifest.yaml (single source of truth) + tools/ (intake, assess_eligibility, redetermine, overpayment, benefits_core) + demo_extra.sh
 policies/       the seven Cedar policies (rendered from the manifest), human-readable + a README
-docs/           architecture note + Word guides (regulatory-adherence, SA runbook, maintenance)
+docs/           architecture note + Word guides (regulatory-adherence, SA runbook, maintenance, depth-evidence, cost/latency one-pager)
 ```
 
 The Cedar policies in `policies/` are the governance core — see `policies/README.md`. They are
@@ -119,7 +124,7 @@ The accelerator owns the governed agent, the Cedar policies, the tools, the fail
 human-gate workflow, the WORM audit design, the IaC, the tests. The adopter owns: IdP federation and
 caseworker role mapping; validated connectors to the state benefits system of record; the authoritative
 program rules/thresholds and their legal review; computer-system validation; and production authorization
-to operate (StateRAMP / ATO). `verify_income` and system-of-record connectors ship as labeled stubs.
+to operate (StateRAMP / ATO). The repo also ships a **real** governed OAuth connector — `verify_source` authenticates to a mock system of record via AgentCore Identity (no stored secret) and the SoR verifies the token's RS256 signature against the Cognito JWKS — as the reference pattern; connectors to the **production** system of record remain adopter work.
 
 
 ## License
