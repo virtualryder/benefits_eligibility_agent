@@ -1,5 +1,7 @@
 # Benefits Eligibility Agent — Governed Agentic AI on Amazon Bedrock AgentCore
 
+[![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
+
 A **governed** public-benefits eligibility & adjudication agent for State & Local Government. It
 intakes an application, de-identifies PII, determines eligibility and the processing clock, drafts a
 determination notice, and **pauses at a human sign-off gate** — a caseworker makes and commits the
