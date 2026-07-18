@@ -1,0 +1,10 @@
+{
+  "name": "benefits-doc-generators",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Source generators for the Benefits Eligibility AgentCore SA runbook, guides, and decks (regenerate the files in ../).",
+  "dependencies": {
+    "docx": "9.6.1",
+    "pptxgenjs": "4.0.1"
+  }
+}

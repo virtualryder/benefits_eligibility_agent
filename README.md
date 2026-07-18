@@ -111,7 +111,7 @@ lib/connector/  reusable governed OAuth connector: verify_source (token via Agen
 agents/benefits-eligibility/
                 manifest.yaml (single source of truth) + tools/ (intake, assess_eligibility, redetermine, overpayment, benefits_core) + demo_extra.sh
 policies/       the seven Cedar policies (rendered from the manifest), human-readable + a README
-docs/           architecture note + Word guides (regulatory-adherence, SA runbook, maintenance, depth-evidence, cost/latency one-pager)
+docs/           architecture note + Word guides (regulatory-adherence, SA runbook, maintenance, depth-evidence, cost/latency one-pager; generators/ regenerates the guides & decks)
 ```
 
 The Cedar policies in `policies/` are the governance core — see `policies/README.md`. They are
