@@ -65,7 +65,25 @@ Same runtime, invoked as a user who is **not** in the caseworker group:
 
 The agent gets an **empty toolset** and does nothing — governance is bound to the human identity the agent acts for, not to the agent's own privileges.
 
-> **Observability.** The runtime emits OpenTelemetry spans per agent/tool step; the GenAI Observability view (CloudWatch → *GenAI Observability → AgentCore*) renders the per-invocation trace and populates within ~10 minutes of first launch. The data-plane correlation above (invocation → WORM record with SHA-256 → sign-off execution → outsider deny) is the substantive, reproducible evidence; the console trace is the visual companion.
+### 1d. The captured trace — per-tool span timeline (Observability / X-Ray)
+
+With Transaction Search enabled, the runtime emits OpenTelemetry spans that X-Ray captures as a single per-invocation trace. The captured trace for the caseworker run (`1-6a5af167-…`, 37.5s) shows the agent's reasoning loop interleaved with each **governed tool call through the MCP gateway** — this is the structural proof that it runs as an *autonomous agent*, not a scripted sequence:
+
+```
+invoke_agent (Strands Agents)                         37.5s
+├─ mcp.session (governed AgentCore Gateway)           36.8s
+├─ execute_event_loop_cycle → chat → BedrockRuntime    7.5s   (agent reasons)
+├─ execute_tool  intake-application___intake_application 498ms
+├─ execute_tool  mask-pii___mask_pii                   2966ms
+├─ execute_event_loop_cycle → chat → BedrockRuntime    2.4s
+├─ execute_tool  assess-eligibility___assess_eligibility 440ms
+├─ execute_tool  ben-core___draft_notice               9565ms  (real Bedrock narrative)
+├─ execute_tool  write-audit___write_audit             4304ms  (WORM)
+├─ execute_event_loop_cycle → chat → BedrockRuntime    4.7s
+└─ execute_tool  request-signoff___request_signoff     3813ms  (human gate opened)
+```
+
+Every `execute_tool` span is a call through the Cedar-authorized gateway (`mcp.session`); the `chat`/`BedrockRuntime` spans are the agent deciding what to do next. The consequential `finalize_determination` never appears — the agent stops at `request_signoff`. This trace, plus the data-plane correlation in 1b (invocation → WORM record with SHA-256 → sign-off execution) and the outsider deny in 1c, is the full "it runs as a governed agent" evidence chain. The same view renders in the CloudWatch **GenAI Observability → AgentCore** console.
 
 ---
 
