@@ -56,7 +56,7 @@ const body = [
     ["AU — Audit & Accountability", "Immutable WORM audit of every decision and state change (append-only DynamoDB + S3 Object Lock), with identity-tagged, OTel-correlated logs.", "Live; agency sets retention and log aggregation."],
     ["SI — System & Information Integrity", "Fail-closed PII masking and a fail-closed Bedrock output guardrail (PII anonymize + prompt-attack HIGH) on every drafted notice.", "Live; agency tunes guardrail policy."],
     ["IA — Identification & Authentication", "JWT inbound authorizer validates the caseworker before any tool runs.", [{ text: "Agency: ", bold: true }, "IdP federation, MFA, and account lifecycle."]],
-    ["CA/CM — Assessment & Configuration Mgmt", "Reproducible, manifest-driven infrastructure-as-code and a 28-check governance test harness that runs in enforcement mode.", [{ text: "Agency: ", bold: true }, "the StateRAMP authorization package and continuous monitoring."]],
+    ["CA/CM — Assessment & Configuration Mgmt", "Reproducible, manifest-driven infrastructure-as-code and a 29-check governance test harness that runs in enforcement mode.", [{ text: "Agency: ", bold: true }, "the StateRAMP authorization package and continuous monitoring."]],
   ], [2500, 4240, 3700]),
 
   H1("7. Separation of duties & the human sign-off gate"),
@@ -76,7 +76,7 @@ const body = [
     ["The human sign-off workflow (separation of duties)", "Validated connectors to the state benefits system of record"],
     ["The deterministic eligibility rules engine (illustrative defaults)", "The authoritative program rules/thresholds and their legal review"],
     ["The immutable WORM audit design", "Data-retention policy and records management"],
-    ["Reproducible IaC + the 28-check governance harness", "Notice language, appeal rights, and the fair-hearing process (legal review)"],
+    ["Reproducible IaC + the 29-check governance harness", "Notice language, appeal rights, and the fair-hearing process (legal review)"],
     ["Documentation (this guide, the runbook, maintenance)", "Pub 1075 safeguarding program and the safeguard security report, where FTI is used"],
   ], [5220, 5220]),
 

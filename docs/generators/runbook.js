@@ -14,7 +14,7 @@ const body = [
   bullet([bold("Identity stack "), "— a stable Amazon Cognito user pool, app client, and test users. Long-lived; not touched by spine redeploys."]),
   bullet([bold("Governance spine "), "— the Cedar policy engine, AgentCore Gateway, tool Lambdas, Bedrock Guardrail, WORM audit stores, and the Step Functions human sign-off gate. Reproducible; stood up and torn down as a unit."]),
   bullet([bold("Runtime agent "), "— the generic Strands agent, containerized and deployed to AgentCore Runtime with a Cognito JWT inbound authorizer; its workflow prompt is rendered from the manifest."]),
-  P(["The whole spine deploys with one command, proves itself with a 28-check governance demo, and tears down with zero residual. Everything is driven from ", code("agents/benefits-eligibility/manifest.yaml"), " — the engine, control library, and runtime are shared across agents."]),
+  P(["The whole spine deploys with one command, proves itself with a 29-check governance demo, and tears down with zero residual. Everything is driven from ", code("agents/benefits-eligibility/manifest.yaml"), " — the engine, control library, and runtime are shared across agents."]),
   callout("Honesty boundary", [["This is an accelerator, not a production-certified system. Authorization to operate (StateRAMP / ATO), IdP federation, validated connectors to the state benefits system of record, the authoritative program rules, and legal review of notices are agency responsibilities. See the Regulatory-Adherence Guide."]], G.colors.AMBER, "FBF3E7"),
 
   H1("2. Prerequisites"),
@@ -69,8 +69,8 @@ const body = [
   callout("Run cycles serialized", [["Do not run two spine deploys concurrently — overlapping runs collide on the policy-engine name. Deploy takes roughly three to four minutes end to end."]], G.colors.TEAL),
 
   P([bold("Tamper-evident audit. "), "The demo also proves the audit ledger is ", bold("hash-chained"), ": each record embeds the prior record’s hash (", code("chain_hash = SHA-256(prev_hash + entry_hash)"), "), so editing, reordering, or deleting any record breaks every link after it — on top of the append-only + Object-Lock guarantees. ", code("lib/controls/verify_chain.py"), " replays the links and reports INTACT or the first broken record."]),
-  H2("Step 3 — Prove the governance (28 checks)"),
-  P("Mints caseworker and outsider tokens and exercises the full governed workflow live, in ENFORCE mode. Expect 28 passed / 0 failed."),
+  H2("Step 3 — Prove the governance (29 checks)"),
+  P("Mints caseworker and outsider tokens and exercises the full governed workflow live, in ENFORCE mode. Expect 29 passed / 0 failed."),
   ...codeBlock(["bash lib/engine/demo.sh agents/benefits-eligibility"]),
   P("The demo proves deny-by-default (caseworker ALLOW / outsider DENY), the mask-before-assess and mask-before-draft forbids and no-self-commit (each denial names the exact Cedar policy), real PII masking (name/SSN redaction), the eligibility determination + processing clock (using the authoritative 2026 HHS poverty guidelines, with the source stamped into the determination), a real Bedrock determination notice through the Guardrail, the immutable WORM audit (write-once + duplicate rejection), and the human sign-off gate (separation of duties + single-use token)."),
   P([bold("Deeper caseload workflows (step two). "), "The demo also exercises the deeper workflows, each a governed tool with its own Cedar control: ", code("redetermine"), " (a changed-circumstances re-determination that, on an ADVERSE result, flags that timely advance due-process notice is required — Goldberg v. Kelly), ", code("detect_overpayment"), " (deterministic overpayment math), and ", code("refer_fraud"), " — a consequential, human-only action the agent can never take (forbidden by ", code("no_self_fraud_referral"), "). The pattern is the point: every new high-risk action is a tool body plus its own deny-by-default forbid."]),
@@ -112,7 +112,7 @@ const body = [
   H1("6. Validation checklist"),
   bullet([code("deploy_identity.sh"), " → identity-state.env written; pool visible in Cognito."]),
   bullet([code("deploy.sh"), " → ends with a ", code("Gateway URL: … (mode ENFORCE)"), " line and ", code("spine-state.env"), " written."]),
-  bullet([code("demo.sh"), " → ", code("28 passed, 0 failed"), " / ", code("GOVERNANCE DEMO: PASS"), "."]),
+  bullet([code("demo.sh"), " → ", code("29 passed, 0 failed"), " / ", code("GOVERNANCE DEMO: PASS"), "."]),
   bullet(["SSM parameter ", code("/ben-eligibility/gateway-url"), " exists and matches the live gateway."]),
   bullet(["Runtime invoke: caseworker → workflow summary; outsider → ACCESS DENIED."]),
   bullet(["CloudWatch log group ", code("/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-*-DEFAULT"), " shows per-step, identity-tagged logs."]),

@@ -35,7 +35,7 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
   s.addText("Governed Agentic AI,\nProven in Public-Benefits Eligibility", { x: 0.66, y: 1.95, w: 11.4, h: 2.1, fontFace: TF, fontSize: 40, bold: true, color: WHITE, lineSpacingMultiple: 1.02, margin: 0 });
   s.addText("A public-benefits eligibility accelerator running natively on Amazon Bedrock AgentCore — identity-bound, deny-by-default with Cedar, and proven end-to-end on AWS. Built from the same template as the pharmacovigilance agent.",
     { x: 0.7, y: 4.15, w: 9.7, h: 1.0, fontFace: BF, fontSize: 16, color: ICE, lineSpacingMultiple: 1.15, margin: 0 });
-  const chips = ["28 / 28 live governance checks", "Agent native on Runtime", "Built from a reusable template"];
+  const chips = ["29 / 29 live governance checks", "Agent native on Runtime", "Built from a reusable template"];
   let cx = 0.7;
   chips.forEach((c) => {
     const w = 0.42 + c.length * 0.098;
@@ -219,8 +219,8 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
 (() => {
   const s = p.addSlide(); bg(s, CLOUD);
   eyebrow(s, "Evidence");
-  title(s, "Proof, not slideware: 28 / 28 governance checks, live on AWS");
-  const stats = [["28/28", "governance checks pass", MINT], ["6", "controls native on AgentCore", TEAL], ["3", "regulated controls built & proven", AMBER], ["0", "residual on teardown", NAVY]];
+  title(s, "Proof, not slideware: 29 / 29 governance checks, live on AWS");
+  const stats = [["29/29", "governance checks pass", MINT], ["6", "controls native on AgentCore", TEAL], ["3", "regulated controls built & proven", AMBER], ["0", "residual on teardown", NAVY]];
   const sw = 2.9, gap = 0.23, x0 = 0.62, y = 1.5;
   stats.forEach((st, i) => {
     const x = x0 + i * (sw + gap);
@@ -248,7 +248,7 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
     s.addText(t, { x: x + 0.44, y: yy - 0.05, w: cw, h: 0.44, valign: "middle", fontFace: BF, fontSize: 12, color: INK, margin: 0 });
   });
   footer(s, 8);
-  s.addNotes("The credibility slide. A reproducible, one-command demo stands the stack up, proves 28 checks in ENFORCE mode, and tears down with zero residual. Four more checks than PV because there are two mask-before forbids and a distinct rules-engine assertion.");
+  s.addNotes("The credibility slide. A reproducible, one-command demo stands the stack up, proves 29 checks in ENFORCE mode, and tears down with zero residual. The count reflects two mask-before forbids and a distinct rules-engine assertion.");
 })();
 
 /* 9. RUNTIME + IDENTITY */
@@ -372,7 +372,7 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
     s.addText(v[2], { x: x + w / 2 - 0.6, y: y + 1.36, w: 1.2, h: 0.3, align: "center", valign: "middle", color: NAVY, fontFace: BF, fontSize: 10, bold: true, margin: 0 });
   });
   s.addText("THE ASK", { x: 0.62, y: 4.65, w: 4, h: 0.35, fontFace: BF, fontSize: 12.5, bold: true, color: MINT, charSpacing: 2, margin: 0 });
-  const asks = [["1", "Internal demo", "Stand up the stack live and walk leadership through the 28-check proof."], ["2", "Agency workshops", "Take the pattern to SLG accounts as a reference architecture."], ["3", "Scoped pilot", "A pilot on synthetic applications with a named agency, boundary made explicit."]];
+  const asks = [["1", "Internal demo", "Stand up the stack live and walk leadership through the 29-check proof."], ["2", "Agency workshops", "Take the pattern to SLG accounts as a reference architecture."], ["3", "Scoped pilot", "A pilot on synthetic applications with a named agency, boundary made explicit."]];
   asks.forEach((a, i) => {
     const x = 0.62 + i * 4.06;
     circle(s, x, 5.15, 0.5, MINT, a[0], NAVY, 16);

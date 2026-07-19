@@ -57,7 +57,7 @@ SSM and validates the caseworker's Cognito JWT.
 ## Tests — proven live in ENFORCE
 
 `bash lib/engine/demo.sh agents/benefits-eligibility` exercises the full governed workflow against the
-deployed system with Cedar in **ENFORCE**, and reports `28 passed, 0 failed / GOVERNANCE DEMO: PASS`:
+deployed system with Cedar in **ENFORCE**, and reports `29 passed, 0 failed / GOVERNANCE DEMO: PASS`:
 deny-by-default (caseworker ALLOW / outsider DENY), fail-closed PII masking, the mask-before forbids
 firing *by name*, the eligibility determination + processing clock (with the authoritative 2026 HHS
 poverty guidelines and provenance), a real guarded Bedrock notice, the append-only, tamper-evident WORM audit (write-once +
@@ -77,7 +77,7 @@ The higher-risk the action, the stronger the governance. Beyond intake/screening
   suspected fraud. Forbidden by Cedar `no_self_fraud_referral` — the same deny-by-default pattern as
   `no_self_commit`, showing the model scales to every new high-risk action.
 
-All three are proven live in the 28-check demo.
+All three are proven live in the 29-check demo.
 
 ## Deploy / prove / run / tear down
 
@@ -87,7 +87,7 @@ tool bodies + Cedar policies; the engine, control library, and runtime are reuse
 
 ```bash
 bash lib/engine/deploy.sh  agents/benefits-eligibility   # spine: engine -> gateway -> targets -> policies -> ENFORCE
-bash lib/engine/demo.sh    agents/benefits-eligibility   # 28-check governance proof
+bash lib/engine/demo.sh    agents/benefits-eligibility   # 29-check governance proof
 bash lib/engine/redteam.sh agents/benefits-eligibility   # adversarial proof: governance holds under attack
 # Runtime (from a fresh venv):
 bash lib/runtime/setup_venv.sh
