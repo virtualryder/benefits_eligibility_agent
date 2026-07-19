@@ -60,7 +60,7 @@ SSM and validates the caseworker's Cognito JWT.
 deployed system with Cedar in **ENFORCE**, and reports `28 passed, 0 failed / GOVERNANCE DEMO: PASS`:
 deny-by-default (caseworker ALLOW / outsider DENY), fail-closed PII masking, the mask-before forbids
 firing *by name*, the eligibility determination + processing clock (with the authoritative 2026 HHS
-poverty guidelines and provenance), a real guarded Bedrock notice, the immutable WORM audit (write-once +
+poverty guidelines and provenance), a real guarded Bedrock notice, the append-only, tamper-evident WORM audit (write-once +
 duplicate rejection), `no_self_commit`, and the human sign-off gate (separation of duties + single-use
 token).
 

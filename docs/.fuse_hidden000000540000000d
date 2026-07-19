@@ -25,7 +25,7 @@ Workflow Complete — CASE-2026-0700
 `tools_available` returned by the runtime (the exact set Cedar authorized for this caseworker):
 `intake-application, mask-pii, assess-eligibility, redetermine, detect_overpayment, draft_notice, write-audit, request-signoff`. Note the consequential `finalize_determination` and `refer_fraud` are **absent** — the agent is never handed them.
 
-### 1b. Correlation — the run ties to the tamper-evident audit and the human gate
+### 1b. Correlation — the run ties to the immutable audit and the human gate
 
 **WORM audit ledger record** (DynamoDB `ben-audit`), pulled by `audit_id`:
 
@@ -108,7 +108,7 @@ Every `execute_tool` span is a call through the Cedar-authorized gateway (`mcp.s
 === RED-TEAM: 8 blocked, 0 leaked ===  RED-TEAM: PASS (governance held under attack)
 ```
 
-Each attack maps to a distinct architectural control:
+Each attack maps to a distinct architectural guarantee:
 
 - **A / B** — even if the agent is fully convinced to "finalize now" or "skip masking and proceed on raw data," the call is a **Gateway call**, and Cedar denies it *before the tool body runs*. A jailbreak of the model cannot rewrite the policy.
 - **C** — masking is **deterministic** (Amazon Comprehend `DetectPiiEntities`), so "do not redact" instructions in the document are inert; the name and SSN are redacted regardless.
@@ -158,4 +158,4 @@ What this demonstrates for an adopter: swapping the mock system of record for a 
 
 ## Why these three matter for adoption
 
-The happy-path demo proves the controls work when everything cooperates. These two prove the harder claims a security-minded reviewer actually asks: the thing **runs as an autonomous agent** (not a scripted sequence of API calls) and produces tamper-evident, hash-chained evidence, **and it stays governed when the agent is adversarial**. Together they move the story from "governed tools" to "a governed agent you can put in front of an ATO reviewer."
+The happy-path demo proves the controls work when everything cooperates. These two prove the harder claims a security-minded reviewer actually asks: the thing **runs as an autonomous agent** (not a scripted sequence of API calls) and produces court-defensible evidence, **and it stays governed when the agent is adversarial**. Together they move the story from "governed tools" to "a governed agent you can put in front of an ATO reviewer."
