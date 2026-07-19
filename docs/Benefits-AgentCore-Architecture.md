@@ -1,12 +1,12 @@
 # Benefits Eligibility Agent — AgentCore-Native Architecture
 
-*Target architecture for the public-benefits eligibility & adjudication hero agent, built natively on Amazon Bedrock AgentCore. This note is the anchor design — it doubles as the opening of the leadership deck and the first section of the SA runbook. It is the SLG counterpart to the pharmacovigilance (HCLS) agent, produced from the same reusable governed-hero-agent template. Draft v1.0 · 2026-07.*
+*Target architecture for the public-benefits eligibility-screening & determination-support hero agent, built natively on Amazon Bedrock AgentCore. This note is the anchor design — it doubles as the opening of the leadership deck and the first section of the SA runbook. It is the SLG counterpart to the pharmacovigilance (HCLS) agent, produced from the same reusable governed-hero-agent template. Draft v1.0 · 2026-07.*
 
 ---
 
 ## 1. What this agent does (the regulated workflow)
 
-Public-benefits intake is high-volume, time-critical eligibility work: SNAP, Medicaid, TANF, unemployment insurance, and general assistance. When an application arrives, a regulated adjudication workflow must run end to end:
+Public-benefits intake is high-volume, time-critical eligibility work: SNAP, Medicaid, TANF, unemployment insurance, and general assistance. When an application arrives, a regulated eligibility-determination workflow must run end to end:
 
 **intake the application → de-identify PII → assess eligibility and the processing clock (expedited vs. standard) → draft a determination notice → a qualified caseworker reviews and signs off → the determination is committed to the benefits system of record.**
 
@@ -63,7 +63,7 @@ AWS now ships, in Amazon Bedrock AgentCore, the governance primitives a regulate
 
 ## 6a. Deeper caseload workflows (step two)
 
-Beyond intake and adjudication, the agent adds the workflows a real caseload needs — each a **new governed tool with its own Cedar control**, following one rule: the higher-risk the action, the stronger the governance.
+Beyond intake and screening, the agent adds the workflows a real caseload needs — each a **new governed tool with its own Cedar control**, following one rule: the higher-risk the action, the stronger the governance.
 
 - **`redetermine`** — changed-circumstances re-determination. It re-runs the rules on new facts, classifies the change, and on an **ADVERSE** result (a reduction or termination) flags that **timely, adequate advance written notice** and a fair-hearing right are required *before* the action takes effect (*Goldberg v. Kelly*). Fail-closed (`mask_before_redetermine`).
 - **`detect_overpayment`** — deterministic overpayment math over a recovery period. Recovery and any referral remain human decisions. Fail-closed (`mask_before_overpayment`).

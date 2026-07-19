@@ -1,12 +1,13 @@
 # benefits-eligibility/manifest.yaml
-# SLG flagship: a governed public-benefits eligibility & adjudication agent, built on the same
+# SLG vertical: a governed public-benefits eligibility-screening & determination-support agent (a human
+# caseworker makes and commits the determination), built on the same
 # governed-hero-agent pattern as the pharmacovigilance agent. The agent screens and recommends; a
 # caseworker makes and commits the determination at the human sign-off gate. render.py turns this
 # manifest into the deploy inputs.
 
 agent:
   slug: benefits-eligibility
-  title: Benefits Eligibility and Adjudication
+  title: Benefits Eligibility Screening and Determination Support
   industry: SLG
   region: us-east-1
   prefix: ben
@@ -161,8 +162,8 @@ tools:
         description: "Request caseworker sign-off before committing a determination; starts a separation-of-duties approval workflow. The agent can never commit directly."
         input:
           icsr_id: { type: string, description: "Case/record id." }
-          access_token: { type: string, description: "The requester's validated Cognito access token; the requester identity is derived from it (P0-5), never from a name field." }
-        required: [icsr_id, access_token]
+          requester: { type: string, description: "The caseworker requesting the commit." }
+        required: [icsr_id, requester]
 
 policies:
   - { name: caseworker_permit,        kind: permit, role_group: benefits_caseworker }

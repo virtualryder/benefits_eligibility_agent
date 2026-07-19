@@ -5,7 +5,7 @@
 > **Continuous validation.** CI runs render + unit + eval on every push. An **opt-in** end-to-end job (`.github/workflows/e2e.yml`, manual `workflow_dispatch`) deploys the spine to a sandbox AWS account, proves it live with the demo in ENFORCE, and tears it down — see the workflow header for one-time setup.
 
 
-A **governed** public-benefits eligibility & adjudication agent for State & Local Government. It
+A **governed** public-benefits eligibility-screening & determination-support agent for State & Local Government. It
 intakes an application, de-identifies PII, determines eligibility and the processing clock, drafts a
 determination notice, and **pauses at a human sign-off gate** — a caseworker makes and commits the
 determination; the agent never self-adjudicates. Built on the same governed-hero-agent pattern as the
@@ -66,7 +66,7 @@ token).
 
 ### Deeper caseload workflows (each a governed tool + its own Cedar control)
 
-The higher-risk the action, the stronger the governance. Beyond intake/adjudication, the agent adds:
+The higher-risk the action, the stronger the governance. Beyond intake/screening, the agent adds:
 
 - **`redetermine`** — changed-circumstances re-determination that classifies the change and, on an
   **ADVERSE** result (a reduction or termination), flags that **timely advance due-process notice** is
