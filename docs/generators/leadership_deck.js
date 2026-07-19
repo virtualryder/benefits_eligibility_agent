@@ -32,7 +32,7 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
   s.addShape(p.ShapeType.ellipse, { x: 10.4, y: -0.9, w: 4.2, h: 4.2, fill: { color: "18466F" }, line: { type: "none" } });
   s.addShape(p.ShapeType.ellipse, { x: 11.25, y: -0.05, w: 2.5, h: 2.5, fill: { color: TEAL }, line: { type: "none" } });
   s.addText("AMAZON BEDROCK AGENTCORE  ·  STATE & LOCAL GOVERNMENT", { x: 0.7, y: 1.35, w: 11, h: 0.4, fontFace: BF, fontSize: 13, bold: true, color: MINT, charSpacing: 2, margin: 0 });
-  s.addText("Governed Agentic AI,\nProven in Public-Benefits Adjudication", { x: 0.66, y: 1.95, w: 11.4, h: 2.1, fontFace: TF, fontSize: 40, bold: true, color: WHITE, lineSpacingMultiple: 1.02, margin: 0 });
+  s.addText("Governed Agentic AI,\nProven in Public-Benefits Eligibility", { x: 0.66, y: 1.95, w: 11.4, h: 2.1, fontFace: TF, fontSize: 40, bold: true, color: WHITE, lineSpacingMultiple: 1.02, margin: 0 });
   s.addText("A public-benefits eligibility accelerator running natively on Amazon Bedrock AgentCore — identity-bound, deny-by-default with Cedar, and proven end-to-end on AWS. Built from the same template as the pharmacovigilance agent.",
     { x: 0.7, y: 4.15, w: 9.7, h: 1.0, fontFace: BF, fontSize: 16, color: ICE, lineSpacingMultiple: 1.15, margin: 0 });
   const chips = ["28 / 28 live governance checks", "Agent native on Runtime", "Built from a reusable template"];
@@ -136,7 +136,7 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
 (() => {
   const s = p.addSlide(); bg(s, CLOUD);
   eyebrow(s, "The hero use case");
-  title(s, "Benefits eligibility: adjudicating a SNAP / Medicaid application");
+  title(s, "Benefits eligibility: determining eligibility from a SNAP / Medicaid application");
   const steps = ["Intake the\napplication", "De-identify\nPII", "Assess eligibility\n& processing clock", "Draft the\ndetermination notice", "Caseworker\nsign-off", "Commit the\ndetermination"];
   const n = steps.length, w = 1.86, gap = 0.15, x0 = 0.62, y = 1.85, h = 1.35;
   steps.forEach((t, i) => {
