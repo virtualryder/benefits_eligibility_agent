@@ -61,8 +61,19 @@ def _draft(e):
         notice = resp["output"]["message"]["content"][0]["text"].strip()
         if resp.get("stopReason") == "guardrail_intervened" and not notice:
             return {"error": "output guardrail blocked the draft (fail-closed)", "drafted_by": None, "guardrail": "BLOCKED"}
-        return {"drafted_by": DRAFT_MODEL_ID, "chars": len(notice),
-                "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True, "notice": notice}
+        out = {"drafted_by": DRAFT_MODEL_ID, "chars": len(notice),
+               "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True}
+        # R3-2 pass-by-reference for the DRAFT OUTPUT: even though the notice is drafted from
+        # de-identified content, a redaction gap could leave PII in the text — so it must never travel
+        # in Step Functions state or telemetry. With a case store configured, store the notice
+        # server-side and return ONLY an opaque notice_ref; the caseworker retrieves it at sign-off.
+        import os
+        if os.environ.get("CASE_TABLE"):
+            import case_store
+            out["notice_ref"] = case_store.put_case(notice, kind="notice")
+        else:
+            out["notice"] = notice
+        return out
     except (BotoCoreError, ClientError, KeyError, IndexError) as exc:
         return {"error": "draft failed: " + type(exc).__name__ + ": " + str(exc), "drafted_by": None}
 

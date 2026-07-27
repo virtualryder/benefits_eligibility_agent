@@ -2,7 +2,17 @@
 
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
-> **Part of the Governed Agent Platform.** This agent shares one versioned governance core (`governed-core`) with the sibling verticals and is being consolidated into the [governed-agent-platform](https://github.com/virtualryder/governed-agent-platform) monorepo, whose direction is AWS CDK infrastructure-as-code. **In this standalone repo the current deploy path is the shell engine (`lib/engine/`); a CDK stack set is not yet ported here** (see the financial-aid agent for the reference CDK port). Do not read "CDK IaC" as available in this repo today.
+> **SUPPORTED DEPLOYMENT PATH — read this first.** The ONE supported path is **AWS CDK at the validated
+> release tag [`v0.1.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.0-pilot-rc1)**
+> (`cdk/ben_stacks`, 7 stacks, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
+> per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md); the
+> tag was cut AFTER the EP1 live validation captured its evidence (2026-07-27 — `evidence/EP1-VALIDATION.md`).
+> The shell engine (`lib/engine/`) is **legacy/internal reference only**. Product framing: a governed
+> eligibility **screening & determination-support Assistant** — it never adjudicates, denies, reduces,
+> terminates, or refers fraud (`PILOT-SCOPE.md`).
+>
+> *Part of the Governed Agent Platform: shares one versioned governance core with the sibling verticals,
+> also consolidated into the [governed-agent-platform](https://github.com/virtualryder/governed-agent-platform) monorepo.*
 
 > **Continuous validation.** On every push CI runs the **governance-core integrity gate** (`lib/verify_core.py`, so the shared core must match its pinned `core.lock` and drift cannot merge unnoticed), manifest render, the unit + eval suite, and a bug-class lint, plus a **supply-chain job** that audits the pinned runtime dependencies (`pip-audit`) and emits a CycloneDX SBOM. An **opt-in** end-to-end job (`.github/workflows/e2e.yml`, manual `workflow_dispatch`) deploys the spine to a sandbox AWS account, proves it live with the demo in ENFORCE, and tears it down — see the workflow header for one-time setup.
 
@@ -28,9 +38,13 @@ from a reusable, manifest-driven template.
 > the trusted runtime injects it out-of-band (P0-3). A **deterministic guard set** (`workflow_guards.py`)
 > gives a Step Functions controller the machine-verifiable transition evidence to branch on — including a
 > **due-process advance-notice HOLD** on any adverse redetermination — so eligibility/masking/notice
-> cannot be skipped by the model (P0-2). Remaining to reach the financial-aid agent's pilot depth: the
-> CDK stack set + Gate-B posture, an EP1-style live validation, a tagged release + manifest, and the
-> operating-model doc bundle — see `PILOT-SCOPE.md`. Suite: **73 offline tests**.
+> cannot be skipped by the model (P0-2). **Now at the sibling agents' pilot depth: the full 7-stack AWS
+> CDK set + Gate-B posture (zero public egress · CMK · MFA identity · tenant pin), R3-2 pass-by-reference
+> (both directions), release discipline + manifest, and the operating-model doc bundle — all live
+> EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
+> controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
+> redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.0-pilot-rc1`. Suite: **91 offline tests**.
 
 ---
 

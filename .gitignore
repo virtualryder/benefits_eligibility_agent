@@ -25,3 +25,6 @@ docs/*.pdf
 
 # Node deps for docs/generators
 node_modules/
+
+cdk/cdk.out/
+cdk.out/

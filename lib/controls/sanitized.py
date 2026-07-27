@@ -15,7 +15,7 @@ import provenance  # shared HMAC signer/verifier (bundled beside this module at 
 # `{"case":"<unmasked PHI>","deidentified":true}` satisfied both the Cedar forbid and the in-body
 # check. A flag you can type is not a control.
 #
-# THE FIX (same pattern as the openFDA provenance signer, provenance.py): the ONLY component that
+# THE FIX (same pattern as the authoritative-source provenance signer, provenance.py): the ONLY component that
 # actually performed the masking (mask_pii, which alone ran Comprehend DetectPiiEntities) MINTS a
 # signed sanitized-artifact reference over the EXACT masked content:
 #
@@ -39,7 +39,7 @@ import provenance  # shared HMAC signer/verifier (bundled beside this module at 
 # reference, never on the boolean. Fail-closed everywhere: no secret, no ref, bad signature, or a hash
 # mismatch all refuse — they never degrade to trusting the caller.
 #
-# NOTE (scope): this port uses the single per-deploy PROVENANCE_SECRET that already signs openFDA
+# NOTE (scope): this port uses the single per-deploy PROVENANCE_SECRET (the single trust domain for benefits: only mask_pii signs a sanitized_ref)
 # provenance here. Splitting the masking key from the source-provenance key (GA-2 domain-split, as in
 # the financial-aid agent) is a follow-on hardening; it is not required for the boolean->ref fix.
 
