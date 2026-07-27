@@ -44,8 +44,10 @@ def _eligible(hh, income, categorical):
 
 def handler(event, context):
     e = _coerce(event)
-    if e.get("deidentified") is not True:
-        return {"redetermined": False, "error": "refused: case is not de-identified (deidentified must be true)",
+    import sanitized
+    if not sanitized.verify_ref(e.get("sanitized_ref")):
+        return {"redetermined": False,
+                "error": "refused: de-identification not proven (a valid sanitized_ref signed by mask_pii is required; a boolean is not proof)",
                 "deidentified_input": e.get("deidentified")}
 
     hh = e.get("household_size")

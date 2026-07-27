@@ -8,7 +8,7 @@ Rules basis (assess_eligibility): 2026 HHS poverty guidelines — FPL base 15960
 gross limit 130% FPL; expedited when gross monthly income < 150 AND liquid resources <= 100.
 """
 import pytest
-from toolkit import call
+from toolkit import call, make_sanitized_ref
 
 # (label, input, expected-subset) — every key in the expected dict must match the tool output.
 GOLDEN = [
@@ -43,6 +43,8 @@ NEGATIVE = [n for n in NEGATIVE if n[2] is not None]
 
 @pytest.mark.parametrize("label,inp,expected", GOLDEN, ids=[g[0] for g in GOLDEN])
 def test_golden_determination(label, inp, expected):
+    # P0-1: masking is proven by a signed sanitized_ref (assess reads numeric fields, not case text).
+    inp = dict(inp, sanitized_ref=make_sanitized_ref())
     r = call("assess_eligibility", inp)
     for k, v in expected.items():
         assert r.get(k) == v, f"{label}: {k} expected {v!r}, got {r.get(k)!r}"

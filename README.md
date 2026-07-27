@@ -2,22 +2,35 @@
 
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
-> **Part of the Governed Agent Platform.** This agent is being consolidated into the [governed-agent-platform](https://github.com/virtualryder/governed-agent-platform) monorepo, where all four verticals share one versioned governance core (`governed-core`) and deploy via AWS CDK infrastructure-as-code (deployed + validated live) in place of the shell engine. This repo remains the standalone, shell-deployable reference.
+> **Part of the Governed Agent Platform.** This agent shares one versioned governance core (`governed-core`) with the sibling verticals and is being consolidated into the [governed-agent-platform](https://github.com/virtualryder/governed-agent-platform) monorepo, whose direction is AWS CDK infrastructure-as-code. **In this standalone repo the current deploy path is the shell engine (`lib/engine/`); a CDK stack set is not yet ported here** (see the financial-aid agent for the reference CDK port). Do not read "CDK IaC" as available in this repo today.
 
 > **Continuous validation.** On every push CI runs the **governance-core integrity gate** (`lib/verify_core.py`, so the shared core must match its pinned `core.lock` and drift cannot merge unnoticed), manifest render, the unit + eval suite, and a bug-class lint, plus a **supply-chain job** that audits the pinned runtime dependencies (`pip-audit`) and emits a CycloneDX SBOM. An **opt-in** end-to-end job (`.github/workflows/e2e.yml`, manual `workflow_dispatch`) deploys the spine to a sandbox AWS account, proves it live with the demo in ENFORCE, and tears it down — see the workflow header for one-time setup.
 
 
-A **governed** public-benefits eligibility-screening & determination-support agent for State & Local Government. It
-intakes an application, de-identifies PII, determines eligibility and the processing clock, drafts a
-determination notice, and **pauses at a human sign-off gate** — a caseworker makes and commits the
-determination; the agent never self-adjudicates. Built on the same governed-hero-agent pattern as the
-pharmacovigilance agent, from a reusable, manifest-driven template.
+A **governed** public-benefits eligibility-**screening** & determination-**support** assistant for State &
+Local Government. It intakes an application, de-identifies PII, runs a deterministic **eligibility screen +
+estimate** and the processing clock, prepares redetermination/overpayment findings, drafts a determination
+notice, and **pauses at a human sign-off gate** — a caseworker makes and commits the determination; the
+assistant never adjudicates, denies, reduces, terminates, or refers fraud on its own. Because benefits
+determinations are **due-process protected** (Goldberg v. Kelly), every adverse action stays human-committed
+with notice and appeal rights. Built on the same governed-hero-agent pattern as the pharmacovigilance agent,
+from a reusable, manifest-driven template.
 
 > **Accelerator, not a certification.** Reference implementation of the *pattern*. Not a
 > production-certified system. Computer-system validation, IdP federation, connectors to the state's
 > benefits system of record, authoritative program rules, and the authorization to operate (StateRAMP /
 > ATO) remain the adopter's responsibility. Poverty guidelines and program thresholds here are
 > **illustrative federal defaults** — configure per program, state, and year.
+
+> **Control-plane hardening (ported from the financial-aid/housing agents).** De-identification is now
+> proven by a **mask_pii-signed `sanitized_ref`** with content binding — the spoofable `deidentified`
+> boolean is no longer accepted by any tool (P0-1). The bearer token is **out of every tool schema**;
+> the trusted runtime injects it out-of-band (P0-3). A **deterministic guard set** (`workflow_guards.py`)
+> gives a Step Functions controller the machine-verifiable transition evidence to branch on — including a
+> **due-process advance-notice HOLD** on any adverse redetermination — so eligibility/masking/notice
+> cannot be skipped by the model (P0-2). Remaining to reach the financial-aid agent's pilot depth: the
+> CDK stack set + Gate-B posture, an EP1-style live validation, a tagged release + manifest, and the
+> operating-model doc bundle — see `PILOT-SCOPE.md`. Suite: **73 offline tests**.
 
 ---
 

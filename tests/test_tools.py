@@ -1,7 +1,7 @@
 """Unit tests for the benefits-eligibility governed tools — contract + fail-closed behavior.
 No AWS: only the deterministic paths and the deny-branches are exercised (the model/masking calls
 are covered by the live demo, not here)."""
-from toolkit import call
+from toolkit import call, make_sanitized_ref
 
 
 def test_intake_extracts_decision_fields():
@@ -13,11 +13,12 @@ def test_intake_extracts_decision_fields():
 def test_assess_is_fail_closed_on_unmasked():
     r = call("assess_eligibility", {"household_size": 4, "monthly_income": 2500, "deidentified": False})
     assert r["assessed"] is False
-    assert "de-identified" in r["error"]
+    assert "de-identif" in r["error"]
 
 
 def test_assess_eligible_path():
-    r = call("assess_eligibility", {"household_size": 4, "monthly_income": 2500, "deidentified": True})
+    r = call("assess_eligibility", {"household_size": 4, "monthly_income": 2500,
+                                    "sanitized_ref": make_sanitized_ref()})
     assert r["determination"] == "ELIGIBLE"
     assert r["eligible"] is True
     assert r["fpl_year"] == 2026
@@ -25,14 +26,14 @@ def test_assess_eligible_path():
 
 def test_redetermine_adverse_requires_advance_notice():
     r = call("redetermine", {"household_size": 4, "monthly_income": 9000,
-                             "prior_eligible": True, "deidentified": True})
+                             "prior_eligible": True, "sanitized_ref": make_sanitized_ref()})
     assert r["change_type"] == "ADVERSE"
     assert r["advance_notice_required"] is True
 
 
 def test_overpayment_math():
     r = call("overpayment", {"prior_monthly_benefit": 500, "corrected_monthly_benefit": 300,
-                             "months": 6, "deidentified": True})
+                             "months": 6, "sanitized_ref": make_sanitized_ref()})
     assert r["classification"] == "OVERPAYMENT"
     assert r["overpayment_amount"] == 1200.0
 

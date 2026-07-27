@@ -1,0 +1,64 @@
+# Pilot Scope — Public-Benefits Eligibility Screening & Communication Assistant
+
+*What a pilot of this assistant is, what it is explicitly NOT, and what the adopter owns. Due process is
+the headline constraint. One page.*
+
+---
+
+## Due process is the defining constraint
+
+A benefits determination that reduces, suspends, or terminates aid triggers constitutional and statutory
+**due-process** protections (Goldberg v. Kelly; program regulations — SNAP 7 CFR 273, Medicaid 42 CFR 435).
+That is exactly why this assistant **screens and prepares, never adjudicates**, and why every adverse action
+stays human-committed, with timely written notice and appeal rights. The deterministic guard set enforces an
+**advance-notice HOLD** on any adverse redetermination so the platform — not the model — protects due process.
+
+## What it is
+
+A **governed assistant** for benefits intake: it extracts non-PII decision fields, de-identifies PII, runs a
+deterministic **eligibility screen + estimate** and the processing clock (expedited vs standard), prepares
+**redetermination** and **overpayment** findings, and drafts a determination notice — then **pauses at a
+caseworker sign-off gate**. Every consequential action is made and committed by a qualified human.
+
+## What it will NOT do (do not claim these)
+
+- **No adjudication / no adverse action.** The assistant never denies, reduces, suspends, or terminates
+  benefits; a caseworker commits every determination (Cedar `no_self_commit`, tool-refused).
+- **No fraud referral.** Referring a case as suspected fraud is a human-only action (Cedar
+  `no_self_fraud_referral`, tool-refused).
+- **No writes to the system of record.** Shadow mode reads nothing and writes nothing into the official case.
+- **No authoritative eligibility determination.** Output is a **screen/estimate** on illustrative federal
+  thresholds; the authoritative rules and verification are the agency's.
+- **No PII unmasked downstream.** Tools refuse anything not proven de-identified by a signed `sanitized_ref`
+  (P0-1); a `deidentified: true` boolean is never accepted.
+
+## Adopter / out-of-scope (state in every conversation)
+
+Authoritative **state eligibility rules** and their frequent policy churn · **income/identity verification**
+against authoritative sources (IEVS / SAVE / PARIS-class matches) · **system-of-record** integration (the
+state benefits/eligibility system) · **notice and appeal / fair-hearing** workflow · **overpayment
+establishment and recovery** rules · multi-program interactions · **IRS Pub 1075** controls where federal tax
+info is used · **Section 508 / plain-language** accessibility for citizen-facing notices (arguably more
+important here, since notices go directly to recipients) · enterprise **IdP** federation · **StateRAMP / ATO**.
+
+## Maturity (honest, code-accurate)
+
+**Present + hardened this cycle:** signed-`sanitized_ref` de-identification (P0-1), token boundary (P0-3),
+deterministic guard set with the due-process advance-notice HOLD (P0-2), Cedar deny-by-default,
+`no_self_commit` + `no_self_fraud_referral`, WORM hash-chained audit, human separation-of-duties sign-off, the
+FPL-pinned drift gate. Suite: 73 offline tests.
+
+**Not yet (to reach the financial-aid agent's pilot depth):** the CDK stack set and Gate-B posture (private
+networking + egress allowlist + customer-managed KMS + MFA identity + tenant pin); an EP1-equivalent
+clean-account **live validation** with evidence + teardown; a tagged **release + manifest** + consistency
+gate; and the operating-model doc bundle (threat model, START-HERE, VALIDATED_RELEASE, data-source policy,
+retention profiles, key management, incident response, audit readiness, accessibility, config worksheet).
+Evidence to date is author-produced; independent security testing and a benefits-policy-owner (SME) sign-off
+on the eligibility rules + notice language are pre-production gates.
+
+## Recommended pilot shape
+
+One program / one state · synthetic and de-identified retrospective cases first, then shadow mode ·
+read-only everything · every output human-reviewed · no adjudication, no adverse action, no fraud referral,
+no SoR writes · measured against verification handling time, repeat-contact rate, determination agreement with
+a caseworker, and notice edit rate.
