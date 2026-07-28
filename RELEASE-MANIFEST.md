@@ -12,7 +12,7 @@ this table, this table is correct and the other file is a bug.*
 |---|---|
 | **Product** | Public-Benefits Eligibility Screening & Determination-Support **Assistant** (never an adjudicator; never denies/reduces/terminates/refers fraud) |
 | **Pilot tag** | `v0.1.0-pilot-rc1` (RELEASE file) — **cut after the live EP1 validation (2026-07-27)** |
-| **Offline test suite** | **98 / 98** passing (control-plane + **13 CDK stack-synthesis** assertions + 3 doc-integrity gates + 4 independent-verification gates) |
+| **Offline test suite** | **101** passing (control-plane + **13 CDK stack-synthesis** assertions + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates). 100 run locally; 1 CI-completeness gate runs only in CI (`skipif` outside CI). |
 | **Deployment IaC** | AWS CDK, 7 stacks (`cdk/ben_stacks`, prefix `ben-`) — synthesizes to valid CloudFormation (in-suite `aws_cdk.assertions`) |
 | **Gate-B posture** | **zero public egress** (isolated subnets; AWS private endpoints only; no NAT/IGW/firewall) · customer-managed KMS · MFA-enforced pilot identity · tenant pin — **as CDK switches, live EP1-validated** |
 | **Live EP1 validation** | **DONE (2026-07-27, env `ben-val1`, us-east-1)** — see `evidence/EP1-VALIDATION.md` |
@@ -21,7 +21,7 @@ this table, this table is correct and the other file is a bug.*
 
 ## Count glossary
 
-- **98 offline tests** — the CI suite (control-plane + 13 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates). Authoritative offline number.
+- **101 offline tests** — the CI suite (control-plane + 13 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates). Authoritative offline number. Locally you see `100 passed, 1 skipped`: one gate asserts the CDK libs are installed and only runs inside CI.
 
 ## Known limitations (explicit)
 

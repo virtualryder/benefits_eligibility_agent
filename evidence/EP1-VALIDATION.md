@@ -15,6 +15,15 @@ subnets + AWS private endpoints only; no NAT/IGW/firewall), customer-managed KMS
 the MFA-enforced identity pool, and the **AgentCore/Gateway/Cedar ENFORCE attachment** (custom resource) —
 the highest-risk step — completed cleanly. Deploy time ~12 min (no egress-firewall provisioning).
 
+**Toolchain (pinned so an independent verifier resolves the same synthesis):**
+`aws-cdk-lib==2.262.1` · `constructs==10.7.1` · Python 3.12 · CDK CLI `npx aws-cdk@2`.
+These are pinned in `cdk/requirements.txt` and enforced by `tests/test_ci_completeness.py`.
+
+*Post-run change (2026-07-27):* `verify_income` was **removed from the deployed Lambda set**. It was
+never configured (`SOR_URL` unset), never a Gateway target, and always returned `verified: false` — so it
+was an unreachable function holding an AgentCore-Identity OAuth grant. Removing it drops that privilege;
+it changes none of the results below.
+
 ## Turnkey validator — `scripts/validate_deployment.py --env val1` → **PASS**
 
 ```json
@@ -80,7 +89,7 @@ customer-side Gate-C item.
 ## Load / exactly-once
 
 Concurrency and exactly-once replay-storm behavior (idempotent finalize, single FINAL# marker) are proven
-by the offline suite — **98/98 passing** (control-plane + 13 CDK synthesis). A live prod-scale load test
+by the offline suite — **98/98 passing at the time of this run** (control-plane + 13 CDK synthesis); the suite is **101** today after post-run hardening gates were added. A live prod-scale load test
 is a customer-side Gate-B exit item.
 
 ## Finding fixed during this EP1 run

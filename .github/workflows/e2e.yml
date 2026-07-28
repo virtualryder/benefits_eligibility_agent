@@ -1,25 +1,43 @@
-# End-to-end deploy test — OPT-IN, manual only. Stands up the governance spine in a real AWS
-# account, proves it live with the demo (Cedar in ENFORCE), and tears it down. NEVER runs on push.
+# End-to-end live test — OPT-IN, manual only. NEVER runs on push.
+#
+# TWO MODES. The default is the SUPPORTED customer path.
+#
+#   path: cdk      (default)  -> scripts/independent_verify.py: deploys the 7-stack CDK set with every
+#                               Gate-B switch, runs the validator + strict PII canary, proves the human
+#                               sign-off gate and the AdverseNoticeHold due-process terminal, then
+#                               destroys and sweeps for residual. This is the path customers deploy.
+#
+#   path: legacy-shell        -> lib/engine/{deploy,demo,destroy}.sh: the LEGACY internal reference
+#                               engine and its 29-check governance demo. It is NOT a customer
+#                               deployment path (see README / DEPLOYMENT-GUIDE) and is kept only so the
+#                               historical demo stays runnable. Do not cite it as release evidence.
 #
 # One-time setup in the target (sandbox) AWS account + this repo's settings:
 #   * Enable the Anthropic Claude models in Amazon Bedrock (us-east-1).
+#   * CDK bootstrap the account/region (cdk mode): npx aws-cdk@2 bootstrap aws://<account>/us-east-1
 #   * Auth — pick ONE:
 #       OIDC (recommended): create a GitHub OIDC IAM role with admin-in-sandbox perms and set the
-#         repository VARIABLE  AWS_ROLE_ARN  to its ARN (Settings -> Secrets and variables -> Actions -> Variables).
+#         repository VARIABLE  AWS_ROLE_ARN  (Settings -> Secrets and variables -> Actions -> Variables).
 #       Static keys: set repository SECRETS  AWS_ACCESS_KEY_ID  and  AWS_SECRET_ACCESS_KEY.
-#   * (housing only, optional) set secret  HUD_API_TOKEN  to exercise the live HUD lookup; without it the
-#     demo still passes (the live call degrades to a WARN and falls back).
 #
-# Run it: Actions -> "e2e-deploy" -> Run workflow -> type "deploy" to confirm. Costs a few cents per run.
+# Run it: Actions -> "e2e-deploy" -> Run workflow -> type "deploy" to confirm. Real (small) AWS spend.
 name: e2e-deploy
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "deploy" to confirm a live deploy -> demo -> destroy in the configured AWS account'
+        description: 'Type "deploy" to confirm a live deploy -> validate -> destroy in the configured AWS account'
         required: true
         default: ''
+      path:
+        description: 'Which path to exercise'
+        required: true
+        default: 'cdk'
+        type: choice
+        options:
+          - cdk
+          - legacy-shell
 
 concurrency:
   group: e2e-benefits-eligibility
@@ -33,7 +51,7 @@ jobs:
   e2e:
     if: ${{ github.event.inputs.confirm == 'deploy' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     env:
       AWS_REGION: us-east-1
       AWS_DEFAULT_REGION: us-east-1
@@ -43,8 +61,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install render dependency
-        run: pip install pyyaml
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -52,14 +69,49 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Who am I
         run: aws sts get-caller-identity
-      - name: Pre-clean any stale spine (best effort)
+
+      # ── SUPPORTED PATH ────────────────────────────────────────────────────
+      - name: Install CDK + test deps (supported path)
+        if: ${{ github.event.inputs.path == 'cdk' }}
+        run: |
+          python -m pip install --quiet -r cdk/requirements.txt
+          python -m pip install --quiet "pyyaml==6.0.3" "boto3==1.43.51" "pytest==9.1.1"
+
+      - name: Deploy -> validate -> canary -> gates -> destroy (CDK, all Gate-B switches)
+        if: ${{ github.event.inputs.path == 'cdk' }}
+        run: |
+          python scripts/independent_verify.py \
+            --verifier "github-actions e2e (${{ github.actor }})" \
+            --env e2e${{ github.run_number }}
+
+      - name: Upload the verification report
+        if: ${{ github.event.inputs.path == 'cdk' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report-${{ github.run_number }}
+          path: evidence/independent-verification-report.json
+          if-no-files-found: warn
+
+      # ── LEGACY INTERNAL REFERENCE (not a customer path) ───────────────────
+      - name: Install render dependency (legacy shell)
+        if: ${{ github.event.inputs.path == 'legacy-shell' }}
+        run: pip install pyyaml
+
+      - name: LEGACY ONLY — pre-clean any stale spine (best effort)
+        if: ${{ github.event.inputs.path == 'legacy-shell' }}
         run: bash lib/engine/destroy.sh "$AGENT" || true
-      - name: Deploy the governance spine (flips to ENFORCE)
+
+      - name: LEGACY ONLY — deploy the shell governance spine (flips to ENFORCE)
+        if: ${{ github.event.inputs.path == 'legacy-shell' }}
         run: bash lib/engine/deploy.sh "$AGENT"
-      - name: Prove governance live (demo, Cedar ENFORCE)
+
+      - name: LEGACY ONLY — 29-check governance demo (NOT release evidence)
+        if: ${{ github.event.inputs.path == 'legacy-shell' }}
         run: bash lib/engine/demo.sh "$AGENT"
-      - name: Teardown (always, even on failure)
-        if: always()
+
+      - name: LEGACY ONLY — teardown (always, even on failure)
+        if: ${{ github.event.inputs.path == 'legacy-shell' && always() }}
         run: bash lib/engine/destroy.sh "$AGENT" || true

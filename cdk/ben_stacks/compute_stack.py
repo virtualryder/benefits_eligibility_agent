@@ -4,7 +4,7 @@ One function per manifest tool target, from a single staged asset bundle (tools 
 IAM is explicit and minimal per function: the audit writer can only PutItem the ledger + PutObject the
 vault (with an explicit Deny on mutation/bypass); mask_pii can only Comprehend-detect + write the
 sanitized store; the assessor/guards/drafter only read the sanitized store; the drafter only invokes
-Bedrock; verify_income mints its outbound token via AgentCore Identity (holds no client secret).
+Bedrock. (`verify_income` is intentionally NOT deployed — see the note at the tool list.)
 Benefits has ONE signing trust domain (only mask_pii signs a sanitized_ref — there is no external
 authoritative source to sign), so a single per-deploy HMAC key suffices (GA-2 domain-split N/A).
 Exact ARNs are exported — nothing downstream discovers by name (P0-7)."""
@@ -79,7 +79,14 @@ class ComputeStack(cdk.Stack):
         self.intake = fn("intake-application", "intake_application")
         self.mask = fn("mask-pii", "mask_pii")
         self.assess = fn("assess-eligibility", "assess_eligibility")
-        self.verify_income = fn("verify-income", "verify_income")   # AgentCore-Identity OAuth connector
+        # NOTE: `verify_income` is deliberately NOT deployed. It is a reference implementation of an
+        # AgentCore-Identity M2M connector to a benefits system of record, but no SoR exists for this
+        # pilot: `SOR_URL` is never set, it is not a Gateway target (so Cedar cannot authorize it), and
+        # it would always return `verified: false`. Shipping an unreachable Lambda that holds
+        # `bedrock-agentcore:GetResourceOauth2Token` is privilege with no purpose — least privilege says
+        # don't deploy it. The manifest lists it under `stubbed:`. Re-enable it here (and add it to the
+        # gateway target map + set SOR_URL) only when a real read-only SoR connector is in scope
+        # (Gate-C, see BENEFITS-PILOT-READINESS-PLAN.md).
         self.redetermine = fn("redetermine", "redetermine")
         self.overpayment = fn("overpayment", "overpayment")
         self.core = fn("core-tools", "benefits_core", timeout=60)  # draft_notice (Bedrock)
@@ -115,12 +122,7 @@ class ComputeStack(cdk.Stack):
         # drafter: Bedrock only
         self.core.add_to_role_policy(iam.PolicyStatement(
             actions=["bedrock:InvokeModel"], resources=["*"]))
-        # verify_income: mints its outbound OAuth2 token via AgentCore Identity — it holds NO client
-        # secret. The token vault (client_id/secret for the SOR) lives in the Identity credential
-        # provider; this tool only asks for a workload token + a resource OAuth2 token.
-        self.verify_income.add_to_role_policy(iam.PolicyStatement(
-            actions=["bedrock-agentcore:GetWorkloadAccessToken",
-                     "bedrock-agentcore:GetResourceOauth2Token"], resources=["*"]))
+        # (No AgentCore-Identity OAuth grant is issued: `verify_income` is not deployed — see above.)
         # audit writer: append-only + WORM put, with explicit tamper Deny
         data.audit_table.grant(self.write_audit, "dynamodb:PutItem",
                                "dynamodb:GetItem", "dynamodb:TransactWriteItems")
@@ -144,7 +146,7 @@ class ComputeStack(cdk.Stack):
 
         for name, f in {
             "IngestArn": self.ingest, "IntakeArn": self.intake, "MaskArn": self.mask,
-            "AssessArn": self.assess, "VerifyIncomeArn": self.verify_income,
+            "AssessArn": self.assess,
             "RedetermineArn": self.redetermine, "OverpaymentArn": self.overpayment,
             "CoreArn": self.core, "WriteAuditArn": self.write_audit,
             "RequestSignoffArn": self.request_signoff, "GuardsArn": self.guards,

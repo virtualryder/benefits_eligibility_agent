@@ -5,9 +5,19 @@ import urllib.parse
 import urllib.error
 import boto3
 
-# verify_income — a GOVERNED connector tool that verifies a household's reported income against a REAL,
-# OAuth2-protected external system of record (mock EIV). This retires the "labeled stub" honesty caveat:
-# it is a real authenticated call. The outbound OAuth2 token is minted by **AgentCore Identity** — this
+# verify_income — REFERENCE IMPLEMENTATION ONLY. NOT DEPLOYED, NOT CONFIGURED, NOT REACHABLE.
+#
+# HONESTY NOTE (do not remove): the manifest lists this under `stubbed:` and that is accurate.
+#   * `SOR_URL` is never set by the CDK, so every call returns `verified: false`.
+#   * It is NOT registered as a Gateway target, so Cedar cannot authorize it and no caller can reach it
+#     through the governed path.
+#   * `cdk/ben_stacks/compute_stack.py` deliberately does NOT deploy it — shipping an unreachable Lambda
+#     holding `bedrock-agentcore:GetResourceOauth2Token` would be privilege with no purpose.
+# It is kept as a worked example of the intended pattern for a future read-only system-of-record
+# connector (a Gate-C item — see BENEFITS-PILOT-READINESS-PLAN.md). Do NOT cite it as a working
+# income-verification integration.
+#
+# The pattern it illustrates: the outbound OAuth2 token would be minted by **AgentCore Identity** so the
 # tool holds NO client secret. Flow (client_credentials / 2-legged M2M):
 #   1. get_workload_access_token(workloadName)         -> a workload identity token
 #   2. get_resource_oauth2_token(..., oauth2Flow=M2M)  -> an OAuth2 access token from the Identity

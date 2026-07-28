@@ -118,9 +118,18 @@ The harness is part of the reusable template (`lib/engine/redteam.sh`) and runs 
 
 ---
 
-## Item 3 — Real connector via AgentCore Identity outbound auth (retires the "it's a stub" caveat)
+## Item 3 — Real connector via AgentCore Identity outbound auth
 
-The template shipped system-of-record connectors as **labeled stubs**. This replaces the stub for benefits with a **real, authenticated** call to an external OAuth2-protected system of record — and, critically, the outbound credential is minted by **AgentCore Identity**, so the tool holds no secret.
+> ⚠️ **SCOPE OF THIS ITEM — read before citing it.** This capture is from the **legacy shell-engine
+> deployment (2026-07-17)** against a *mock* EIV-style system of record that was stood up for the
+> demonstration. It is **NOT part of the supported CDK release** (`v0.1.0-pilot-rc1`):
+> `verify_income` is **not deployed** by `cdk/ben_stacks/compute_stack.py`, is **not** a Gateway target,
+> and `SOR_URL` is never set — the manifest correctly lists it under `stubbed:`. What this item proves is
+> that **the AgentCore Identity outbound-auth pattern works**; it does **not** mean the shipped release
+> performs income verification. A real read-only system-of-record connector is a Gate-C item
+> (`BENEFITS-PILOT-READINESS-PLAN.md`). Do not present this as a working integration in the current release.
+
+The template shipped system-of-record connectors as **labeled stubs**. This item demonstrated the pattern for replacing one with a **real, authenticated** call to an OAuth2-protected system of record — and, critically, the outbound credential is minted by **AgentCore Identity**, so the tool holds no secret.
 
 ### Architecture
 

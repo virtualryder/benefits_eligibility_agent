@@ -1,2 +1,7 @@
-aws-cdk-lib>=2.150
-constructs>=10.0
+# PINNED to the versions used for the live EP1 validation (2026-07-27), recorded in
+# evidence/EP1-VALIDATION.md. An independent verifier (docs/INDEPENDENT-VERIFICATION.md) must resolve
+# the SAME versions — otherwise a synthesis difference cannot be told apart from version drift, which
+# would make their result incomparable to the recorded evidence.
+# Bump deliberately: re-run the CDK assertions and note the change in RELEASE-MANIFEST.md.
+aws-cdk-lib==2.262.1
+constructs==10.7.1
