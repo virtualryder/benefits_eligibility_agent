@@ -1,4 +1,6 @@
-# Benefits Eligibility Agent — Governed Agentic AI on Amazon Bedrock AgentCore
+# Public Benefits Intake, Eligibility Screening & Caseworker Decision-Support Assistant
+
+*Governed Agentic AI on Amazon Bedrock AgentCore*
 
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
@@ -26,6 +28,24 @@ determinations are **due-process protected** (Goldberg v. Kelly), every adverse 
 with notice and appeal rights. Built on the same governed-hero-agent pattern as the pharmacovigilance agent,
 from a reusable, manifest-driven template.
 
+> ## ⚠️ Scope boundary — read before any customer conversation
+>
+> **This is NOT an eligibility determination engine.** The deterministic logic here is a **preliminary
+> income screen**: public HHS Federal Poverty Guidelines with a **SNAP-style gross-income test** (130% FPL,
+> 7 CFR 273.9) plus an expedited/standard processing clock.
+>
+> A production SNAP determination additionally requires gross **and net** income tests, earned-income /
+> shelter / dependent-care / medical / child-support deductions, resource rules, broad-based categorical
+> eligibility, household composition, student and immigration eligibility, work requirements, state
+> options, proration, certification periods and benefit-allotment calculation. **Medicaid** eligibility
+> varies by state and coverage group (MAGI vs non-MAGI, disability, pregnancy, spend-down, asset and
+> long-term-care rules) and **cannot** be represented by a generic FPL rule. **TANF** is state-specific.
+> **Unemployment insurance is out of scope entirely** — no UI logic exists in this repository.
+>
+> Position this as: *intake summarization, preliminary screening, missing-information identification and
+> draft caseworker communication* — for **one state and one program** at a time. The authoritative rules
+> remain the agency's. See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) and [`docs/VALIDATED-MATRIX.md`](docs/VALIDATED-MATRIX.md).
+
 > **Accelerator, not a certification.** Reference implementation of the *pattern*. Not a
 > production-certified system. Computer-system validation, IdP federation, connectors to the state's
 > benefits system of record, authoritative program rules, and the authorization to operate (StateRAMP /
@@ -44,13 +64,13 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.0-pilot-rc1`. Suite: **91 offline tests**.
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.0-pilot-rc1`. Suite: **94 offline tests**.
 
 ---
 
 ## Why this agent
 
-Benefits intake (SNAP, Medicaid, TANF, unemployment insurance) is high-volume, time-critical, and
+Public-benefits intake (SNAP and similar means-tested programs) is high-volume, time-critical, and
 under heavy regulation (Social Security Act, IRS Pub 1075 for federal tax info, due-process
 requirements, StateRAMP / NIST 800-53). It's an obvious place for an AI agent — but a regulated agency
 cannot adopt an ungoverned one: PII must never leak, every decision needs a tamper-evident audit, tool
@@ -84,6 +104,11 @@ Authorization is **Cedar deny-by-default** at the AgentCore Gateway: `caseworker
 SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
+
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 94/94 tests**
+> (control-plane + 13 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
+> (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
+> ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
 
 `bash lib/engine/demo.sh agents/benefits-eligibility` exercises the full governed workflow against the
 deployed system with Cedar in **ENFORCE**, and reports `29 passed, 0 failed / GOVERNANCE DEMO: PASS`:

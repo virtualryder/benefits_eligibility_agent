@@ -6,7 +6,7 @@
 
 ## 1. What this agent does (the regulated workflow)
 
-Public-benefits intake is high-volume, time-critical eligibility work: SNAP, Medicaid, TANF, unemployment insurance, and general assistance. When an application arrives, a regulated eligibility-determination workflow must run end to end:
+Public-benefits intake is high-volume, time-critical work across means-tested programs. **This agent targets one program at a time — SNAP intake screening first**; Medicaid and TANF are illustrative context only (their rules are state- and coverage-group-specific and are not implemented here), and unemployment insurance is **excluded** — no UI logic exists in this repository. When an application arrives, a regulated intake workflow must run end to end:
 
 **intake the application → de-identify PII → assess eligibility and the processing clock (expedited vs. standard) → draft a determination notice → a qualified caseworker reviews and signs off → the determination is committed to the benefits system of record.**
 
@@ -59,7 +59,7 @@ AWS now ships, in Amazon Bedrock AgentCore, the governance primitives a regulate
 
 ## 6. The eligibility rules engine (deterministic, illustrative)
 
-`assess_eligibility` is a **deterministic rules engine**, not a model. It applies the **authoritative 2026 HHS Federal Poverty Guidelines** ($15,960 base, +$5,680 per additional person — Federal Register 2026‑00755) and a SNAP-style gross-income test (130% FPL, 7 CFR 273.9) to the de-identified decision fields, and returns a determination (ELIGIBLE / INELIGIBLE / NEEDS_REVIEW) and the **processing clock** (EXPEDITED 7-day vs. STANDARD 30-day). Every determination now **stamps the FPL source and year** into its output, so the basis is traceable to a named, authoritative source in the audit — not a magic number. It fails closed if the case is not marked de-identified. Alaska/Hawaii and program/state variations remain a per-program configuration item. This is the eligibility counterpart to the PV agent's seriousness/reporting-clock step: a transparent, auditable, non-model determination that a caseworker can defend at a fair hearing.
+`assess_eligibility` is a **deterministic rules engine**, not a model. It applies the **authoritative 2026 HHS Federal Poverty Guidelines** ($15,960 base, +$5,680 per additional person — Federal Register 2026‑00755) and a SNAP-style gross-income test (130% FPL, 7 CFR 273.9) to the de-identified decision fields, and returns a determination (ELIGIBLE / INELIGIBLE / NEEDS_REVIEW) and the **processing clock** (EXPEDITED 7-day vs. STANDARD 30-day). Every determination now **stamps the FPL source and year** into its output, so the basis is traceable to a named, authoritative source in the audit — not a magic number. It fails closed if the case is not marked de-identified. Alaska/Hawaii and program/state variations remain a per-program configuration item. This is a transparent, auditable, non-model determination that a caseworker can defend at a fair hearing.
 
 ## 6a. Deeper caseload workflows (step two)
 

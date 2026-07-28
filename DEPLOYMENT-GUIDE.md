@@ -1,4 +1,4 @@
-# Deployment Guide — Benefits determination Assistant (AWS CDK)
+# Deployment Guide — Public Benefits Intake & Eligibility Screening Assistant (AWS CDK)
 
 *The authoritative step-by-step for the supported deployment path. CDK, at the validated release tag,
 never `main`. The shell engine (`lib/engine/`) is a legacy internal reference and must not be used for
@@ -23,40 +23,70 @@ cdk deploy --all \
   -c kms=customer-managed \
   -c network_mode=private \
   -c identity_mode=pilot \
-  -c tenant=<sponsor-id>
+  -c tenant=<agency-id>
 ```
 
 Seven stacks deploy: `ben-pilot-{data,network,compute,workflow,identity,observability,gateway}`,
-including the AgentCore Gateway + Cedar policies as IaC (no post-deploy shell steps). The the eligibility engine
-lookup needs **no API key** (public). Switches:
+including the AgentCore Gateway + Cedar policies as IaC (no post-deploy shell steps). **No API key or
+external data credential is needed** — the eligibility screen runs on public HHS Federal Poverty
+Guidelines compiled in as configuration, so there is no runtime external dependency. Switches:
 
 | Switch | Effect |
 |---|---|
 | `retention_profile=sandbox-demo\|pilot\|production-reference` | WORM Object-Lock mode + days (GOVERNANCE/1d sandbox → COMPLIANCE/7y prod) |
 | `kms=customer-managed` | one CMK over tables, secrets, Lambda env, log groups, SNS |
-| `network_mode=private` | VPC + Network Firewall egress allowlist = `.api.fda.gov` ONLY; tools in isolated subnets |
+| `network_mode=private` | **ZERO public egress** — governed Lambdas in isolated subnets, AWS private endpoints only; **no NAT, no internet gateway, no egress firewall** (benefits reaches no external API) |
 | `identity_mode=pilot` | MFA ON (software token), threat protection ENFORCED, admin-create-only, zero users |
-| `tenant=<sponsor-id>` | HMAC-signed into sanitized artifacts (Gate-B B5) |
+| `tenant=<agency-id>` | HMAC-signed into sanitized artifacts (Gate-B B5) |
 
 ## 2. Run a case (execution-input contract)
 
-Start the controller (`ben-pilot-determination-workflow`) with:
-`{case_id, requester, source, drug, case_key, known_keys}` — `source` is the raw benefits text,
-`drug` the suspect product. The pipeline: extract → the eligibility engine → mask → eligibility → duplicate
-check → (AdverseNoticeHold if a duplicate) → draft narrative → INTENT audit → a **different** qualified
-reviewer approves at the `waitForTaskToken` gate → finalize (exactly-once `FINAL#` marker).
+**Step 1 — ingest (required, R3-2).** Call the **`ben-<env>-ingest-application`** Lambda FIRST with
+`{application, case_id}`. It stores the raw application in the encrypted case store and returns an opaque
+`case_ref`. Raw applicant content never enters Step Functions state.
 
-> **Zero-PII note (R3-2):** call the **ingest-application** Lambda FIRST — it stores the raw `source` in the
-> encrypted case store and returns the opaque `case_ref` you pass to the workflow. Raw content never
-> enters Step Functions state, and the masked text is reached only server-side via the signed
-> `sanitized_ref`, so the strict PII canary can PASS.
+**Step 2 — start the controller** (`ben-<env>-determination-workflow`) with:
 
-## 3. The EP1 validation (what cuts the release)
+```json
+{ "case_id": "<id>", "requester": "<caseworker-id>", "case_ref": "case-…",
+  "redetermination": { "change_type": "NEW" } }
+```
 
-On a clean account, deploy all switches, then capture: a happy-path SUCCEEDED run, a AdverseNoticeHold
-run, the strict PII canary (0 hits across Logs/X-Ray/DLQ/SFN history — R3-2 pass-by-reference keeps raw
-+ masked content out of state, so this should PASS), a load run, and an exactly-once replay storm. Then tear down
-and confirm zero residual. Record the results in `VALIDATED_RELEASE.md` and cut `v0.1.0-pilot-rc1`.
+`redetermination.change_type` is `NEW` for a new application, or `ADVERSE` / `FAVORABLE` / `NO_CHANGE`
+for a re-determination (an `ADVERSE` change must carry `"advance_notice_required": true` to proceed).
+
+The pipeline: extract → **GuardExtracted** → mask PII → **GuardDeidentified** → assess eligibility →
+**GuardRulesExecuted** → **CheckAdverseNotice** → (**AdverseNoticeHold** if an adverse change lacks the
+required advance notice — terminal, due process) → draft notice → INTENT audit → a **different**
+qualified caseworker approves at the `waitForTaskToken` gate → finalize (exactly-once `FINAL#` marker).
+Any guard that fails routes to `ManualReview`.
+
+> **Zero-PII note (R3-2, both directions):** the masked case *and* the drafted notice are stored
+> server-side and reached only via signed references — neither the raw application nor the notice text
+> enters Step Functions state, which is why the strict PII canary passes with 0 leaks.
+
+## 3. Validate the deployment (reproduce EP1)
+
+This exact sequence was run on a clean account for `v0.1.0-pilot-rc1` — see
+[`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md). To reproduce it in your own account:
+
+```bash
+python scripts/validate_deployment.py --env <env> --region us-east-1   # expect deployment_status: PASS
+python scripts/pii_canary.py --prefix ben-<env> --execute --strict     # expect verdict: PASS, leaks: {}
+```
+
+Then exercise both terminals: a **new application** (`change_type: NEW`) should run to `HumanSignoff`
+and pause; an **adverse redetermination without advance notice**
+(`{"change_type":"ADVERSE","advance_notice_required":false}`) should terminate at `AdverseNoticeHold`.
+Tear down and confirm zero residual:
+
+```bash
+cdk destroy --all -c env=<env>
+python scripts/validate_deployment.py --env <env> --expect-absent      # expect residual_stacks: []
+```
+
+Live prod-scale load and failure-injection testing are **not** covered by this run — they are a
+customer-side Gate-B exit item (`BENEFITS-PILOT-READINESS-PLAN.md`).
 
 ## 4. Teardown
 
@@ -86,6 +116,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 88/88: control-plane + CDK synthesis + pass-by-ref + canary logic
+python -m pytest tests/ -q                    # 94/94: control-plane + CDK synthesis + pass-by-ref + canary logic
 python -m pytest tests/test_cdk_stacks.py -q  # 22 CDK assertions (synthesizes all 7 stacks)
 ```

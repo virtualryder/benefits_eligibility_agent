@@ -80,7 +80,7 @@ customer-side Gate-C item.
 ## Load / exactly-once
 
 Concurrency and exactly-once replay-storm behavior (idempotent finalize, single FINAL# marker) are proven
-by the offline suite — **91/91 passing** (control-plane + 13 CDK synthesis). A live prod-scale load test
+by the offline suite — **94/94 passing** (control-plane + 13 CDK synthesis). A live prod-scale load test
 is a customer-side Gate-B exit item.
 
 ## Finding fixed during this EP1 run

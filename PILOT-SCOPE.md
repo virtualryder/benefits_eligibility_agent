@@ -43,18 +43,28 @@ important here, since notices go directly to recipients) · enterprise **IdP** f
 
 ## Maturity (honest, code-accurate)
 
-**Present + hardened this cycle:** signed-`sanitized_ref` de-identification (P0-1), token boundary (P0-3),
+**Present + hardened:** signed-`sanitized_ref` de-identification (P0-1), token boundary (P0-3),
 deterministic guard set with the due-process advance-notice HOLD (P0-2), Cedar deny-by-default,
-`no_self_commit` + `no_self_fraud_referral`, WORM hash-chained audit, human separation-of-duties sign-off, the
-FPL-pinned drift gate. Suite: 73 offline tests.
+`no_self_commit` + `no_self_fraud_referral`, WORM hash-chained audit, human separation-of-duties sign-off,
+the FPL-pinned drift gate, **R3-2 pass-by-reference in both directions** (application + drafted notice).
+**Plus the full 7-stack AWS CDK set + Gate-B posture** (zero-public-egress private networking ·
+customer-managed KMS · MFA identity · tenant pin), release discipline (RELEASE + manifest +
+VALIDATED_RELEASE + consistency and cross-vertical gates), and the operating-model doc bundle.
+Suite: **94 offline tests** (control-plane + 13 CDK synthesis) — authoritative count in
+[`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). A separate legacy shell **governance demo** reports 29
+live checks in Cedar ENFORCE; it is not part of the 91.
 
-**Not yet (to reach the financial-aid agent's pilot depth):** the CDK stack set and Gate-B posture (private
-networking + egress allowlist + customer-managed KMS + MFA identity + tenant pin); an EP1-equivalent
-clean-account **live validation** with evidence + teardown; a tagged **release + manifest** + consistency
-gate; and the operating-model doc bundle (threat model, START-HERE, VALIDATED_RELEASE, data-source policy,
-retention profiles, key management, incident response, audit readiness, accessibility, config worksheet).
-Evidence to date is author-produced; independent security testing and a benefits-policy-owner (SME) sign-off
-on the eligibility rules + notice language are pre-production gates.
+**Live-validated (EP1, 2026-07-27, env `ben-val1`, us-east-1):** `validate_deployment.py` PASS; the
+controller ran to the human sign-off gate; **AdverseNoticeHold** held an adverse redetermination; **strict
+PII canary 0 leaks**; MFA pool ON with 0 users; torn down + residual-swept
+([`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md)).
+
+**Not yet — say these plainly:** the eligibility logic is a **preliminary federal-threshold screen**, not
+authoritative program rules; **no independent deployment** of the tag by a third party; no independent
+audit or penetration test; no benefits-program SME sign-off on the rules or notice language; no enterprise
+IdP round-trip; tenant-scoped case-store fetch is a follow-on; no prod-scale load or failure-injection
+testing; no system-of-record integration; **no real applicant data has ever been processed**. Full gate
+sequence: [`BENEFITS-PILOT-READINESS-PLAN.md`](BENEFITS-PILOT-READINESS-PLAN.md).
 
 ## Recommended pilot shape
 

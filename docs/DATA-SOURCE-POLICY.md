@@ -7,8 +7,8 @@ rule when it can't be trusted. One page.*
 
 ## The assistant has NO external data dependency
 
-Unlike the sibling agents (housing → HUD income limits, financial-aid → College Scorecard, PV → openFDA
-FAERS), the benefits eligibility engine reaches **no external API at determination time**. The eligibility
+Unlike the sibling agents in the portfolio — each of which calls one sanctioned external API — the
+benefits eligibility engine reaches **no external API at determination time**. The eligibility
 screen runs entirely on **public HHS Federal Poverty Guidelines** compiled into the tool as configuration:
 
 - **Source:** HHS annual poverty guidelines — 2026 figures (Federal Register 2026-00755, published

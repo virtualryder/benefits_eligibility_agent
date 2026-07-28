@@ -16,9 +16,9 @@ the public internet:
   the audit ledger and the WORM bucket.
 - **Interface endpoints** (PrivateLink, one ENI per subnet, SG-guarded): `bedrock-runtime` (draft/guardrail),
   `comprehend` + `comprehendmedical` (PII/PHI masking), `states` (sign-off Step Functions), `ssm`
-  (provenance secret / gateway URL), `secretsmanager` (HUD/API tokens), `sts`, `logs` (CloudWatch),
+  (provenance secret / gateway URL), `secretsmanager` (provenance signing key), `sts`, `logs` (CloudWatch),
   `kms`, and `bedrock-agentcore` (the gateway/policy-engine control plane).
-- **Egress to genuinely external authoritative sources** (HUD USER, College Scorecard, openFDA) is the one
+- **This agent has NO external authoritative source** — the eligibility screen uses public HHS poverty guidelines compiled in as configuration, so there is no external egress path at all. (Sibling agents that DO call an external API keep an allowlist; benefits needs none.) The former "one
   case that needs the public internet. Route it through a **NAT gateway in a single egress subnet** with an
   allow-list (or a forward proxy), so the blast radius is one controlled path, not per-Lambda egress. The
   connector's outbound OAuth stays minted by AgentCore Identity — no secret on the wire.
@@ -35,7 +35,7 @@ Enable it (bring your own VPC):
 VPC_MODE=1 \
   LAMBDA_SUBNET_IDS=subnet-aaa,subnet-bbb \
   LAMBDA_SG_IDS=sg-xxx \
-  bash lib/engine/deploy.sh agents/pharmacovigilance
+  bash lib/engine/deploy.sh agents/benefits-eligibility
 ```
 
 `deploy.sh` then attaches every control/tool Lambda to that VPC config and grants the ENI permissions.
@@ -61,7 +61,7 @@ store with a **customer-managed KMS key (CMK)** you own, rotate, and can audit/r
 Enable it (bring your own key):
 
 ```bash
-CMK_ARN=arn:aws:kms:us-east-1:<acct>:key/<id> bash lib/engine/deploy.sh agents/pharmacovigilance
+CMK_ARN=arn:aws:kms:us-east-1:<acct>:key/<id> bash lib/engine/deploy.sh agents/benefits-eligibility
 ```
 
 `deploy.sh` then creates the DynamoDB tables with CMK SSE and sets the WORM bucket's default encryption to
