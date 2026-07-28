@@ -9,15 +9,19 @@ customer deployments.*
 ## 0. Supported path
 
 ```bash
-git checkout v0.1.0-pilot-rc1                 # a validated release tag, never main
-cd cdk && pip install -r requirements.txt
-cdk bootstrap aws://<account>/us-east-1       # once per account
+git checkout v0.1.1-pilot-rc1                 # a validated release tag, never main
+cd cdk && pip install -r requirements.txt     # PINNED: aws-cdk-lib==2.262.1, constructs==10.7.1
+npx --yes aws-cdk@2 bootstrap aws://<account>/us-east-1     # once per account
 ```
+
+> **Use `npx --yes`** (or install the CDK CLI globally). Without `--yes`, `npx aws-cdk@2` stops at an
+> interactive "Ok to proceed?" install prompt — in a hidden or CI shell that simply hangs with no
+> output and no error. Verified on a clean machine, 2026-07-28.
 
 ## 1. Deploy (full Gate-B posture)
 
 ```bash
-cdk deploy --all \
+npx --yes aws-cdk@2 deploy --all --require-approval never \
   -c env=pilot \
   -c retention_profile=pilot \
   -c kms=customer-managed \
@@ -67,13 +71,30 @@ Any guard that fails routes to `ManualReview`.
 
 ## 3. Validate the deployment (reproduce EP1)
 
-This exact sequence was run on a clean account for `v0.1.0-pilot-rc1` — see
-[`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md). To reproduce it in your own account:
+This exact sequence was re-run on a clean account on 2026-07-28 (env `ben-val2`) — see
+[`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md). To reproduce it in your own account, deploy
+with **`retention_profile=sandbox-demo`**, *not* the `pilot` profile shown in §1:
+
+```bash
+npx --yes aws-cdk@2 deploy --all --require-approval never \
+  -c env=<env> -c retention_profile=sandbox-demo \
+  -c kms=customer-managed -c network_mode=private -c identity_mode=pilot -c tenant=<agency-id>
+```
+
+> **Why `sandbox-demo` for a validation run.** `retention_profile=pilot` applies **90-day GOVERNANCE**
+> Object Lock to the WORM vault. That is right for a real pilot, but on a throwaway environment you
+> intend to destroy the same day it leaves locked objects behind — and the audit writer is deliberately
+> DENIED `s3:BypassGovernanceRetention`, by design. `sandbox-demo` is GOVERNANCE / 1 day.
 
 ```bash
 python scripts/validate_deployment.py --env <env> --region us-east-1   # expect deployment_status: PASS
 python scripts/pii_canary.py --prefix ben-<env> --execute --strict     # expect verdict: PASS, leaks: {}
 ```
+
+> **Both scripts run for minutes and print nothing until they finish — that is not a hang.**
+> `validate_deployment.py` polls the Step Functions execution (20 × 6s ≈ 2–3 min); `pii_canary.py
+> --strict` intentionally waits 120s for telemetry to settle before sweeping (≈ 3 min). Redirected to a
+> file, Python buffers, so the log stays 0 bytes until the process exits. Do not kill them early.
 
 Then exercise both terminals: a **new application** (`change_type: NEW`) should run to `HumanSignoff`
 and pause; an **adverse redetermination without advance notice**
@@ -81,7 +102,7 @@ and pause; an **adverse redetermination without advance notice**
 Tear down and confirm zero residual:
 
 ```bash
-cdk destroy --all -c env=<env>
+npx --yes aws-cdk@2 destroy --all --force -c env=<env> -c retention_profile=sandbox-demo
 python scripts/validate_deployment.py --env <env> --expect-absent      # expect residual_stacks: []
 ```
 
@@ -91,12 +112,50 @@ customer-side Gate-B exit item (`BENEFITS-PILOT-READINESS-PLAN.md`).
 ## 4. Teardown
 
 ```bash
-cdk destroy --all -c env=pilot
+# Stop any executions parked at the human sign-off gate FIRST — a RUNNING execution
+# blocks deletion of the state machine and the destroy stalls.
+aws stepfunctions list-executions --state-machine-arn <arn> --status-filter RUNNING \
+  --query "executions[].executionArn" --output text | xargs -n1 -I{} \
+  aws stepfunctions stop-execution --execution-arn {} --cause "teardown"
+
+npx --yes aws-cdk@2 destroy --all --force -c env=pilot -c retention_profile=pilot
 ```
 
 The audit ledger + WORM vault + customer-managed CMK are **RETAIN'd** by design (the CMK alias deletes
 with the stack — find the retained key by tag and schedule deletion). VPC-attached Lambda stacks take
 ~15–30 min to delete (Hyperplane ENI release).
+
+### Completing a zero-residual teardown (validation environments only)
+
+`cdk destroy` leaves the retained resources behind **on purpose** — that is correct for a pilot, where
+the audit ledger and WORM vault are the evidence you must keep. On a throwaway validation environment
+you also want them gone. `destroy` alone does **not** get you to zero; these are the resources it leaves
+and the commands to clear them (verified on `ben-val2`, 2026-07-28):
+
+```bash
+E=val2   # your env
+
+aws dynamodb   delete-table    --table-name ben-$E-audit-ledger
+aws cognito-idp delete-user-pool --user-pool-id "$(aws cognito-idp list-user-pools --max-results 50 \
+                  --query "UserPools[?contains(Name,'ben-$E')].Id" --output text)"
+aws logs       delete-log-group --log-group-name "$(aws logs describe-log-groups \
+                  --log-group-name-prefix "/aws/lambda/ben-$E-gateway" \
+                  --query 'logGroups[0].logGroupName' --output text)"   # AgentCore attachment provider
+aws s3api      delete-bucket   --bucket "$(aws s3api list-buckets \
+                  --query "Buckets[?contains(Name,'ben-$E-data-wormvault')].Name" --output text)"
+```
+
+> The WORM vault deletes cleanly only if it is **empty or past retention**. Under `sandbox-demo`
+> (GOVERNANCE / 1 day) a same-day validation vault with no committed evidence is empty and deletes
+> immediately. Under `pilot` (90 days) it will **not** — another reason to validate with `sandbox-demo`.
+
+Then confirm zero residual across every resource type, not just stacks:
+
+```bash
+python scripts/validate_deployment.py --env $E --expect-absent   # residual_stacks: []
+for q in "cloudformation list-stacks" "lambda list-functions" "dynamodb list-tables" \
+         "s3api list-buckets" "logs describe-log-groups"; do aws $q | grep -c "ben-$E"; done   # all 0
+```
 
 ## 4b. EP1 harness (turnkey)
 

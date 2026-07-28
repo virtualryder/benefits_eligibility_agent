@@ -1,5 +1,39 @@
 # EP1 — Live Clean-Account Validation (Public-Benefits Eligibility Assistant)
 
+> ## Re-validation — `ben-val2`, 2026-07-28 (supersedes the EP1 run below)
+>
+> The full runbook was re-walked end to end as a Solution Architect would, from the hardened code
+> (post `e4ee109`), on a clean account. **Every gate passed.**
+>
+> | Check | Result |
+> |---|---|
+> | 7/7 CDK stacks (all Gate-B switches) | `CREATE_COMPLETE`, **734s** |
+> | AgentCore Gateway + Cedar **ENFORCE** | attached as IaC, no post-deploy shell step |
+> | `validate_deployment.py --env val2` | **PASS** (`masking_control`, `guard_genuine`, `forged_ref_denied`, `ingest_pass_by_reference` all PASS) |
+> | Happy path | ran every guard, paused at `HumanSignoff` |
+> | Due process (*Goldberg v. Kelly*) | adverse-without-notice → **`AdverseNoticeHold`**, SUCCEEDED; never reached a drafted notice or the gate |
+> | Strict PII canary | **PASS**, `leaks: {}` (marker `CANARY-8E1FC8E616AD-…`) |
+> | Identity | MFA `ON`, **0 users**, admin-create-only `True` |
+> | Zero public egress | **0 NAT gateways · 0 internet gateways · 9 VPC endpoints** (measured, not asserted) |
+>
+> **What this run proves that EP1 did not.** During EP1 the zero-egress security group blocked the
+> S3/DynamoDB *gateway* endpoints, and the fix was applied by hand to the live SG because a named SG
+> cannot be updated in place. The corrected rule went into `network_stack.py` but had **never been
+> exercised from IaC**. This run deployed from code onto a clean account and the data plane worked on
+> the first call — `ingest-application` returned a `case_ref` with no timeout. That claim is now
+> demonstrated rather than inferred.
+>
+> **Runbook defects found and fixed in this pass** (the point of the exercise):
+> `npx aws-cdk@2` hangs on an install prompt without `--yes`; §3 didn't restate the deploy switches, so
+> an SA reproducing EP1 would inherit `retention_profile=pilot` (90-day Object Lock) on a throwaway
+> environment; the teardown step didn't say to stop executions parked at the human gate first; and
+> nothing warned that the validator and canary buffer output for minutes (I misread it as a hang twice).
+>
+> Account IDs redacted to `111122223333`. Torn down with a residual sweep.
+
+---
+
+
 **Environment:** `ben-val1` · **Region:** us-east-1 · **Account:** `111122223333` (redacted) ·
 **Date:** 2026-07-27 · **Switches:** `network_mode=private kms=customer-managed identity_mode=pilot
 tenant=ben-example-agency retention_profile=sandbox-demo` (all Gate-B switches ON).

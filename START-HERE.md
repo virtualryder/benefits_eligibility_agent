@@ -2,9 +2,15 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.1.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.0-pilot-rc1)**
-— cut after the live EP1 clean-account validation. **Deploy the tag, never `main`.** Supported deployment
-path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks); the shell engine (`lib/engine/`) is legacy/internal only.
+**Validated release: [`v0.1.1-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.1-pilot-rc1)**
+— cut after a **full runbook re-walk and clean-account re-validation on 2026-07-28** (env `ben-val2`),
+run from the hardened code with the whole `DEPLOYMENT-GUIDE.md` followed step by step as an SA would.
+**Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks);
+the shell engine (`lib/engine/`) is legacy/internal only.
+
+> The earlier `v0.1.0-pilot-rc1` tag is **superseded — do not deploy it.** It predates the security
+> hardening: it still deploys the unreachable `verify_income` Lambda holding an AgentCore-Identity OAuth
+> grant, and its CDK dependencies are unpinned.
 
 ---
 
@@ -31,7 +37,9 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 | Claim | Status |
 |---|---|
 | Offline suite | **101 passing** (100 locally + 1 CI-only gate) (control-plane + 13 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
-| Live clean-account validation (EP1) | **Done** 2026-07-27, env `ben-val1`, us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
+| Live clean-account validation | **Done twice** — EP1 2026-07-27 (`ben-val1`) and a full runbook re-walk 2026-07-28 (`ben-val2`), us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
+| Zero public egress | **Measured, not asserted** — 0 NAT gateways · 0 internet gateways · 9 VPC endpoints on the live `ben-val2` VPC |
+| Deploy-from-IaC of the zero-egress SG fix | **Proven** on `ben-val2`. (In EP1 that rule had to be patched onto the live SG by hand, so the IaC version was previously unexercised.) |
 | Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 101 offline tests |
 | Independent deployment by a third party | **Not yet** — all evidence is author-produced. **A verification kit is ready:** [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md) + `python scripts/independent_verify.py`. This is the highest-value next step — if you are that third party, start there. |
 | Independent security test / pen test | **Not yet** |
@@ -77,7 +85,8 @@ override reasons. Full shape + exclusions: [`BENEFITS-PILOT-READINESS-PLAN.md`](
 
 ## Status in one line
 
-Control plane hardened, full CDK/Gate-B IaC, **live EP1-validated** (2026-07-27, `ben-val1`),
-**101 offline tests**, tag `v0.1.0-pilot-rc1`. Next, in order: independent redeploy of the tag,
+Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-27 `ben-val1`;
+2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual),
+**101 offline tests**, tag `v0.1.1-pilot-rc1`. Next, in order: independent redeploy of the tag,
 tenant-scoped case-store fetch, enterprise IdP round-trip, a one-state SNAP rule set with
 benefits-program SME sign-off, and independent security testing — before any real data.

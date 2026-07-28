@@ -5,7 +5,7 @@
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
 > **SUPPORTED DEPLOYMENT PATH — read this first.** The ONE supported path is **AWS CDK at the validated
-> release tag [`v0.1.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.0-pilot-rc1)**
+> release tag [`v0.1.1-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.1-pilot-rc1)**
 > (`cdk/ben_stacks`, 7 stacks, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
 > per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md); the
 > tag was cut AFTER the EP1 live validation captured its evidence (2026-07-27 — `evidence/EP1-VALIDATION.md`).
@@ -64,7 +64,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.0-pilot-rc1`. Suite: **101 offline tests**.
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.1-pilot-rc1`. Suite: **101 offline tests**.
 
 ---
 
