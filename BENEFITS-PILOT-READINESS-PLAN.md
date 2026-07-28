@@ -4,7 +4,7 @@
 (never an adjudicator; never denies, reduces, terminates, refers fraud, or writes to a system of record).
 **Repo:** `github.com/virtualryder/benefits_eligibility_agent`. **Tag:** `v0.1.0-pilot-rc1` (cut after the
 live EP1 run, 2026-07-27). **Build state:** control plane hardened + full CDK/Gate-B IaC, **live
-EP1-validated**; **94/94 offline tests** (control-plane + 13 CDK synthesis). **Owner:** David Ryder (AWS SA).
+EP1-validated**; **98/98 offline tests** (control-plane + 13 CDK synthesis). **Owner:** David Ryder (AWS SA).
 
 ---
 
@@ -35,7 +35,7 @@ EP1-validated**; **94/94 offline tests** (control-plane + 13 CDK synthesis). **O
 
 ## 2. Gates
 
-**Gate A — code + synth (done).** 94/94 offline; CDK synthesizes to valid CloudFormation.
+**Gate A — code + synth (done).** 98/98 offline; CDK synthesizes to valid CloudFormation.
 
 **Gate B — live EP1 validation (done, 2026-07-27, env `ben-val1`, us-east-1).** All Gate-B switches on a
 clean account: `validate_deployment.py` PASS; the controller ran every guard to the human sign-off gate;
@@ -46,6 +46,11 @@ fixed during the run (zero-egress SG blocked the S3/DynamoDB gateway endpoints).
 **Gate B-exit — independent reproduction (NOT done; highest-priority next step).**
 1. **A second AWS SA deploys the exact tag** unaided and runs the validation suite — the single biggest
    credibility gap today (all current evidence is author-produced).
+   **Kit is ready — this now needs a person, not more engineering:** hand the verifier
+   [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md); they run
+   `python scripts/independent_verify.py --verifier "<name>" --env iv1` (~45–75 min, a few dollars,
+   self-tearing-down) and sign `evidence/INDEPENDENT-VERIFICATION-RESULT.md`. Until that signed result
+   exists, a CI gate keeps every document saying independent verification has **not** happened.
 2. **Live concurrency + failure injection**: peak/renewal surge, Lambda/Bedrock/Comprehend throttling,
    KMS failure, DynamoDB conditional-write conflict, WORM-succeeds/ledger-fails (and the inverse), two
    caseworkers approving simultaneously, a case changed after approval, a stale policy version.

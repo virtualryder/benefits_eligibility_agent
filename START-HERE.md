@@ -30,10 +30,10 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 
 | Claim | Status |
 |---|---|
-| Offline suite | **94/94 passing** (control-plane + 13 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Offline suite | **98/98 passing** (control-plane + 13 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Live clean-account validation (EP1) | **Done** 2026-07-27, env `ben-val1`, us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
-| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 94 offline tests |
-| Independent deployment by a third party | **Not yet** — all evidence is author-produced |
+| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 98 offline tests |
+| Independent deployment by a third party | **Not yet** — all evidence is author-produced. **A verification kit is ready:** [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md) + `python scripts/independent_verify.py`. This is the highest-value next step — if you are that third party, start there. |
 | Independent security test / pen test | **Not yet** |
 | Enterprise IdP round-trip | **Not yet** (federation exists as IaC; no agency IdP integrated) |
 | Benefits-program SME sign-off on the rules | **Not yet** ([`docs/SME-REVIEW-PACKET.md`](docs/SME-REVIEW-PACKET.md)) |
@@ -78,6 +78,6 @@ override reasons. Full shape + exclusions: [`BENEFITS-PILOT-READINESS-PLAN.md`](
 ## Status in one line
 
 Control plane hardened, full CDK/Gate-B IaC, **live EP1-validated** (2026-07-27, `ben-val1`),
-**94/94 offline tests**, tag `v0.1.0-pilot-rc1`. Next, in order: independent redeploy of the tag,
+**98/98 offline tests**, tag `v0.1.0-pilot-rc1`. Next, in order: independent redeploy of the tag,
 tenant-scoped case-store fetch, enterprise IdP round-trip, a one-state SNAP rule set with
 benefits-program SME sign-off, and independent security testing — before any real data.

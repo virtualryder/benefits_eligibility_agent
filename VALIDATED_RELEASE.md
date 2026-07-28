@@ -7,7 +7,7 @@
 |---|---|
 | Tag | `v0.1.0-pilot-rc1` — cut after the live EP1 validation below. Single source of truth: `RELEASE`. |
 | Commit SHA | the commit carrying tag `v0.1.0-pilot-rc1` (`git rev-list -n1 v0.1.0-pilot-rc1`) |
-| Test count | **94/94** offline (control-plane + CDK synthesis). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Test count | **98/98** offline (control-plane + CDK synthesis). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |

@@ -28,3 +28,7 @@ node_modules/
 
 cdk/cdk.out/
 cdk.out/
+
+# Independent-verification run output — produced by the VERIFIER on their account,
+# attached to their signed result. Never shipped by the author.
+evidence/independent-verification-report.json

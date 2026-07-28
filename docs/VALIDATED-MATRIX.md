@@ -3,7 +3,7 @@
 *The single page that says exactly what is proven, how it was proven, and what is not. If any other
 document in this repo disagrees with this table, **this table is correct and the other file is a bug.***
 
-Release `v0.1.0-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1) · offline suite **94/94**.
+Release `v0.1.0-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1) · offline suite **98/98**.
 
 ---
 
@@ -37,7 +37,7 @@ Release `v0.1.0-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1
 
 | Item | Reality |
 |---|---|
-| **Independent deployment by a third party** | Never done. All evidence is author-produced. **The single biggest credibility gap.** |
+| **Independent deployment by a third party** | **Never done. All evidence is author-produced — the single biggest credibility gap.** A verification kit is now ready so a third party can close it without the author's help: protocol [`docs/INDEPENDENT-VERIFICATION.md`](INDEPENDENT-VERIFICATION.md), one-command harness `scripts/independent_verify.py`, result template `evidence/INDEPENDENT-VERIFICATION-RESULT.md` (currently **UNCLAIMED**). A CI gate (`tests/test_independent_verification.py`) keeps this row honest until a signed result exists. |
 | **Independent security test / penetration test** | Never done |
 | **Authoritative program eligibility rules** | The engine is a **preliminary FPL / SNAP-style gross-income screen**. No net-income test, no deductions, no per-state resource rules, no benefit allotment. **Not** a SNAP/Medicaid/TANF determination engine |
 | **Medicaid / TANF determinations** | Not implemented — state- and coverage-group-specific |

@@ -50,9 +50,10 @@ the FPL-pinned drift gate, **R3-2 pass-by-reference in both directions** (applic
 **Plus the full 7-stack AWS CDK set + Gate-B posture** (zero-public-egress private networking ·
 customer-managed KMS · MFA identity · tenant pin), release discipline (RELEASE + manifest +
 VALIDATED_RELEASE + consistency and cross-vertical gates), and the operating-model doc bundle.
-Suite: **94 offline tests** (control-plane + 13 CDK synthesis) — authoritative count in
-[`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). A separate legacy shell **governance demo** reports 29
-live checks in Cedar ENFORCE; it is not part of the 91.
+Suite: **98 offline tests** (control-plane + 13 CDK synthesis + 3 doc-integrity gates + 4
+independent-verification gates) — authoritative count in [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md).
+A separate legacy shell **governance demo** reports 29 live checks in Cedar ENFORCE; it is **not** part
+of the 98.
 
 **Live-validated (EP1, 2026-07-27, env `ben-val1`, us-east-1):** `validate_deployment.py` PASS; the
 controller ran to the human sign-off gate; **AdverseNoticeHold** held an adverse redetermination; **strict
