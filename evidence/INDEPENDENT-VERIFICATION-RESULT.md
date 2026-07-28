@@ -19,7 +19,7 @@
 | Verifier (name, org, email) | _______________________ |
 | Relationship to the author | _(independent SA / partner / customer — must not be the author)_ |
 | Date of run (UTC) | _______________________ |
-| Release tag verified | `v0.1.1-pilot-rc1` |
+| Release tag verified | `v0.1.2-pilot-rc1` |
 | Commit SHA (from the report) | _______________________ |
 | AWS account | **do not record** — the harness stores a truncated hash only |
 | Region | _______________________ |

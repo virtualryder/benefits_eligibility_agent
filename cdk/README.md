@@ -1,6 +1,6 @@
 # CDK — THE supported customer deployment path
 
-*Reviewable, parameterized IaC. Deploy the validated release tag (`v0.1.1-pilot-rc1`), never `main`, per
+*Reviewable, parameterized IaC. Deploy the validated release tag (`v0.1.2-pilot-rc1`), never `main`, per
 [`../DEPLOYMENT-GUIDE.md`](../DEPLOYMENT-GUIDE.md). The shell engine (`lib/engine/`) is
 **legacy/internal reference only** and must not be used for customer deployments.*
 
@@ -19,7 +19,7 @@
 ## Deploy
 
 ```
-git checkout v0.1.1-pilot-rc1            # deploy the validated release, never main
+git checkout v0.1.2-pilot-rc1            # deploy the validated release, never main
 cd cdk && pip install -r requirements.txt
 npx aws-cdk@2 deploy --all --require-approval never \
   -c env=pilot -c retention_profile=pilot -c kms=customer-managed \

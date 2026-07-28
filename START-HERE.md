@@ -2,7 +2,7 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.1.1-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.1-pilot-rc1)**
+**Validated release: [`v0.1.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.2-pilot-rc1)**
 — cut after a **full runbook re-walk and clean-account re-validation on 2026-07-28** (env `ben-val2`),
 run from the hardened code with the whole `DEPLOYMENT-GUIDE.md` followed step by step as an SA would.
 **Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks);
@@ -87,6 +87,6 @@ override reasons. Full shape + exclusions: [`BENEFITS-PILOT-READINESS-PLAN.md`](
 
 Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-27 `ben-val1`;
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual),
-**101 offline tests**, tag `v0.1.1-pilot-rc1`. Next, in order: independent redeploy of the tag,
+**101 offline tests**, tag `v0.1.2-pilot-rc1`. Next, in order: independent redeploy of the tag,
 tenant-scoped case-store fetch, enterprise IdP round-trip, a one-state SNAP rule set with
 benefits-program SME sign-off, and independent security testing — before any real data.

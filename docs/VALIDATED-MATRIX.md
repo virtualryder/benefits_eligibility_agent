@@ -3,7 +3,7 @@
 *The single page that says exactly what is proven, how it was proven, and what is not. If any other
 document in this repo disagrees with this table, **this table is correct and the other file is a bug.***
 
-Release `v0.1.1-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1) · offline suite **101**.
+Release `v0.1.2-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1) · offline suite **101**.
 
 ---
 

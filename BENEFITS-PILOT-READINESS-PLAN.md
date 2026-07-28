@@ -2,7 +2,7 @@
 
 **Product:** Public Benefits Intake, Eligibility Screening & Caseworker Decision-Support **Assistant**
 (never an adjudicator; never denies, reduces, terminates, refers fraud, or writes to a system of record).
-**Repo:** `github.com/virtualryder/benefits_eligibility_agent`. **Tag:** `v0.1.1-pilot-rc1` (cut after the
+**Repo:** `github.com/virtualryder/benefits_eligibility_agent`. **Tag:** `v0.1.2-pilot-rc1` (cut after the
 live EP1 run, 2026-07-27). **Build state:** control plane hardened + full CDK/Gate-B IaC, **live
 EP1-validated**; **101 offline tests** (control-plane + 13 CDK synthesis). **Owner:** David Ryder (AWS SA).
 
