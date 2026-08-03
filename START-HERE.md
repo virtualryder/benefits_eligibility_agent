@@ -87,7 +87,7 @@ override reasons. Full shape + exclusions: [`BENEFITS-PILOT-READINESS-PLAN.md`](
 
 Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-27 `ben-val1`;
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual),
-tag `v0.1.2-pilot-rc1`. Current suite: **125 offline tests** (the tag was cut at 101; re-cut to
+tag `v0.2.0-pilot-rc1`, cut from this tree. Suite: **125 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and stood at 101; do not
 re-align). Next, in order: independent redeploy of the tag,
 tenant-scoped case-store fetch, enterprise IdP round-trip, a one-state SNAP rule set with
 benefits-program SME sign-off, and independent security testing — before any real data.
