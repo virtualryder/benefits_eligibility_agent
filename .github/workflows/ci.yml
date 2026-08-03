@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: render · tests · lint
+    name: render Â· tests Â· lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,13 +17,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: No real AWS account id in committed content
+        run: python tools/scan_account_ids.py
       - name: Governance-core integrity (P0-9 - no drift from the pinned core version)
         run: python lib/verify_core.py
 
       - name: Install tooling
         run: python -m pip install --quiet "pyyaml==6.0.3" "boto3==1.43.51" "pytest==9.1.1" "ruff==0.15.22"
 
-      # WITHOUT aws-cdk-lib, tests/test_cdk_stacks.py hits pytest.importorskip and SILENTLY SKIPS —
+      # WITHOUT aws-cdk-lib, tests/test_cdk_stacks.py hits pytest.importorskip and SILENTLY SKIPS â€”
       # which previously meant the 13 CDK security assertions (zero-public-egress, audit tamper-Deny,
       # no default passwords, exact-ARN outputs, single signing key, and the R3-2 "no case/notice
       # content in Step Functions state" check) never ran in CI while the build still reported green.
@@ -45,7 +47,7 @@ jobs:
         run: ruff check --select E9,F63,F7,F82 agents lib tests
 
   supply-chain:
-    name: dependency audit · SBOM
+    name: dependency audit Â· SBOM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
