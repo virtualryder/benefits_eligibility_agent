@@ -1,0 +1,22 @@
+# The governance control plane, consumed as a PINNED, HASH-VERIFIED dependency.
+#
+# This repo used to carry a COPY of these modules in lib/controls/. That is how the exactly-once
+# FINAL# finalization control came to exist in the financial-aid and housing agents and not in the
+# pharmacovigilance and benefits agents, while all four integrity locks recorded the same tree hash
+# and every CI run was green. For a benefits determination workflow the missing control is a
+# due-process risk: a retried or replayed finalize writes a second COMMITTED record, i.e. an adverse
+# action — a denial, a reduction, a termination of assistance — committed twice against the same
+# person, with two notice clocks and two appeal windows the agency cannot reconcile.
+#
+# A cross-repo parity check detects that. A dependency PREVENTS it. This is the dependency.
+#
+#   pip install --require-hashes -r requirements-core.txt
+#
+# --require-hashes means pip refuses the install if the artifact at that URL ever changes. Bump the
+# version AND the hash together; they are published side by side on the release.
+#
+# Source: https://github.com/virtualryder/governed-core  (Apache-2.0, public)
+# Release: https://github.com/virtualryder/governed-core/releases/tag/v1.4.0
+
+governed-core @ https://github.com/virtualryder/governed-core/releases/download/v1.4.0/governed_core-1.4.0-py3-none-any.whl \
+    --hash=sha256:6dfe756fe55b08d08e0bded8cba6824824f6a1da84f99f97ea47f9bd6c2aeddb
