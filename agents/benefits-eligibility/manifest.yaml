@@ -192,3 +192,28 @@ honesty_boundary:
   stubbed: [verify_income, connect_system_of_record]
   connectors: "state benefits system / eligibility system integration is customer engagement work"
   not_certified: true
+
+# --- Minimum Bar gates 4/5/8/9 — declarative blocks (added 2026-08-20) -------
+# See pharmacovigilance manifest for rationale; render.py ignores unknown keys.
+
+grounding:                       # bar 4 — declared grounding source + threshold
+  source: fpl_reference_data     # FPL-pinned eligibility tables (FPL-pinned test)
+  grounding_threshold: 0.85      # pilot-tunable; PQ evidence sets the floor
+  relevance_threshold: 0.80
+
+budget:                          # bar 5 — hard cap; benefits data fails closed
+  monthly_token_cap: 5000000
+  inference_profile: ben-agent
+  cap_behavior: hard
+  alert_thresholds: [0.6, 0.85, 1.0]
+
+evals:                           # bar 6 — suite + declared rate
+  suite: tests/
+  min_pass_rate: 1.0
+
+pack: SLG                        # bar 9 — pack compatibility declaration
+
+signing:                         # bar 8 — signed by a known publisher
+  publisher: virtualryder
+  algorithm: rsassa-pss-sha256
+  signature: null                # UNSIGNED — delivery gate blocks until signed
