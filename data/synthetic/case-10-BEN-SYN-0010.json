@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0010",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Rowan Pierce",
+    "ssn": "900-69-1333",
+    "address": "163 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Rowan Pierce, SSN 900-69-1333, applies for SNAP. Household of 2, income $1,700, resources $60. Standard deduction only.",
+  "household_size": 2,
+  "monthly_income": 1700,
+  "liquid_resources": 60,
+  "expected": {
+    "determination": "ELIGIBLE"
+  }
+}

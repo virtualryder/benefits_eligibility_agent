@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0006",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Avery Brooks",
+    "ssn": "900-65-1185",
+    "address": "135 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Avery Brooks, SSN 900-65-1185, applies for SNAP. Household of 2, reported income $0, recent job loss - verification of separation required.",
+  "household_size": 2,
+  "monthly_income": 0,
+  "liquid_resources": 40,
+  "expected": {
+    "determination": "NEEDS_REVIEW"
+  }
+}

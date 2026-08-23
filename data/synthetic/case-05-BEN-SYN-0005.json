@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0005",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Riley Santos",
+    "ssn": "900-64-1148",
+    "address": "128 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Riley Santos, SSN 900-64-1148, applies for SNAP. Household of 5, income $3,300, resources $180. Two children under 6.",
+  "household_size": 5,
+  "monthly_income": 3300,
+  "liquid_resources": 180,
+  "expected": {
+    "determination": "ELIGIBLE"
+  }
+}

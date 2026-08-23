@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0011",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Emerson Cole",
+    "ssn": "900-70-1370",
+    "address": "170 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Emerson Cole, SSN 900-70-1370, applies for SNAP. Household of 3, income $5,400 - over limit even with dependent-care deduction.",
+  "household_size": 3,
+  "monthly_income": 5400,
+  "liquid_resources": 500,
+  "expected": {
+    "determination": "INELIGIBLE"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0004",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Morgan Ellis",
+    "ssn": "900-63-1111",
+    "address": "121 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Morgan Ellis, SSN 900-63-1111, applies for SNAP. Household of 4, income $2,950, self-employment income varies month to month.",
+  "household_size": 4,
+  "monthly_income": 2950,
+  "liquid_resources": 200,
+  "expected": {
+    "determination": "NEEDS_REVIEW"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0009",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Skyler Hayes",
+    "ssn": "900-68-1296",
+    "address": "156 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Skyler Hayes, SSN 900-68-1296, applies for SNAP. Household of 3, mixed immigration status - eligible-member computation required.",
+  "household_size": 3,
+  "monthly_income": 2100,
+  "liquid_resources": 90,
+  "expected": {
+    "determination": "NEEDS_REVIEW"
+  }
+}

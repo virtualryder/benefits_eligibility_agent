@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0003",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Casey Nguyen",
+    "ssn": "900-62-1074",
+    "address": "114 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Casey Nguyen, SSN 900-62-1074, applies for SNAP. Household of 2, income $4,900 - over gross income limit.",
+  "household_size": 2,
+  "monthly_income": 4900,
+  "liquid_resources": 300,
+  "expected": {
+    "determination": "INELIGIBLE"
+  }
+}

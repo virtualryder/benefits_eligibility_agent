@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0012",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Finley Marsh",
+    "ssn": "900-71-1407",
+    "address": "177 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Finley Marsh, SSN 900-71-1407, applies for SNAP. Household of 4, income $2,800, claims high shelter costs needing documentation.",
+  "household_size": 4,
+  "monthly_income": 2800,
+  "liquid_resources": 130,
+  "expected": {
+    "determination": "NEEDS_REVIEW"
+  }
+}

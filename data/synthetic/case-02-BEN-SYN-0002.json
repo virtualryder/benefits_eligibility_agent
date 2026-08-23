@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0002",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Jordan Blake",
+    "ssn": "900-61-1037",
+    "address": "107 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Jordan Blake, SSN 900-61-1037, applies for SNAP. Household of 1, income $1,150, resources $50. Elderly member, simplified reporting.",
+  "household_size": 1,
+  "monthly_income": 1150,
+  "liquid_resources": 50,
+  "expected": {
+    "determination": "ELIGIBLE"
+  }
+}

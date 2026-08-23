@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0008",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Dakota Reyes",
+    "ssn": "900-67-1259",
+    "address": "149 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Dakota Reyes, SSN 900-67-1259, applies for SNAP. Household of 6, income $3,900, resources $220. Disabled member, medical expense deduction applies.",
+  "household_size": 6,
+  "monthly_income": 3900,
+  "liquid_resources": 220,
+  "expected": {
+    "determination": "ELIGIBLE"
+  }
+}

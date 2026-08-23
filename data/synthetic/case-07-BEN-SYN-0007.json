@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0007",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Quinn Foster",
+    "ssn": "900-66-1222",
+    "address": "142 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Quinn Foster, SSN 900-66-1222, applies for SNAP. Household of 1, income $2,600, substantial lottery winnings last month (resource test).",
+  "household_size": 1,
+  "monthly_income": 2600,
+  "liquid_resources": 15000,
+  "expected": {
+    "determination": "INELIGIBLE"
+  }
+}

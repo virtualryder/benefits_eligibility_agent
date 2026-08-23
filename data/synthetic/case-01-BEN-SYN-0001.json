@@ -1,0 +1,17 @@
+{
+  "case_id": "BEN-SYN-0001",
+  "SYNTHETIC": true,
+  "note": "Synthetic demo record. Name is fictional; SSN uses the 900- range, which the SSA never issues.",
+  "applicant": {
+    "name": "Alex Rivera",
+    "ssn": "900-60-1000",
+    "address": "100 Demo Street, Springfield, ST 00000"
+  },
+  "application": "Applicant Alex Rivera, SSN 900-60-1000, applies for SNAP. Household of 3, gross monthly income $2,050, liquid resources $120. Within 130% FPL.",
+  "household_size": 3,
+  "monthly_income": 2050,
+  "liquid_resources": 120,
+  "expected": {
+    "determination": "ELIGIBLE"
+  }
+}
