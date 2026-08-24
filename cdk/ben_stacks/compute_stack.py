@@ -27,6 +27,12 @@ class ComputeStack(cdk.Stack):
         common_env = {
             "AUDIT_TABLE": data.audit_table.table_name,
             "WORM_BUCKET": data.worm_bucket.bucket_name,
+            # The pinned governed-core evidence writer reads AUDIT_BUCKET
+            # (governed_core/controls/evidence.py: _env("AUDIT_BUCKET") or
+            # "evidence-worm-<acct>-<region>"). Without this alias the WORM mirror
+            # silently no-ops with worm_error=NoSuchBucket (found live on ben-demo,
+            # 2026-08-24). WORM_BUCKET kept for anything reading the old name.
+            "AUDIT_BUCKET": data.worm_bucket.bucket_name,
             "SANITIZED_TABLE": data.sanitized_table.table_name,
             "PENDING_TABLE": data.pending_table.table_name,
             "CASE_TABLE": data.case_table.table_name,   # R3-2 pass-by-reference store
