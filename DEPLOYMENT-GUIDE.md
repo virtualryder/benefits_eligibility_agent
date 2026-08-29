@@ -42,6 +42,21 @@ Guidelines compiled in as configuration, so there is no runtime external depende
 | `network_mode=private` | **ZERO public egress** — governed Lambdas in isolated subnets, AWS private endpoints only; **no NAT, no internet gateway, no egress firewall** (benefits reaches no external API) |
 | `identity_mode=pilot` | MFA ON (software token), threat protection ENFORCED, admin-create-only, zero users |
 | `tenant=<agency-id>` | HMAC-signed into sanitized artifacts (Gate-B B5) |
+| `guardrail_id=<id>` `guardrail_version=<v>` | Arms the platform Bedrock guardrail on the drafter (`draft_notice`). Every generation is guardrail-assessed; an intervention fails closed (no `notice_ref`) and the case routes to `ManualReview`. Omit → drafting is unguarded (sandbox only). |
+| `approvals_client_id=<cognito-client-id>` | Client id the `approve-signoff` Lambda verifies caseworker access tokens against. The identity pool/reviewer group are wired from the identity stack automatically; this is only needed when approvals use a different app client than the gateway (e.g. a CLI/native client). |
+
+### Observability & governance evidence (verify the claims)
+
+Deployed as IaC by the stacks above — no post-deploy instrumentation:
+
+- **X-Ray** — `Tracing.ACTIVE` on every governed tool Lambda and the gateway; one execution is a single connected trace (ingest → guards → mask → assess → draft → audit → finalize).
+- **Step Functions execution logging** — `loggingConfiguration` level `ALL`, `includeExecutionData=false` (R3-2: references only, no case content), 1-year CMK-when-present log group at `/aws/states/<prefix>-determination-workflow`.
+- **Lambda logs** — unconditional 1-year retention on every `/aws/lambda/<prefix>-*` group (decoupled from the KMS switch).
+- **Model prompts & responses** — account-level **Bedrock model-invocation logging** (a platform runbook one-time step) captures full request/response bodies; because masking runs *before* the model, the logged prompt is de-identified (`[REDACTED:NAME]` / `[REDACTED:SSN]`).
+- **Data-source touches** — the platform **evidence trail** records management-write events + DynamoDB data events for all tables; each agent adds a **data-only CloudTrail** on its own WORM vault (`<prefix>-worm-data-events`). Answers "who touched the evidence" independent of the app's own logging.
+- **Approval integrity (governed-core ≥ 1.5.0)** — approvals go through `approve-signoff` (Cognito access-token verified, separation-of-duties, single-use). `finalize` verifies the **approval path**: a task token released around that Lambda (e.g. a raw `send-task-success`) is refused fail-closed to `ManualReview` and recorded `DENIED` — never `COMMITTED`.
+
+One end-to-end run produces four independent captures of the same action (X-Ray trace, SFN log stream, de-identified invocation-log entry, ledger + WORM object with a CloudTrail data event). See `evidence/OBSERVABILITY-VALIDATION-2026-08-29.md` for a live run.
 
 ## 2. Run a case (execution-input contract)
 

@@ -93,11 +93,24 @@ intake_application -> mask_pii -> assess_eligibility -> draft_notice -> write_au
 - **assess_eligibility** — a deterministic rules engine (public Federal Poverty Guidelines + SNAP-style
   gross-income test) returning ELIGIBLE / INELIGIBLE / NEEDS_REVIEW and the **processing clock**
   (EXPEDITED 7-day vs STANDARD 30-day). No model, no licensed data.
-- **draft_notice** — a real Bedrock (Claude) determination notice, through a fail-closed output
-  guardrail, on de-identified data only.
+- **draft_notice** — a real Bedrock (Claude) determination notice on de-identified data only,
+  through the platform Bedrock guardrail when armed (`-c guardrail_id=…`). Any guardrail
+  intervention fails closed (no `notice_ref`); the workflow's `DraftOk` gate then routes the case
+  to `ManualReview` rather than the sign-off gate. Proven live 2026-08-29: a prompt-injection
+  application was intervened and never reached an approver.
 - **write_audit** — append-only DynamoDB ledger + S3 Object Lock (WORM) copy of every decision. Each record is **hash-chained** to the prior one (`chain_hash = SHA-256(prev_hash + entry_hash)`), so the ledger is tamper-evident by construction — not just un-deletable but provably un-editable — and `lib/controls/verify_chain.py` replays the links to prove INTACT (or name the first broken record).
-- **request_signoff** — starts a Step Functions separation-of-duties gate; a *different* caseworker
-  approves with a single-use token before `finalize_determination` ever runs.
+- **request_signoff / approve-signoff / finalize** — a Step Functions separation-of-duties gate. A
+  *different* caseworker approves through **`approve-signoff`** (Cognito access-token verified, SoD,
+  single-use token) before `finalize` runs. On **governed-core ≥ 1.5.0**, `finalize` verifies the
+  **approval path**: a token released around that Lambda (a raw `send-task-success`, say) is refused
+  fail-closed to `ManualReview` and recorded `DENIED`. Proven live 2026-08-29: a raw-CLI approval
+  wrote no `COMMITTED` marker; a token-verified approval committed; self-approval was refused.
+
+**Observability** is IaC on every deploy: X-Ray on all tools + the gateway, Step Functions execution
+logging (payload-free), unconditional 1-year Lambda log retention, account-level Bedrock
+model-invocation logging (de-identified prompts), and a data-only CloudTrail on the WORM vault
+alongside the platform evidence trail — four independent captures of every action. See
+`DEPLOYMENT-GUIDE.md` and `evidence/OBSERVABILITY-VALIDATION-2026-08-29.md`.
 
 Authorization is **Cedar deny-by-default** at the AgentCore Gateway: `caseworker_permit` (role-gated),
 `mask_before_assess` and `mask_before_draft` forbids (no processing/drafting on un-masked data), and
