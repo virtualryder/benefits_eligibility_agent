@@ -56,13 +56,14 @@ class ComputeStack(cdk.Stack):
             common_env["PROVENANCE_SECRET_ARN"] = self.signing_secret.secret_arn
 
         def fn(name, handler_module, env=None, timeout=30):
-            log_group = None
-            if cmk is not None:
-                log_group = logs.LogGroup(
-                    self, name.replace("-", " ").title().replace(" ", "") + "Logs",
-                    log_group_name=f"/aws/lambda/{prefix}-{name}",
-                    encryption_key=cmk, retention=logs.RetentionDays.ONE_YEAR,
-                    removal_policy=cdk.RemovalPolicy.DESTROY)
+            # Observability review 2026-08-29: the log group is now UNCONDITIONAL —
+            # 1-year retention must not be a side effect of the kms switch. CMK
+            # encryption still applies only when a customer-managed key exists.
+            log_group = logs.LogGroup(
+                self, name.replace("-", " ").title().replace(" ", "") + "Logs",
+                log_group_name=f"/aws/lambda/{prefix}-{name}",
+                encryption_key=cmk, retention=logs.RetentionDays.ONE_YEAR,
+                removal_policy=cdk.RemovalPolicy.DESTROY)
             net = {}
             if network is not None:
                 net = dict(vpc=network.vpc,
@@ -74,7 +75,9 @@ class ComputeStack(cdk.Stack):
                 handler=f"{handler_module}.handler",
                 timeout=cdk.Duration.seconds(timeout), memory_size=256,
                 environment={**common_env, **(env or {})},
-                environment_encryption=cmk, log_group=log_group, **net,
+                environment_encryption=cmk, log_group=log_group,
+                tracing=lambda_.Tracing.ACTIVE,   # X-Ray on every governed tool (obs review 2026-08-29)
+                **net,
             )
             if cmk is not None:
                 cmk.grant_decrypt(f)

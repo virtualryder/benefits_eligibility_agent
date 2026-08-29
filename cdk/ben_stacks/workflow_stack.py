@@ -21,7 +21,8 @@ drafted notice text never enters state either. The strict canary holds the contr
 in execution history.
 """
 import aws_cdk as cdk
-from aws_cdk import aws_stepfunctions as sfn, aws_stepfunctions_tasks as tasks
+from aws_cdk import (aws_kms as kms, aws_logs as logs, aws_stepfunctions as sfn,
+                     aws_stepfunctions_tasks as tasks)
 from constructs import Construct
 
 
@@ -113,10 +114,23 @@ class WorkflowStack(cdk.Stack):
         g_adverse.next(c4)
         draft.next(audit_intent).next(signoff).next(finalize).next(committed)
 
+        # Observability review 2026-08-29: retained (1y) execution logging + X-Ray tracing.
+        # include_execution_data=False keeps case payloads out of the log stream — state carries
+        # references only (R3-2), and the log record matches that discipline. CMK applies when present.
+        wf_cmk = None
+        if getattr(data, "cmk", None) is not None:
+            wf_cmk = kms.Key.from_key_arn(self, "WfCmk", data.cmk.key_arn)
+        wf_logs = logs.LogGroup(
+            self, "ControllerLogs", log_group_name=f"/aws/states/{prefix}-determination-workflow",
+            encryption_key=wf_cmk, retention=logs.RetentionDays.ONE_YEAR,
+            removal_policy=cdk.RemovalPolicy.DESTROY)
         self.controller = sfn.StateMachine(
             self, "Controller", state_machine_name=f"{prefix}-determination-workflow",
             definition_body=sfn.DefinitionBody.from_chainable(definition),
             state_machine_type=sfn.StateMachineType.STANDARD,
             timeout=cdk.Duration.hours(25),
+            tracing_enabled=True,
+            logs=sfn.LogOptions(destination=wf_logs, level=sfn.LogLevel.ALL,
+                                include_execution_data=False),
         )
         cdk.CfnOutput(self, "ControllerArn", value=self.controller.state_machine_arn)
