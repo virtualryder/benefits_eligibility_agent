@@ -60,12 +60,43 @@ Second case **BEN-SYN-0006** ran the same path to Committed (approver `superviso
 surfaced as CloudWatch metric `Benefits/Governance GuardFailed{Guard=deidentified} Sum=1` — the
 security-signal path that drives the GuardFailures alarm.
 
-## Known gaps carried into the follow-up plan
+## Gap closure — same-day fixes, all proven live
 
-- DraftNotice `Converse` call carries **no guardrail config** — the guardrail v1 pin covers the
-  platform gateway path; the benefits drafter invokes Bedrock directly. (Top item of the follow-up plan.)
-- `/aws/lambda/ben-demo-gateway-AttachmentProvider…` (CDK custom-resource singleton) has no retention policy.
-- Bedrock invocation log group uses default SSE, not the CMK (sandbox-acceptable; hardening item).
-- Stale PENDING approval rows from earlier validation runs remain in `ben-demo-pending-approvals`.
-- X-Ray Transaction Search destination not configured (classic X-Ray in use and sufficient today).
-- These observability edits are not yet ported to the PV / financial-aid templates.
+Every gap below was fixed, redeployed, and re-verified live in the same session.
+
+**G1 — guardrail-pinned drafting (closed).** `core-tools` now carries `GUARDRAIL_ID=h02ji3st2lkd`,
+`GUARDRAIL_VERSION=1` + `bedrock:ApplyGuardrail`; a guardrail intervention fails closed (no
+`notice_ref`), and a new `DraftOk` workflow choice routes a blocked draft to `ManualReview`. Proven
+live: a **prompt-injection application** (`BEN-SYN-ATK-02`) was **intervened**
+(`AWS/Bedrock/Guardrails InvocationsIntervened=1`, guardrail version `1`); the drafter returned
+`guardrail: BLOCKED` and the case went to `ManualReview` — it never reached an approver. A clean case
+still drafts and commits normally.
+
+**G2 — approval-path verification (closed, governed-core 1.5.0).** Deployed the identity-verifying
+`approve-signoff` Lambda (Cognito access-token RS256/JWKS, separation-of-duties, single-use), and
+`finalize` now verifies the approval path with a `FinalizeOk` fail-closed route. Proven live across
+three scenarios:
+- raw `send-task-success` bypass (`BEN-G2-0009`, approver `attacker-self`) → **ManualReview, no
+  `FINAL#` COMMITTED marker** (refused);
+- token-verified approval (`BEN-G2-0010`, `approver-demo-1` ≠ requester) → **Committed**,
+  `FINAL#BEN-G2-0010` approver `approver-demo-1`;
+- self-approval (identity == requester) → refused (`separation-of-duties`); spoofed approver string
+  with no token → refused (`a signed access token is required, not an 'approver' field`).
+
+**G5 hardening (closed).** Gateway AttachmentProvider log group set to 365-day retention; the Bedrock
+invocation log group is now **CMK-encrypted** (added the CloudWatch Logs statement to the platform CMK
+key policy — the generic ViaService statement never matches Logs; found live, fixed in the platform
+stack and associated); stale PENDING approval rows marked `EXPIRED_STALE`/`CONSUMED` (no deletes).
+
+**G3 — ported.** The observability edits + `AUDIT_BUCKET` alias + guardrail/approve-signoff wiring are
+now in the PV and financial-aid templates (both `cdk synth` green, core-dependency tests pass), on
+governed-core 1.5.0.
+
+**Deferred (optional):** X-Ray Transaction Search destination — classic X-Ray is in use and sufficient
+today; enable when console-first trace queries or a SIEM seam are needed.
+
+## Final live config (re-verified)
+
+`core-tools`: TracingConfig=Active, GUARDRAIL_ID=h02ji3st2lkd, GUARDRAIL_VERSION=1 ·
+`approve-signoff`: Active, pool us-east-1_HiNG6H9qk, group benefits_caseworker ·
+state machine: logging ALL, tracing enabled · `/aegis/bedrock/model-invocations`: 365-day, CMK=true.
