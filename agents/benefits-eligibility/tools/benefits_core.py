@@ -59,8 +59,14 @@ def _draft(e):
         br = boto3.client("bedrock-runtime")
         resp = br.converse(**kwargs)
         notice = resp["output"]["message"]["content"][0]["text"].strip()
-        if resp.get("stopReason") == "guardrail_intervened" and not notice:
-            return {"error": "output guardrail blocked the draft (fail-closed)", "drafted_by": None, "guardrail": "BLOCKED"}
+        if resp.get("stopReason") == "guardrail_intervened":
+            # ANY intervention is fail-closed — including when the guardrail substitutes its
+            # configured blocked message (non-empty text). Proven live 2026-08-29: a prompt-injection
+            # application was intervened with the canned Aegis message, and the old `and not notice`
+            # condition would have minted a notice_ref for it. No notice_ref is created for a
+            # blocked draft; the case surfaces to the caseworker as draft-blocked instead.
+            return {"error": "guardrail blocked the draft (fail-closed)", "drafted_by": None,
+                    "guardrail": "BLOCKED", "guardrail_version": GUARDRAIL_VERSION}
         out = {"drafted_by": DRAFT_MODEL_ID, "chars": len(notice),
                "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True}
         # R3-2 pass-by-reference for the DRAFT OUTPUT: even though the notice is drafted from

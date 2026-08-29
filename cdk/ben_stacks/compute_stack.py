@@ -18,7 +18,9 @@ RUNTIME = lambda_.Runtime.PYTHON_3_12
 
 class ComputeStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, asset_dir: str, data,
-                 provenance_secret: str = "", network=None, tenant: str = "", **kw):
+                 provenance_secret: str = "", network=None, tenant: str = "",
+                 guardrail_id: str = "", guardrail_version: str = "1",
+                 identity=None, approvals_client_id: str = "", **kw):
         super().__init__(scope, cid, **kw)
         code = lambda_.Code.from_asset(asset_dir)
         cmk = None
@@ -98,12 +100,32 @@ class ComputeStack(cdk.Stack):
         # (Gate-C, see BENEFITS-PILOT-READINESS-PLAN.md).
         self.redetermine = fn("redetermine", "redetermine")
         self.overpayment = fn("overpayment", "overpayment")
-        self.core = fn("core-tools", "benefits_core", timeout=60)  # draft_notice (Bedrock)
+        # Guardrail-pinned drafting (G1, obs review 2026-08-29): the drafter already honors
+        # GUARDRAIL_ID / GUARDRAIL_VERSION (benefits_core passes guardrailConfig to Converse and
+        # fails closed on guardrail_intervened with empty output). Supplying the platform guardrail
+        # here makes EVERY generation guardrail-assessed — without it the direct Bedrock call is
+        # unguarded even though the platform gateway path is pinned.
+        core_env = {}
+        if guardrail_id:
+            core_env = {"GUARDRAIL_ID": guardrail_id, "GUARDRAIL_VERSION": guardrail_version}
+        self.core = fn("core-tools", "benefits_core", env=core_env, timeout=60)  # draft_notice (Bedrock)
         self.write_audit = fn("write-audit", "write_audit")
         self.request_signoff = fn("request-signoff", "request_signoff")
         self.signoff_register = fn("signoff-register", "signoff_register")
         self.finalize = fn("finalize", "finalize_signoff")
         self.guards = fn("workflow-guards", "workflow_guards")
+        # approve-signoff (G2, 2026-08-29): the human approver's OUT-OF-BAND door — verifies a
+        # Cognito ACCESS token (RS256/JWKS), enforces separation of duties, consumes the single-use
+        # approval (PENDING -> CONSUMED + recorded approver), and only then releases the task token.
+        # It is deliberately NOT a gateway target (not an agent tool). The finalize shadow refuses
+        # any approval that did not come through here, so this is now the ONLY working approve path.
+        self.approve_signoff = None
+        if identity is not None:
+            self.approve_signoff = fn("approve-signoff", "approve_signoff", env={
+                "POOL_ID": identity.pool.user_pool_id,
+                "CLIENT_ID": approvals_client_id or identity.client.user_pool_client_id,
+                "REVIEWER_GROUP": "benefits_caseworker",
+            })
 
         # ── explicit least-privilege wiring ──────────────────────────────────
         # Signing secret: readable ONLY by the minter (mask_pii) + the sanitized_ref verifiers
@@ -121,6 +143,18 @@ class ComputeStack(cdk.Stack):
         data.case_table.grant(self.core, "dynamodb:PutItem")
         data.pending_table.grant(self.signoff_register, "dynamodb:PutItem")
         data.pending_table.grant_read_write_data(self.finalize)
+        if self.approve_signoff is not None:
+            # approve path: read + consume the pending row, release the token, write DENIED/APPROVED
+            # evidence. SendTaskSuccess is scoped to this deployment's controller by NAME (a
+            # constructed ARN, not a cross-stack ref — workflow deploys after compute).
+            data.pending_table.grant(self.approve_signoff, "dynamodb:GetItem", "dynamodb:UpdateItem")
+            self.approve_signoff.add_to_role_policy(iam.PolicyStatement(
+                actions=["states:SendTaskSuccess", "states:SendTaskFailure"],
+                resources=[f"arn:aws:states:{self.region}:{self.account}:"
+                           f"stateMachine:{prefix}-determination-workflow"]))
+            data.audit_table.grant(self.approve_signoff, "dynamodb:PutItem",
+                                   "dynamodb:GetItem", "dynamodb:TransactWriteItems")
+            data.worm_bucket.grant_put(self.approve_signoff)
         # masking: detect PII + write the sanitized store (PutItem only)
         self.mask.add_to_role_policy(iam.PolicyStatement(
             actions=["comprehend:DetectPiiEntities"], resources=["*"]))
@@ -131,6 +165,11 @@ class ComputeStack(cdk.Stack):
         # drafter: Bedrock only
         self.core.add_to_role_policy(iam.PolicyStatement(
             actions=["bedrock:InvokeModel"], resources=["*"]))
+        if guardrail_id:
+            # Converse with guardrailConfig requires ApplyGuardrail on the specific guardrail.
+            self.core.add_to_role_policy(iam.PolicyStatement(
+                actions=["bedrock:ApplyGuardrail"],
+                resources=[f"arn:aws:bedrock:{self.region}:{self.account}:guardrail/{guardrail_id}"]))
         # (No AgentCore-Identity OAuth grant is issued: `verify_income` is not deployed — see above.)
         # audit writer: append-only + WORM put, with explicit tamper Deny
         data.audit_table.grant(self.write_audit, "dynamodb:PutItem",
@@ -161,3 +200,7 @@ class ComputeStack(cdk.Stack):
             "RequestSignoffArn": self.request_signoff, "GuardsArn": self.guards,
         }.items():
             cdk.CfnOutput(self, name, value=f.function_arn)   # exact ARNs (P0-7)
+        if self.approve_signoff is not None:
+            cdk.CfnOutput(self, "ApproveSignoffArn", value=self.approve_signoff.function_arn,
+                          description="The ONLY working approve path: verifies the approver's Cognito "
+                                      "access token, enforces SoD, consumes the single-use approval.")

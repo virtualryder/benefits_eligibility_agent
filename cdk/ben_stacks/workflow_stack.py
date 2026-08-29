@@ -107,12 +107,28 @@ class WorkflowStack(cdk.Stack):
             sfn.Condition.boolean_equals("$.guards.rules_executed.ok", True), g_adverse).otherwise(manual_review)
         c4 = sfn.Choice(self, "AdverseNoticeOk").when(
             sfn.Condition.boolean_equals("$.guards.adverse_notice.ok", True), draft).otherwise(adverse_hold)
+        # G1 hardening (2026-08-29, proven live): a guardrail-BLOCKED or errored draft must never
+        # reach the sign-off gate — an approver should not be asked to sign a case whose notice the
+        # guardrail refused to generate. A successful draft carries notice_ref (or inline notice in
+        # storeless sandboxes); anything else routes to ManualReview (NEEDS_REVIEW).
+        c5 = sfn.Choice(self, "DraftOk").when(
+            sfn.Condition.or_(sfn.Condition.is_present("$.draft.out.notice_ref"),
+                              sfn.Condition.is_present("$.draft.out.notice")),
+            audit_intent).otherwise(manual_review)
+        # G2 (2026-08-29): finalize now VERIFIES the approval path and refuses a token released
+        # around approve_signoff (or a self-approval). A refused finalize must not land on the
+        # Committed state — it routes to ManualReview (NEEDS_REVIEW), and the refusal is already a
+        # DENIED event in the hash-chained ledger.
+        c6 = sfn.Choice(self, "FinalizeOk").when(
+            sfn.Condition.boolean_equals("$.commit.out.committed", True),
+            committed).otherwise(manual_review)
 
         definition = extract.next(g_extracted).next(c1)
         mask.next(g_deid).next(c2)
         assess.next(g_rules).next(c3)
         g_adverse.next(c4)
-        draft.next(audit_intent).next(signoff).next(finalize).next(committed)
+        draft.next(c5)
+        audit_intent.next(signoff).next(finalize).next(c6)
 
         # Observability review 2026-08-29: retained (1y) execution logging + X-Ray tracing.
         # include_execution_data=False keeps case payloads out of the log stream — state carries
