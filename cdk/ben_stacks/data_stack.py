@@ -94,6 +94,9 @@ class DataStack(cdk.Stack):
         # WORM evidence vault (Object Lock; retention per profile).
         self.worm_bucket = s3.Bucket(
             self, "WormVault",
+            # per-tenant vault gets a PREDICTABLE name so the shared control plane can scope IAM to
+            # <prefix>-*-worm-* (hybrid multi-tenant); silo keeps the CDK auto-name.
+            **({"bucket_name": f"{prefix}-{self.tenant}-worm-{self.account}"} if self.tenant else {}),
             object_lock_enabled=True,
             object_lock_default_retention=(
                 s3.ObjectLockRetention.governance(days) if mode == s3.ObjectLockMode.GOVERNANCE

@@ -199,6 +199,47 @@ class ComputeStack(cdk.Stack):
                                "dynamodb:GetItem", "dynamodb:TransactWriteItems")
         data.worm_bucket.grant_put(self.finalize)
 
+        # ── Hybrid multi-tenant (phase 107/109) ─────────────────────────────
+        # The SAME least-privilege actions, mirrored onto EVERY tenant's own store inside this
+        # deployment prefix (<prefix>-<tenant>-<logical>). Stores are routed per request by
+        # tenancy.route_store from the interceptor-injected, signed tenant; grants never widen past
+        # the prefix, and the audit tamper DENY is mirrored onto every tenant's ledger + vault.
+        if multitenant:
+            def _tbl(logical):
+                base = f"arn:aws:dynamodb:{self.region}:{self.account}:table/{prefix}-*-{logical}"
+                return [base, f"{base}/index/*"]
+            worm = [f"arn:aws:s3:::{prefix}-*-worm-*", f"arn:aws:s3:::{prefix}-*-worm-*/*"]
+
+            def _mt(fn, resources, *actions):
+                fn.add_to_role_policy(iam.PolicyStatement(actions=list(actions), resources=resources))
+            RW = ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan",
+                  "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem",
+                  "dynamodb:BatchWriteItem", "dynamodb:ConditionCheckItem", "dynamodb:DescribeTable"]
+            AUD = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:TransactWriteItems"]
+            _mt(self.ingest, _tbl("case-store"), "dynamodb:PutItem")
+            _mt(self.intake, _tbl("case-store"), "dynamodb:GetItem")
+            _mt(self.mask, _tbl("case-store"), "dynamodb:GetItem")
+            _mt(self.core, _tbl("case-store"), "dynamodb:PutItem")
+            _mt(self.signoff_register, _tbl("pending-approvals"), "dynamodb:PutItem")
+            _mt(self.finalize, _tbl("pending-approvals"), *RW)
+            _mt(self.mask, _tbl("sanitized-artifacts"), "dynamodb:PutItem")
+            for f in (self.core, self.guards, self.assess):
+                _mt(f, _tbl("sanitized-artifacts"), "dynamodb:GetItem")
+            for f in (self.write_audit, self.request_signoff, self.finalize):
+                _mt(f, _tbl("audit-ledger"), *AUD)
+                _mt(f, worm, "s3:PutObject", "s3:Abort*")
+            if self.approve_signoff is not None:
+                _mt(self.approve_signoff, _tbl("pending-approvals"), "dynamodb:GetItem", "dynamodb:UpdateItem")
+                _mt(self.approve_signoff, _tbl("audit-ledger"), *AUD)
+                _mt(self.approve_signoff, worm, "s3:PutObject", "s3:Abort*")
+            self.write_audit.add_to_role_policy(iam.PolicyStatement(
+                effect=iam.Effect.DENY,
+                actions=["dynamodb:DeleteItem", "dynamodb:UpdateItem",
+                         "s3:DeleteObject", "s3:DeleteObjectVersion",
+                         "s3:PutObjectRetention", "s3:PutObjectLegalHold",
+                         "s3:BypassGovernanceRetention"],
+                resources=_tbl("audit-ledger") + worm))
+
         for name, f in {
             "IngestArn": self.ingest, "IntakeArn": self.intake, "MaskArn": self.mask,
             "AssessArn": self.assess,

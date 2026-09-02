@@ -81,6 +81,15 @@ asset_dir = stage_lambda_bundle()
 
 data = DataStack(app, f"{prefix}-data", prefix=prefix, retention_profile=profile,
                  kms_mode=app.node.try_get_context("kms") or "aws-managed")
+# Hybrid multi-tenant (phase 107/109): -c tenants=a,b provisions a PHYSICALLY SEPARATE data stack per
+# tenant (tenant-scoped tables + its own WORM vault). The shared control plane routes to them per
+# request (gateway interceptor -> signed tenant -> tenancy.route_store). The base data stack above
+# keeps the silo path + env-name shape; tenant stores are the ones tenants actually use.
+tenants = [t.strip() for t in str(app.node.try_get_context("tenants") or "").split(",") if t.strip()]
+multitenant = bool(tenants) or str(app.node.try_get_context("multitenant") or "").lower() in ("1", "true", "yes")
+tenant_data = {t: DataStack(app, f"{prefix}-{t}-data", prefix=prefix, retention_profile=profile,
+                            kms_mode=app.node.try_get_context("kms") or "aws-managed", tenant=t)
+               for t in tenants}
 network = None
 if (app.node.try_get_context("network_mode") or "public") == "private":
     network = NetworkStack(app, f"{prefix}-network", prefix=prefix)
@@ -97,7 +106,7 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        network=network,
                        tenant=app.node.try_get_context("tenant") or "",
                        # phase 107 hybrid: -c multitenant=1 -> tenant derived per request (gateway interceptor)
-                       multitenant=str(app.node.try_get_context("multitenant") or "").lower() in ("1", "true", "yes"),
+                       multitenant=multitenant,
                        # G1 guardrail-pinned drafting: pass the platform guardrail so DraftNotice
                        # generations are guardrail-assessed (-c guardrail_id=... -c guardrail_version=1)
                        guardrail_id=app.node.try_get_context("guardrail_id") or "",
@@ -112,7 +121,8 @@ observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix
                                    compute=compute, workflow=workflow, data=data)
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity)
 
-for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()):
+for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
+        + tuple(tenant_data.values()):
     cdk.Tags.of(s).add("app", "benefits-eligibility-agent")
     cdk.Tags.of(s).add("env", env_name)
     cdk.Tags.of(s).add("cost-center", "governed-agents")

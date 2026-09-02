@@ -187,6 +187,8 @@ def test_data_stack_per_tenant_naming_is_physically_separate():
         Match.object_like({"TableName": "ben-test-pha-alameda-audit-ledger"}))
     Template.from_stack(silo).has_resource_properties("AWS::DynamoDB::Table",
         Match.object_like({"TableName": "ben-test-audit-ledger"}))
+    # per-tenant WORM vault gets a predictable, tenant-scoped name (so IAM can scope to <prefix>-*-worm-*)
+    assert "ben-test-pha-oakland-worm-" in json.dumps(Template.from_stack(a).to_json())
 
 
 def test_tenant_interceptor_wired_into_compute_and_gateway():
@@ -210,5 +212,9 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     assert "InterceptorLambdaArn" in gw, "gateway attachment does not carry the interceptor ARN"
     assert "__aegis_tenant" in gw and "__aegis_tenant_sig" in gw, \
         "tool schemas are missing the reserved signed-tenant fields"
+    # multi-tenant mirror grants: the shared Lambdas reach EVERY tenant's store, scoped to the prefix
+    cj = json.dumps(tc.to_json())
+    assert "table/ben-mt-*-case-store" in cj and "table/ben-mt-*-audit-ledger" in cj
+    assert "arn:aws:s3:::ben-mt-*-worm-*" in cj
     # (the gateway role's invoke grant and the attachment both reference the interceptor ARN via the
     #  same cross-stack export token, so InterceptorLambdaArn being present proves the wiring)
