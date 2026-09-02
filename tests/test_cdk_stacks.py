@@ -245,6 +245,22 @@ def test_multitenant_audit_routing_wired_through_compute_and_workflow():
             "WORM_BUCKET_TEMPLATE": Match.object_like({"Fn::Join": Match.any_value()})})},
     }))
     assert "ben-mt-{tenant}-worm-" in json.dumps(tc.to_json())
+    # every tenant-verifying Lambda can read the signing secret (found missing live on ben-mt2):
+    # a role policy granting secretsmanager:GetSecretValue on the SigningSecret for each of these
+    roles_with_secret = set()
+    for name, res in tc.to_json()["Resources"].items():
+        if res["Type"] != "AWS::IAM::Policy":
+            continue
+        doc = json.dumps(res["Properties"]["PolicyDocument"])
+        if "secretsmanager:GetSecretValue" in doc and "SigningSecret" in doc:
+            roles_with_secret.update(json.dumps(res["Properties"]["Roles"]).split('"Ref": "')[1:])
+    roles_with_secret = {r.split('"')[0] for r in roles_with_secret}
+    assert len(roles_with_secret) >= 13, roles_with_secret     # 7 original readers + 6 multi-tenant verifiers
+    fn_roles = {res["Properties"]["FunctionName"]: json.dumps(res["Properties"]["Role"])
+                for res in tc.to_json()["Resources"].values() if res["Type"] == "AWS::Lambda::Function"}
+    for fname in ("ben-mt-ingest-application", "ben-mt-intake-application", "ben-mt-write-audit",
+                  "ben-mt-request-signoff", "ben-mt-signoff-register", "ben-mt-finalize", "ben-mt-mask-pii"):
+        assert any(r in fn_roles[fname] for r in roles_with_secret), f"{fname} cannot read the signing secret"
     wj = json.dumps(tw.to_json())
     # every LambdaInvoke payload (incl. the waitForTaskToken sign-off register) carries the signed pair
     # 11 Lambda-backed states: Extract, 5 guards, MaskPii, AssessEligibility, DraftNotice, AuditIntent,

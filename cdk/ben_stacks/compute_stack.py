@@ -154,6 +154,16 @@ class ComputeStack(cdk.Stack):
             for f in (self.mask, self.assess, self.redetermine, self.overpayment,
                       self.core, self.guards, self.tenant_interceptor):   # interceptor SIGNS the tenant
                 self.signing_secret.grant_read(f)
+            # Hybrid multi-tenant (governed-core 1.6.0): EVERY Lambda that routes a store VERIFIES the
+            # HMAC-signed tenant pair first, so every one of them is a verifier and needs the key
+            # (ingest also SIGNS the pair the workflow carries). Found live 2026-09-02 (ben-mt2): the
+            # audit writer, intake and the sign-off Lambdas had no read grant, so verification failed
+            # and they refused fail-closed (TenantError) - correct behavior, missing grant.
+            if multitenant:
+                for f in (self.ingest, self.intake, self.write_audit, self.request_signoff,
+                          self.signoff_register, self.finalize, self.approve_signoff):
+                    if f is not None:
+                        self.signing_secret.grant_read(f)
         # R3-2 case store: ingest WRITES raw content; intake + mask READ it (the only two consumers of
         # raw text); the drafter WRITES the notice. Nothing else touches raw content; only opaque refs
         # cross Step Functions state.
