@@ -20,7 +20,7 @@ runs exercised is still live and ENFORCE on today's code.
 ## Live control-plane reads (2026-09-02, us-east-1)
 
 **Gateway** `ben-demo-ben-gw-2cdvjxaxth`
-- arn: `arn:aws:bedrock-agentcore:us-east-1:864217980669:gateway/ben-demo-ben-gw-2cdvjxaxth`
+- arn: `arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-demo-ben-gw-2cdvjxaxth`
 - url: `https://ben-demo-ben-gw-2cdvjxaxth.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`
 - status **READY** · protocolType **MCP** · authorizerType **CUSTOM_JWT**
 - inbound authz: Cognito discovery `us-east-1_HiNG6H9qk`, allowedClients `[26eu58bmp51fu8iaa6l3kpftnr]`

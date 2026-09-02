@@ -11,7 +11,7 @@ in `AGENTCORE-MULTITENANT-E2E-2026-09-02.md`.
 Deployment: `cdk deploy --all -c env=mt2 -c retention_profile=sandbox-demo -c tenants=pha-a,pha-b`
 (8 stacks, from zero, account 864217980669 / us-east-1; benefits `c29003b`+, governed-core `v1.6.0`
 pinned by hash `6dbe4c26…93cd`). Gateway `https://ben-mt2-ben-gw-vrmhkswhoe.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`, enforcement `ENFORCE`.
-Harness: `scripts/mt_two_tenant_proof.py --env mt2 --tenants pha-a,pha-b` (verbatim JSON alongside).
+Harness: `scripts/mt_two_tenant_proof.py --env mt2 --tenants pha-a,pha-b` (verbatim JSON alongside; ARN account ids redacted to 111122223333 per repo policy).
 
 ## Verdict
 
