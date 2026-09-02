@@ -36,11 +36,11 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 
 | Claim | Status |
 |---|---|
-| Offline suite | **143 passing** (124 locally + 1 CI-only gate) (control-plane + 15 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Offline suite | **147 passing** (124 locally + 1 CI-only gate) (control-plane + 15 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Live clean-account validation | **Done twice** — EP1 2026-07-27 (`ben-val1`) and a full runbook re-walk 2026-07-28 (`ben-val2`), us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
 | Zero public egress | **Measured, not asserted** — 0 NAT gateways · 0 internet gateways · 9 VPC endpoints on the live `ben-val2` VPC |
 | Deploy-from-IaC of the zero-egress SG fix | **Proven** on `ben-val2`. (In EP1 that rule had to be patched onto the live SG by hand, so the IaC version was previously unexercised.) |
-| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 143 offline tests |
+| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 147 offline tests |
 | Independent deployment by a third party | **Not yet** — all evidence is author-produced. **A verification kit is ready:** [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md) + `python scripts/independent_verify.py`. This is the highest-value next step — if you are that third party, start there. |
 | Independent security test / pen test | **Not yet** |
 | Enterprise IdP round-trip | **Not yet** (federation exists as IaC; no agency IdP integrated) |
@@ -87,7 +87,7 @@ override reasons. Full shape + exclusions: [`BENEFITS-PILOT-READINESS-PLAN.md`](
 
 Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-27 `ben-val1`;
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual),
-tag `v0.2.0-pilot-rc1`, cut from this tree. Suite: **143 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and stood at 101; do not
+tag `v0.2.0-pilot-rc1`, cut from this tree. Suite: **147 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and stood at 101; do not
 re-align). Next, in order: independent redeploy of the tag,
 tenant-scoped case-store fetch, enterprise IdP round-trip, a one-state SNAP rule set with
 benefits-program SME sign-off, and independent security testing — before any real data.

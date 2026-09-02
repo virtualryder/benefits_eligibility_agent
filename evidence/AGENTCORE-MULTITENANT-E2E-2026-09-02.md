@@ -45,10 +45,11 @@ routing_cw-b_only_to_pha-b ✓ · PASS`.
 
 ## Scope / honesty
 
-- Per-tenant routing is proven for the benefits-owned stores (sanitized artifacts, case store). The
-  audit/WORM ledger writer lives in `governed-core` and still writes to the base ledger in multi-tenant
-  mode — per-tenant WORM routing there is the tracked cross-repo follow-up (each tenant already has its
-  own WORM vault provisioned).
+- Per-tenant routing is proven for the benefits-owned stores (sanitized artifacts, case store). At the
+  time of this run the audit/WORM ledger writer (`governed-core` 1.5.0) still wrote to the base ledger in
+  multi-tenant mode. **Closed by governed-core 1.6.0** (per-tenant ledger / WORM vault / approvals
+  register routing promoted into the core) — see `evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`
+  for the live re-run that proves it.
 - Test users were disposable (admin-created, deleted with the identity stack). Torn down after the run;
   residual confirmation appended below.
 

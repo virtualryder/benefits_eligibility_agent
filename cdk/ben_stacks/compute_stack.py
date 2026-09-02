@@ -47,6 +47,10 @@ class ComputeStack(cdk.Stack):
         # HMAC-signed injection (never the pinned env); MULTITENANT=1 makes the routing fail-closed.
         if multitenant:
             common_env["MULTITENANT"] = "1"
+            # governed-core 1.6.0: the CANONICAL evidence writer routes the WORM copy to the acting
+            # tenant's OWN Object Lock vault. The template is the exact per-tenant DataStack naming
+            # (<prefix>-<tenant>-worm-<account>), so infra and runtime cannot drift.
+            common_env["WORM_BUCKET_TEMPLATE"] = f"{prefix}-{{tenant}}-worm-{self.account}"
         # Per-deploy signing secret (P0-1). DEFAULT: a generated AWS Secrets Manager secret referenced
         # by ARN — never plaintext in the template. A context-supplied plaintext secret remains available
         # for disposable sandbox validation ONLY.
@@ -90,7 +94,16 @@ class ComputeStack(cdk.Stack):
             return f
 
         # Benefits governed tool set (manifest targets).
-        self.ingest = fn("ingest-application", "ingest_case")   # R3-2: the only door for raw content
+        # Hybrid multi-tenant ingestion boundary (governed-core 1.6.0): ingest is NOT a gateway tool
+        # (direct IAM invocation by the intake integration), so there is no interceptor to derive the
+        # tenant. In multi-tenant mode it derives the tenant from a VERIFIED Cognito access token of a
+        # tenant member (RS256/JWKS, pool + client checked) and mints the signed pair the workflow
+        # carries. Same identity env as approve_signoff; unused in silo mode.
+        ingest_env = ({"POOL_ID": identity.pool.user_pool_id,
+                       "CLIENT_ID": approvals_client_id or identity.client.user_pool_client_id,
+                       "REVIEWER_GROUP": "benefits_caseworker"}
+                      if (multitenant and identity is not None) else None)
+        self.ingest = fn("ingest-application", "ingest_case", env=ingest_env)   # R3-2: the only door for raw content
         self.intake = fn("intake-application", "intake_application")
         self.mask = fn("mask-pii", "mask_pii")
         self.assess = fn("assess-eligibility", "assess_eligibility")

@@ -226,3 +226,29 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     assert "arn:aws:s3:::ben-mt-*-worm-*" in cj
     # (the gateway role's invoke grant and the attachment both reference the interceptor ARN via the
     #  same cross-stack export token, so InterceptorLambdaArn being present proves the wiring)
+
+
+def test_multitenant_audit_routing_wired_through_compute_and_workflow():
+    """governed-core 1.6.0: per-tenant ledger/WORM/approvals routing. Compute hands the evidence writer
+    the exact per-tenant vault template; the workflow threads the HMAC-signed tenant pair into EVERY
+    Lambda payload (the Step Functions hop has no interceptor). Silo templates carry neither."""
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d4", prefix="ben-mt", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "c4", prefix="ben-mt", asset_dir=asset, data=data, multitenant=True)
+    workflow = WorkflowStack(app, "w4", prefix="ben-mt", compute=compute, data=data, multitenant=True)
+    tc, tw = Template.from_stack(compute), Template.from_stack(workflow)
+    tc.has_resource_properties("AWS::Lambda::Function", Match.object_like({
+        "FunctionName": "ben-mt-write-audit",
+        "Environment": {"Variables": Match.object_like({
+            "MULTITENANT": "1",
+            "WORM_BUCKET_TEMPLATE": Match.object_like({"Fn::Join": Match.any_value()})})},
+    }))
+    assert "ben-mt-{tenant}-worm-" in json.dumps(tc.to_json())
+    wj = json.dumps(tw.to_json())
+    # every LambdaInvoke payload (incl. the waitForTaskToken sign-off register) carries the signed pair
+    # 11 Lambda-backed states: Extract, 5 guards, MaskPii, AssessEligibility, DraftNotice, AuditIntent,
+    # HumanSignoff (waitForTaskToken), Finalize -> each carries the pair exactly once
+    assert wj.count("__aegis_tenant.$") == 11 and wj.count("__aegis_tenant_sig.$") == 11, wj.count("__aegis_tenant.$")
+    silo = json.dumps(T_WORKFLOW.to_json()) + json.dumps(T_COMPUTE.to_json())
+    assert "__aegis_tenant" not in silo and "WORM_BUCKET_TEMPLATE" not in silo

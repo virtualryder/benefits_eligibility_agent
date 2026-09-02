@@ -117,7 +117,8 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        # CLI-auth demo client without touching the IaC gateway client.
                        identity=identity,
                        approvals_client_id=app.node.try_get_context("approvals_client_id") or "")
-workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data)
+workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data,
+                         multitenant=multitenant)
 observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
                                    compute=compute, workflow=workflow, data=data)
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,

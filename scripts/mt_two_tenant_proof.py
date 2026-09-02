@@ -8,6 +8,14 @@ Drives the deployed AgentCore gateway as THREE identities and records verbatim r
 Then proves physical isolation: after cw-a's call only pha-a's sanitized store holds the artifact,
 and after cw-b's only pha-b's - never the other tenant's, never the base silo table.
 
+governed-core 1.6.0 (cross-repo per-tenant AUDIT routing) adds:
+  * gateway write_audit as cw-a / cw-b -> the hash-chained record + WORM copy land ONLY in that
+    tenant's ledger (<prefix>-<tenant>-audit-ledger) and vault (<prefix>-<tenant>-worm-<acct>);
+  * the WORKFLOW hop (no interceptor): ingest with cw-a's verified token mints the signed tenant
+    pair; an execution started with it writes its INTENT evidence + pending-approval into pha-a's
+    stores only (execution stopped at the sign-off pause); an execution started WITHOUT the pair
+    fails at the first state (fail-closed) and writes nothing.
+
 Usage: python scripts/mt_two_tenant_proof.py --env mt --tenants pha-a,pha-b --region us-east-1
 Creates disposable Cognito users (admin-create, permanent password) and authenticates via SRP.
 Synthetic data only. Writes evidence JSON to stdout."""
@@ -94,6 +102,38 @@ def count_items(ddb, table):
         return "ERR:" + type(exc).__name__
 
 
+def count_objects(s3, bucket):
+    try:
+        n, tok = 0, None
+        while True:
+            kw = {"Bucket": bucket, "MaxKeys": 1000}
+            if tok:
+                kw["ContinuationToken"] = tok
+            r = s3.list_objects_v2(**kw)
+            n += r.get("KeyCount", 0)
+            tok = r.get("NextContinuationToken")
+            if not tok:
+                return n
+    except Exception as exc:
+        return "ERR:" + type(exc).__name__
+
+
+def has_item(ddb, table, key):
+    try:
+        return "Item" in ddb.get_item(TableName=table, Key=key)
+    except Exception as exc:
+        return "ERR:" + type(exc).__name__
+
+
+def tool_result(call):
+    """The JSON the tool returned (AgentCore wraps it as result.content[0].text)."""
+    b = call.get("body")
+    try:
+        return json.loads(b["result"]["content"][0]["text"])
+    except Exception:
+        return {}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", default="mt")
@@ -159,6 +199,93 @@ def main():
     def grew(k, x, y):
         return isinstance(x.get(k), int) and isinstance(y.get(k), int) and y[k] > x[k]
 
+    # ---- governed-core 1.6.0: per-tenant AUDIT routing ------------------------------------------
+    acct = boto3.client("sts", region_name=a.region).get_caller_identity()["Account"]
+    s3 = boto3.client("s3", region_name=a.region)
+    lam = boto3.client("lambda", region_name=a.region)
+    sfn = boto3.client("stepfunctions", region_name=a.region)
+    base_data = outputs(cf, f"{prefix}-data")
+    aud = {ta: f"{prefix}-{ta}-audit-ledger", tb: f"{prefix}-{tb}-audit-ledger", "base": f"{prefix}-audit-ledger"}
+    worm = {ta: f"{prefix}-{ta}-worm-{acct}", tb: f"{prefix}-{tb}-worm-{acct}", "base": base_data.get("WormBucketName", "")}
+    pend = {ta: f"{prefix}-{ta}-pending-approvals", tb: f"{prefix}-{tb}-pending-approvals", "base": f"{prefix}-pending-approvals"}
+
+    def audit_counts():
+        return {"ledger": {k: count_items(ddb, v) for k, v in aud.items()},
+                "worm": {k: count_objects(s3, v) for k, v in worm.items()}}
+
+    def write_audit(name):
+        m = Mcp(url, tok[name])
+        m.init()
+        call = m.call("tools/call", {"name": "write-audit___write_audit",
+                                     "arguments": {"icsr_id": "MT-" + uuid.uuid4().hex[:8].upper(),
+                                                   "action": "mt-audit-routing-proof", "phase": "INTENT",
+                                                   "actor": name, "payload": "{\"synthetic\": true}"}})
+        return {"identity": name, "call": call, "tool_result": tool_result(call)}
+
+    a0 = audit_counts()
+    wa = write_audit("cw-a")
+    a1 = audit_counts()
+    wb = write_audit("cw-b")
+    a2 = audit_counts()
+    ev["steps"].append({"step": "audit_gateway", "before": a0, "cw-a": wa, "after_cw-a": a1,
+                        "cw-b": wb, "after_cw-b": a2})
+
+    # workflow hop: token-verified ingest mints the signed pair; the execution carries it
+    ctrl = outputs(cf, f"{prefix}-workflow").get("ControllerArn")
+    case_id = "MT-WF-" + uuid.uuid4().hex[:6].upper()
+    ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
+                                Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id,
+                                                    "access_token": tok["cw-a"]}).encode())["Payload"].read())
+    ing_notoken = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
+                                        Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id + "-X",
+                                                            "tenant": ta}).encode())["Payload"].read())
+    p0 = {k: has_item(ddb, v, {"case_id": {"S": case_id}}) for k, v in pend.items()}
+    w0 = audit_counts()
+    wf = {"ingest": {k: v for k, v in ing.items() if k != "tenant_binding"},
+          "ingest_minted_binding": bool(ing.get("tenant_binding")),
+          "ingest_without_token": ing_notoken, "pending_before": p0}
+    ex_status, ex_hist = None, []
+    if ing.get("case_ref") and ctrl:
+        ex = sfn.start_execution(stateMachineArn=ctrl, name="mtproof-" + case_id.lower(),
+                                 input=json.dumps({"case_id": case_id, "requester": "cw-a",
+                                                   "case_ref": ing["case_ref"],
+                                                   "redetermination": {"change_type": "NEW"},
+                                                   **ing.get("tenant_binding", {})}))["executionArn"]
+        for _ in range(60):
+            time.sleep(5)
+            d = sfn.describe_execution(executionArn=ex)
+            ex_status = d["status"]
+            names = [e.get("stateEnteredEventDetails", {}).get("name") for e in
+                     sfn.get_execution_history(executionArn=ex, maxResults=200)["events"]
+                     if e["type"] == "TaskStateEntered"]
+            ex_hist = [n for n in names if n]
+            if ex_status != "RUNNING" or "HumanSignoff" in ex_hist:
+                break
+        if ex_status == "RUNNING":
+            time.sleep(5)      # let signoff_register + AuditIntent settle
+            sfn.stop_execution(executionArn=ex, cause="mt proof complete (sign-off pause reached)")
+        wf.update({"execution": ex, "status": ex_status, "states": ex_hist})
+        # fail-closed: the same execution WITHOUT the signed pair
+        ex2 = sfn.start_execution(stateMachineArn=ctrl, name="mtproof-nobind-" + case_id.lower(),
+                                  input=json.dumps({"case_id": case_id + "-NB", "requester": "cw-a",
+                                                    "case_ref": ing["case_ref"],
+                                                    "redetermination": {"change_type": "NEW"}}))["executionArn"]
+        for _ in range(24):
+            time.sleep(5)
+            d2 = sfn.describe_execution(executionArn=ex2)
+            if d2["status"] != "RUNNING":
+                break
+        wf["execution_without_binding"] = {"status": d2["status"], "error": d2.get("error"),
+                                           "cause": (d2.get("cause") or "")[:300]}
+    p1 = {k: has_item(ddb, v, {"case_id": {"S": case_id}}) for k, v in pend.items()}
+    w1 = audit_counts()
+    wf.update({"pending_after": p1, "audit_before": w0, "audit_after": w1})
+    ev["steps"].append({"step": "audit_workflow", **wf})
+
+    def only(k, x, y, kind):
+        others = [o for o in x[kind] if o != k]
+        return grew(k, x[kind], y[kind]) and not any(grew(o, x[kind], y[kind]) for o in others)
+
     verdict = {
         "cw-a_allowed": ok_call(ra),
         "cw-b_allowed": ok_call(rb),
@@ -168,6 +295,17 @@ def main():
         "routing_cw-a_only_to_pha-a": grew(ta, before, mid) and not grew(tb, before, mid) and not grew("base", before, mid),
         "routing_cw-b_only_to_pha-b": grew(tb, mid, after) and not grew(ta, mid, after) and not grew("base", mid, after),
     }
+    verdict.update({
+        "audit_cw-a_ledger_and_worm_only_pha-a": (wa["tool_result"].get("stored") is True and wa["tool_result"].get("worm") is True
+                                                  and only(ta, a0, a1, "ledger") and only(ta, a0, a1, "worm")),
+        "audit_cw-b_ledger_and_worm_only_pha-b": (wb["tool_result"].get("stored") is True and wb["tool_result"].get("worm") is True
+                                                  and only(tb, a1, a2, "ledger") and only(tb, a1, a2, "worm")),
+        "ingest_refuses_without_verified_token": ing_notoken.get("ingested") is False,
+        "workflow_reached_signoff_with_binding": "HumanSignoff" in (wf.get("states") or []),
+        "workflow_intent_evidence_only_pha-a": only(ta, w0, w1, "ledger") and only(ta, w0, w1, "worm"),
+        "workflow_pending_approval_only_pha-a": p1.get(ta) is True and p1.get(tb) is False and p1.get("base") is False,
+        "workflow_without_binding_fails_closed": (wf.get("execution_without_binding") or {}).get("status") == "FAILED",
+    })
     verdict["PASS"] = all(verdict.values())
     ev["verdict"] = verdict
     print(json.dumps(ev, indent=1, default=str))

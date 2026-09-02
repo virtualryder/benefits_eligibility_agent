@@ -13,6 +13,7 @@ import sys
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+import governed_core  # noqa: E402,F401  (tenancy ships in governed-core >= 1.6.0: flat-import path)
 sys.path.insert(0, str(ROOT / "lib" / "controls"))
 import tenancy  # noqa: E402
 
@@ -134,3 +135,39 @@ def test_request_claims_context_drives_routing(monkeypatch):
     # cleared -> fail-closed again
     with pytest.raises(tenancy.TenantError):
         tenancy.resolve_tenant()
+
+
+def test_ingest_multitenant_boundary_derives_tenant_from_verified_token_only(monkeypatch):
+    """governed-core 1.6.0: ingest is invoked directly (no gateway interceptor). In multi-tenant mode
+    the tenant comes from a VERIFIED access token's tenant group (or an already-signed pair) — never a
+    typed field — and the response mints the signed pair the workflow execution carries. Fail-closed."""
+    import ingest_case
+    import identity
+    monkeypatch.setenv("PROVENANCE_SECRET", "ben-unit-provenance-secret")
+    stored = {}
+    monkeypatch.setattr(ingest_case.case_store, "put_case",
+                        lambda text, kind="application", case_id="": stored.setdefault("tenant", tenancy.resolve_tenant()) and "case-x")
+    _reset(monkeypatch, mt=True)
+    # no token, a typed tenant -> refused, nothing stored
+    out = ingest_case.handler({"application": "raw text", "tenant": "pha-b"}, None)
+    assert out["ingested"] is False and "identity not verified" in out["error"] and not stored
+    # a verified token of a tenant_pha-a member -> bound to pha-a, signed pair returned
+    monkeypatch.setattr(identity, "verify_access_token",
+                        lambda tok, require_group=True: ({"cognito:groups": ["benefits_caseworker", "tenant_pha-a"]}, None)
+                        if tok == "good" else (None, "bad token"))
+    out = ingest_case.handler({"application": "raw text", "access_token": "good", "tenant": "pha-b"}, None)
+    assert out["ingested"] and stored["tenant"] == "pha-a"
+    binding = out["tenant_binding"]
+    assert binding[tenancy.TENANT_FIELD] == "pha-a"
+    tenancy.clear_request_claims()
+    assert tenancy.bind_tenant_from_args(binding) == "pha-a"      # what every workflow Lambda re-verifies
+    assert "access_token" not in json.dumps(out)
+    # a bad token -> refused
+    tenancy.clear_request_claims()
+    out = ingest_case.handler({"application": "raw text", "access_token": "nope"}, None)
+    assert out["ingested"] is False
+    # silo mode: no token needed, no binding minted
+    _reset(monkeypatch, pinned="agency-1")
+    out = ingest_case.handler({"application": "raw text"}, None)
+    assert out["ingested"] and "tenant_binding" not in out
+    tenancy.clear_request_claims()

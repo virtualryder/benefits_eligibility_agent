@@ -14,6 +14,7 @@ import sys
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+import governed_core  # noqa: E402,F401  (tenancy ships in governed-core >= 1.6.0: flat-import path)
 sys.path.insert(0, str(ROOT / "lib" / "controls"))
 import tenancy  # noqa: E402
 import tenant_interceptor as ti  # noqa: E402

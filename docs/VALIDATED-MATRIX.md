@@ -4,7 +4,7 @@
 document in this repo disagrees with this table, **this table is correct and the other file is a bug.***
 
 Release `v0.1.2-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1). Current offline
-suite: **143 tests**, matching tag `v0.2.0-pilot-rc1`, which was cut from this tree.
+suite: **147 tests**, matching tag `v0.2.0-pilot-rc1`, which was cut from this tree.
 
 ---
 

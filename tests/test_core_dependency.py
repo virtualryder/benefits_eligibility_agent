@@ -42,6 +42,9 @@ CORE_MODULES = [
     "evidence", "verify_chain", "write_audit", "identity",
     "approve_signoff", "request_signoff", "idp_group_mapper", "mcp_client",
     "finalize_signoff",
+    # governed-core 1.6.0: hybrid multi-tenant routing was PROMOTED into the core from this repo's
+    # phase-107 modules; the local copies were deleted so the ledger/WORM/approvals routing cannot drift.
+    "tenancy", "tenant_interceptor",
 ]
 
 # `mcp_client` is a CLI entry point, not a library: it reads sys.argv at module scope, so importing
