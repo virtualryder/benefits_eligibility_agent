@@ -138,7 +138,7 @@ def test_controller_pipeline_order_and_fail_closed_choices():
                 "MaskPii", "GuardDeidentified", "DeidentifiedOk",
                 "AssessEligibility", "GuardRulesExecuted", "RulesOk",
                 "CheckAdverseNotice", "AdverseNoticeOk",
-                "DraftNotice", "AuditIntent", "HumanSignoff", "Finalize", "Committed"]
+                "DraftNotice", "DraftOk", "AuditIntent", "HumanSignoff", "Finalize", "FinalizeOk", "Committed"]
     assert visited == expected, f"happy path deviates from the regulated sequence: {visited}"
     # every non-adverse guard Choice fails closed to ManualReview
     for choice in ("ExtractedOk", "DeidentifiedOk", "RulesOk"):
