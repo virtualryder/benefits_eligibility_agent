@@ -18,6 +18,7 @@ import tenancy  # noqa: E402
 
 
 def _reset(monkeypatch, *, mt=False, pinned=None):
+    tenancy.clear_request_claims()
     monkeypatch.delenv("MULTITENANT", raising=False)
     monkeypatch.delenv("TENANT_ID", raising=False)
     if mt:
@@ -97,3 +98,32 @@ def test_tenant_scoped_name():
     assert tenancy.tenant_scoped_name("audit-ledger", "") == "audit-ledger"
     assert tenancy.tenant_scoped_name("audit-ledger", None) == "audit-ledger"
     assert tenancy.tenant_scoped_name("audit-ledger", "  t  ") == "t-audit-ledger"
+
+
+def test_route_store(monkeypatch):
+    # silo: the physical name is unchanged
+    _reset(monkeypatch)
+    assert tenancy.route_store("ben-e2e-case-store", "case-store") == "ben-e2e-case-store"
+    # multi-tenant with an explicit verified claim: tenant-scoped, matching the CDK DataStack naming
+    _reset(monkeypatch, mt=True)
+    assert tenancy.route_store("ben-e2e-case-store", "case-store",
+                               claims={"custom:tenant": "pha-oakland"}) == "ben-e2e-pha-oakland-case-store"
+    # multi-tenant with no tenant: fail-closed
+    _reset(monkeypatch, mt=True)
+    with pytest.raises(tenancy.TenantError):
+        tenancy.route_store("ben-e2e-case-store", "case-store")
+
+
+def test_request_claims_context_drives_routing(monkeypatch):
+    # the Lambda binds verified claims once; resolve_tenant + route_store then read the context
+    _reset(monkeypatch, mt=True)
+    tenancy.set_request_claims({"custom:tenant": "pha-alameda"})
+    try:
+        assert tenancy.resolve_tenant() == "pha-alameda"
+        assert tenancy.route_store("ben-e2e-sanitized-artifacts", "sanitized-artifacts") == \
+            "ben-e2e-pha-alameda-sanitized-artifacts"
+    finally:
+        tenancy.clear_request_claims()
+    # cleared -> fail-closed again
+    with pytest.raises(tenancy.TenantError):
+        tenancy.resolve_tenant()

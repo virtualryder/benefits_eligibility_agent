@@ -23,6 +23,7 @@ rejection. The multi-tenant claim path is the documented Gate-B extension, now i
 """
 import base64
 import binascii
+import contextvars
 import json
 import os
 
@@ -30,6 +31,24 @@ _ENV = "TENANT_ID"
 _MT_ENV = "MULTITENANT"          # "1"/"true"/"yes" => multi-tenant (claim-derived); else silo
 _CLAIM = "custom:tenant"         # the VERIFIED JWT claim carrying the tenant id
 DEFAULT_TENANT = "default"
+
+# Request-scoped VERIFIED claims. The Lambda entrypoint binds these once per invocation at the trusted
+# boundary (set_request_claims), so the data-access layer can route to the acting tenant's store WITHOUT
+# threading claims through every function signature. Never bind the request BODY here.
+_REQUEST_CLAIMS = contextvars.ContextVar("aegis_request_claims", default=None)
+
+
+def set_request_claims(claims):
+    """Bind the current request's VERIFIED JWT claims (trusted-boundary call). Non-dict clears."""
+    _REQUEST_CLAIMS.set(claims if isinstance(claims, dict) else None)
+
+
+def clear_request_claims():
+    _REQUEST_CLAIMS.set(None)
+
+
+def _effective_claims(claims):
+    return claims if claims is not None else _REQUEST_CLAIMS.get()
 
 
 class TenantError(Exception):
@@ -77,7 +96,7 @@ def resolve_tenant(_event=None, *, claims=None):
     Pass `claims` (the gateway-verified JWT claims) in multi-tenant mode.
     """
     if multitenant_enabled():
-        t = tenant_from_claims(claims)
+        t = tenant_from_claims(_effective_claims(claims))
         if not t:
             raise TenantError(
                 "multi-tenant: no verified custom:tenant claim; refusing "
@@ -104,3 +123,18 @@ def tenant_scoped_name(base, tenant):
     tenant to its store), so naming cannot drift between infra and runtime."""
     t = (tenant or "").strip()
     return f"{t}-{base}" if t else base
+
+
+def route_store(silo_name, logical, claims=None):
+    """Route a logical store to the ACTING tenant's PHYSICAL store name.
+
+    silo (default): the name unchanged ('<prefix>-<logical>').
+    multi-tenant: '<prefix>-<tenant>-<logical>' from the VERIFIED claim (request context or explicit),
+    FAIL-CLOSED if no tenant. `logical` is the store's stable suffix (e.g. 'case-store'), used to locate
+    the insertion point so the derived name matches the CDK's per-tenant DataStack naming exactly."""
+    if not multitenant_enabled():
+        return silo_name
+    tenant = resolve_tenant(claims=claims)          # raises TenantError if no verified tenant
+    suffix = "-" + logical
+    prefix = silo_name[:-len(suffix)] if silo_name.endswith(suffix) else silo_name
+    return f"{prefix}-{tenant}-{logical}"
