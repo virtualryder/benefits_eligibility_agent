@@ -176,6 +176,9 @@ policies:
   - { name: mask_before_draft,        kind: forbid, action: draft_notice,       unless_deidentified: true }
   - { name: no_self_commit,           kind: forbid, action: finalize_determination }
   - { name: no_self_fraud_referral,   kind: forbid, action: refer_fraud }
+  # phase 108 (hybrid multi-tenant): un-tenanted identities are refused at the gateway. Attached ONLY in
+  # multi-tenant deployments (scope: multitenant) - silo principals carry no custom:tenant tag.
+  - { name: require_tenant,           kind: forbid, require_tenant: true, scope: multitenant }
 
 workflow:
   entrypoint: agent.py

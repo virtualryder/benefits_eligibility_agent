@@ -155,6 +155,11 @@ def main():
                     'principal.hasTag("cognito:groups") && '
                     'principal.getTag("cognito:groups") like "*%s*" };' % grp)
             mode = p.get("validation_mode", "FAIL_ON_ANY_FINDINGS")
+        elif kind == "forbid" and p.get("require_tenant"):
+            # phase 108: any tool call by an identity with no tenant tag is forbidden (multi-tenant only)
+            stmt = ('forbid(principal, action, resource is AgentCore::Gateway) '
+                    'unless { principal.hasTag("custom:tenant") };')
+            mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
         elif kind == "forbid":
             aid = action_id(p["action"])
             base = ('forbid(principal, action == AgentCore::Action::"%s", '

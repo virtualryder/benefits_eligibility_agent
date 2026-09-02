@@ -53,11 +53,15 @@ def _targets_from_manifest(compute):
     return out
 
 
-def _policies():
-    """Every shipped .cedar, gateway ARN normalized to the runtime placeholder."""
+def _policies(multitenant=False):
+    """Every shipped .cedar, gateway ARN normalized to the runtime placeholder. Policies marked
+    `scope: multitenant` in their header (phase 108 require_tenant) attach ONLY in multi-tenant
+    deployments - in silo mode principals carry no tenant tag and they would forbid everything."""
     pols = []
     for p in sorted((REPO / "policies").glob("*.cedar")):
         body = p.read_text(encoding="utf-8")
+        if "scope: multitenant" in body.split("\n", 1)[0] and not multitenant:
+            continue
         body = re.sub(r'AgentCore::Gateway::"arn:aws:bedrock-agentcore:[^"]+"',
                       'AgentCore::Gateway::"__GATEWAY_ARN__"', body)
         mode = "IGNORE_ALL_FINDINGS" if "IGNORE_ALL_FINDINGS" in body else "FAIL_ON_ANY_FINDINGS"
@@ -66,7 +70,8 @@ def _policies():
 
 
 class GatewayStack(cdk.Stack):
-    def __init__(self, scope: Construct, cid: str, *, prefix: str, compute, identity, **kw):
+    def __init__(self, scope: Construct, cid: str, *, prefix: str, compute, identity,
+                 multitenant: bool = False, **kw):
         super().__init__(scope, cid, **kw)
 
         gw_role = iam.Role(self, "GatewayRole",
@@ -124,7 +129,7 @@ class GatewayStack(cdk.Stack):
                     "allowedClients": [identity.client.user_pool_client_id]}}),
                 "SsmParam": ssm_param,
                 "TargetsJson": json.dumps(targets, default=str),
-                "PoliciesJson": json.dumps(_policies()),
+                "PoliciesJson": json.dumps(_policies(multitenant)),
                 "Enforcement": "ENFORCE",
                 # Phase 107: the REQUEST interceptor (passRequestHeaders so it sees the validated JWT)
                 "InterceptorLambdaArn": compute.tenant_interceptor.function_arn,

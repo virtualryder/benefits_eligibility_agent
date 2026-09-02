@@ -119,7 +119,8 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
 workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data)
 observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
                                    compute=compute, workflow=workflow, data=data)
-gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity)
+gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,
+                       multitenant=multitenant)
 
 for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
         + tuple(tenant_data.values()):

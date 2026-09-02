@@ -201,7 +201,8 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     data = DataStack(app, "d2", prefix="ben-mt", retention_profile="sandbox-demo")
     compute = ComputeStack(app, "c2", prefix="ben-mt", asset_dir=asset, data=data, multitenant=True)
     identity = IdentityStack(app, "i2", prefix="ben-mt")
-    gateway = GatewayStack(app, "g2", prefix="ben-mt", compute=compute, identity=identity)
+    gateway = GatewayStack(app, "g2", prefix="ben-mt", compute=compute, identity=identity, multitenant=True)
+    gateway_silo = GatewayStack(app, "g3", prefix="ben-mt", compute=compute, identity=identity)  # before synth
     tc, tg = Template.from_stack(compute), Template.from_stack(gateway)
     tc.has_resource_properties("AWS::Lambda::Function", Match.object_like({
         "FunctionName": "ben-mt-tenant-interceptor",
@@ -212,6 +213,9 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     assert "InterceptorLambdaArn" in gw, "gateway attachment does not carry the interceptor ARN"
     assert "__aegis_tenant" in gw and "__aegis_tenant_sig" in gw, \
         "tool schemas are missing the reserved signed-tenant fields"
+    # phase 108: require_tenant attaches ONLY in multi-tenant deployments (silo would forbid everything)
+    assert "require_tenant" in gw and "custom:tenant" in gw
+    assert "require_tenant" not in json.dumps(Template.from_stack(gateway_silo).to_json())
     # multi-tenant mirror grants: the shared Lambdas reach EVERY tenant's store, scoped to the prefix
     cj = json.dumps(tc.to_json())
     assert "table/ben-mt-*-case-store" in cj and "table/ben-mt-*-audit-ledger" in cj

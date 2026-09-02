@@ -19,6 +19,7 @@ after the gateway is created.
 | `mask_before_draft` | forbid | `draft_notice` cannot run on un-masked data — the model only sees de-identified text. |
 | `no_self_commit` | forbid | The agent can never call `finalize_determination`; committing a determination is reachable **only** through the human sign-off gate. |
 | `no_self_fraud_referral` | forbid | The agent can never call `refer_fraud`; a suspected-fraud referral is a human-only decision. |
+| `require_tenant` | forbid | **Multi-tenant deployments only** (phase 108): an identity carrying no `custom:tenant` may not call any tool. Forbid wins. Cross-tenant access is impossible by construction - the gateway interceptor derives the tenant from the caller's own validated identity and the target routes to that tenant's store. Not attached in silo mode. |
 
 Two rules of the engine make this airtight:
 
