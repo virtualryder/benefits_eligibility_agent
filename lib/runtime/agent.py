@@ -6,6 +6,9 @@ is the bearer for every governed Gateway (MCP) tool call, so Cedar evaluates the
 The agent never commits the consequential action; it requests human sign-off (separation of duties).
 """
 import os
+import base64
+import binascii
+import json
 import logging
 import boto3
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
@@ -46,6 +49,28 @@ def _gateway_url():
     return GATEWAY_URL_ENV
 
 
+def _session_tenant(token):
+    """Read custom:tenant from the human's VERIFIED access token to BIND this Runtime session to one
+    tenant. AgentCore Runtime already isolates sessions (microVM per session); this makes the tenant
+    explicit and lets the agent fail closed in multi-tenant mode. READ-ONLY: authorization stays at the
+    gateway/Cedar Policy engine — this never makes an access decision. Mirrors
+    lib/controls/tenancy.tenant_from_bearer (kept self-contained because the runtime image stages only
+    agent.py)."""
+    if not isinstance(token, str) or token.count(".") < 2:
+        return None
+    seg = token.split(".")[1]
+    seg += "=" * (-len(seg) % 4)
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(seg).decode("utf-8"))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        return None
+    t = claims.get("custom:tenant")
+    return t.strip() if isinstance(t, str) and t.strip() else None
+
+
+_MULTITENANT = os.environ.get("MULTITENANT", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 @app.entrypoint
 def invoke(payload, context=None):
     p = payload or {}
@@ -59,6 +84,13 @@ def invoke(payload, context=None):
     log.info("invocation requester=%s case_id=%s token_present=%s", requester, case_id, bool(token))
     if not token:
         return {"error": "no access_token provided; a human identity is required to drive governed tools"}
+
+    session_tenant = _session_tenant(token)
+    if _MULTITENANT and not session_tenant:
+        log.warning("MULTITENANT: identity carries no custom:tenant claim; refusing (tenant is derived, never requested)")
+        return {"error": "multi-tenant: your identity carries no tenant (custom:tenant); refusing",
+                "governed": True}
+    log.info("session_tenant=%s multitenant=%s", session_tenant, _MULTITENANT)
 
     gw = _gateway_url()
     if not gw:
@@ -76,12 +108,12 @@ def invoke(payload, context=None):
                 "result": "ACCESS DENIED - your identity is not authorized for any governed tool at the "
                           "gateway (Cedar deny-by-default). No workflow was run and nothing was drafted, "
                           "masked, audited, or submitted.",
-                "tools_available": [], "governed": True,
+                "tools_available": [], "governed": True, "tenant": session_tenant,
             }
         agent = Agent(model=model, tools=tools, system_prompt=SYSTEM)
         result = agent(prompt)
     log.info("invocation_complete requester=%s case_id=%s result_chars=%d", requester, case_id, len(str(result)))
-    return {"result": str(result), "tools_available": names}
+    return {"result": str(result), "tools_available": names, "tenant": session_tenant}
 
 
 if __name__ == "__main__":
