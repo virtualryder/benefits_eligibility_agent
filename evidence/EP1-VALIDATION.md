@@ -123,8 +123,8 @@ customer-side Gate-C item.
 ## Load / exactly-once
 
 Concurrency and exactly-once replay-storm behavior (idempotent finalize, single FINAL# marker) are proven
-by the offline suite — **98/98 passing at the time of this run** (control-plane + 13 CDK synthesis).
-The suite has grown since: it is **133 tests** today, after post-run hardening and doc-integrity gates
+by the offline suite — **98/98 passing at the time of this run** (control-plane + 14 CDK synthesis).
+The suite has grown since: it is **135 tests** today, after post-run hardening and doc-integrity gates
 were added. A live prod-scale load test is a customer-side Gate-B exit item.
 
 ## Finding fixed during this EP1 run

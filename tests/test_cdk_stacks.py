@@ -171,3 +171,19 @@ def test_identity_creates_no_users_and_no_passwords():
 def test_no_default_password_anywhere_in_any_template():
     for t in (T_DATA, T_COMPUTE, T_WORKFLOW, T_IDENTITY, T_NET):
         assert "ChangeMe" not in json.dumps(t.to_json())
+
+
+def test_data_stack_per_tenant_naming_is_physically_separate():
+    """Hybrid multi-tenant: each tenant's DataStack yields its OWN tenant-scoped tables (physical
+    separation, not a shared table with a tenant key). Silo (no tenant) keeps the base names."""
+    app = aws_cdk.App()
+    # create every stack BEFORE any synth (Template.from_stack synthesizes the app)
+    a = DataStack(app, "da", prefix="ben-test", tenant="pha-oakland")
+    b = DataStack(app, "db", prefix="ben-test", tenant="pha-alameda")
+    silo = DataStack(app, "ds", prefix="ben-test")
+    Template.from_stack(a).has_resource_properties("AWS::DynamoDB::Table",
+        Match.object_like({"TableName": "ben-test-pha-oakland-audit-ledger"}))
+    Template.from_stack(b).has_resource_properties("AWS::DynamoDB::Table",
+        Match.object_like({"TableName": "ben-test-pha-alameda-audit-ledger"}))
+    Template.from_stack(silo).has_resource_properties("AWS::DynamoDB::Table",
+        Match.object_like({"TableName": "ben-test-audit-ledger"}))

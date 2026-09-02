@@ -95,3 +95,12 @@ def check_ref_tenant(ref, *, claims=None):
         return ref.get("tenant") == resolve_tenant(claims=claims)
     except TenantError:
         return False
+
+
+def tenant_scoped_name(base, tenant):
+    """Per-tenant PHYSICAL resource name (hybrid model: each tenant gets its OWN data store, not a
+    shared table with a tenant partition key). Blank tenant -> the base name (single-tenant silo).
+    Used by the CDK (per-tenant table/bucket naming) and by the compute layer (routing a claim-derived
+    tenant to its store), so naming cannot drift between infra and runtime."""
+    t = (tenant or "").strip()
+    return f"{t}-{base}" if t else base

@@ -89,3 +89,11 @@ def test_tenant_from_bearer_reads_claim_without_verify(monkeypatch):
     assert tenancy.tenant_from_bearer(tok) == "pha-oakland"
     assert tenancy.tenant_from_bearer("not-a-jwt") is None
     assert tenancy.tenant_from_bearer(_jwt({"sub": "u1"})) is None   # no tenant claim
+
+
+def test_tenant_scoped_name():
+    # hybrid: each tenant gets its OWN physically-separate store name; silo keeps the base name
+    assert tenancy.tenant_scoped_name("audit-ledger", "pha-oakland") == "pha-oakland-audit-ledger"
+    assert tenancy.tenant_scoped_name("audit-ledger", "") == "audit-ledger"
+    assert tenancy.tenant_scoped_name("audit-ledger", None) == "audit-ledger"
+    assert tenancy.tenant_scoped_name("audit-ledger", "  t  ") == "t-audit-ledger"
