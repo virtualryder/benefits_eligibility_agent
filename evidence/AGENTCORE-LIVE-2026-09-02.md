@@ -47,7 +47,15 @@ token). Forbid overrides permit, so mask-before-processing and no-self-commit al
 UPDATE_COMPLETE (2026-09-02, refreshed from current code) · `ben-demo-workflow` UPDATE_COMPLETE ·
 `ben-demo-observability` UPDATE_COMPLETE · `ben-demo-gateway` CREATE_COMPLETE.
 
-## Residual note (action for the owner)
+## Teardown (completed 2026-09-02)
+
+After this verification the environment was **torn down** — `cdk destroy --all --force -c env=demo
+-c retention_profile=sandbox-demo` — completing the deploy -> exercise -> destroy lifecycle. All six
+`ben-demo` stacks (including `ben-demo-gateway`, which ran the AgentCore custom-resource Delete to
+remove targets -> Cedar policies -> gateway -> policy engine) are gone; CloudFormation shows **zero
+residual `ben-demo` stacks**. No standing cost remains.
+
+## Residual note (historical)
 
 `ben-demo` is the **standing demo environment** (up since 2026-08-24), deliberately not torn down
 so it can be shown on demand — unlike the throwaway `ben-val1/ben-val2` validation envs, which were
