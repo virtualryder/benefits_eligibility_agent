@@ -52,6 +52,12 @@ def finalize(monkeypatch):
     store = {}
     committed = []
 
+    # governed-core 1.5.0 added G2 approval-path verification to finalize (it now REFUSES an
+    # unverified approval). Approval verification has its own coverage; THIS test isolates the
+    # exactly-once FINAL# marker, so it uses the handler's documented sandbox escape to bypass
+    # the approval gate (SIGNOFF_ALLOW_UNVERIFIED) and exercise the commit-once logic directly.
+    monkeypatch.setenv("SIGNOFF_ALLOW_UNVERIFIED", "true")
+
     fake_table = FakeTable(store)
 
     class FakeResource:
