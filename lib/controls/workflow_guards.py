@@ -112,7 +112,13 @@ def _emit_metric(guard, ok):
         pass   # metrics must never affect the control decision
 
 
+import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+
+
 def handler(event, context):
+    # Phase 107 (hybrid multi-tenant): bind the gateway-interceptor-injected, HMAC-SIGNED tenant for
+    # per-tenant store routing. Unsigned/forged values are refused; multi-tenant mode fails closed.
+    tenancy.bind_tenant_from_args(event)
     e = _coerce(event)
     name = str(e.get("guard", ""))
     fn = _GUARDS.get(name)

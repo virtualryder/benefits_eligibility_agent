@@ -42,7 +42,13 @@ def _eligible(hh, income, categorical):
     return False, "exceeds 130%% FPL (%.0f)" % gross_limit
 
 
+import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+
+
 def handler(event, context):
+    # Phase 107 (hybrid multi-tenant): bind the gateway-interceptor-injected, HMAC-SIGNED tenant for
+    # per-tenant store routing. Unsigned/forged values are refused; multi-tenant mode fails closed.
+    tenancy.bind_tenant_from_args(event)
     e = _coerce(event)
     import sanitized
     if not sanitized.verify_ref(e.get("sanitized_ref")):

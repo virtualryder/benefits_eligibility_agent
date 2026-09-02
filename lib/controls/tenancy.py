@@ -174,7 +174,12 @@ def verified_tenant_from_args(args, secret):
 def bind_tenant_from_args(args, secret=None):
     """Tool-Lambda entrypoint helper: verify the injected tenant and bind it for routing
     (set_request_claims). Returns the tenant or None; multi-tenant callers treat None as fail-closed."""
-    secret = secret if secret is not None else os.environ.get("PROVENANCE_SECRET", "")
+    if secret is None:
+        try:
+            import provenance
+            secret = provenance._secret()   # same resolver/trust domain as the interceptor
+        except Exception:
+            secret = os.environ.get("PROVENANCE_SECRET", "")
     t = verified_tenant_from_args(args, secret)
     set_request_claims({_CLAIM: t} if t else None)
     return t

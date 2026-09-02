@@ -19,7 +19,13 @@ def _num(s):
     m = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?", str(s))
     return float(m.group(0).replace(",", "")) if m else None
 
+import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+
+
 def handler(event, context):
+    # Phase 107 (hybrid multi-tenant): bind the gateway-interceptor-injected, HMAC-SIGNED tenant for
+    # per-tenant store routing. Unsigned/forged values are refused; multi-tenant mode fails closed.
+    tenancy.bind_tenant_from_args(event)
     e = _coerce(event)
     # R3-2 pass-by-reference: the controller hands an OPAQUE case_ref (raw application content never
     # travels through Step Functions state); fetch server-side. Inline text stays for direct/dev calls.

@@ -84,7 +84,13 @@ def _draft(e):
         return {"error": "draft failed: " + type(exc).__name__ + ": " + str(exc), "drafted_by": None}
 
 
+import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+
+
 def handler(event, context):
+    # Phase 107 (hybrid multi-tenant): bind the gateway-interceptor-injected, HMAC-SIGNED tenant for
+    # per-tenant store routing. Unsigned/forged values are refused; multi-tenant mode fails closed.
+    tenancy.bind_tenant_from_args(event)
     e = _coerce(event)
     if "fraud_case_id" in e:
         # refer_fraud is a consequential, HUMAN-ONLY action. The agent can never refer a case as suspected
