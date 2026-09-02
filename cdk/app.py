@@ -96,6 +96,7 @@ if (app.node.try_get_context("network_mode") or "public") == "private":
 identity = IdentityStack(
     app, f"{prefix}-identity", prefix=prefix,
     identity_mode=app.node.try_get_context("identity_mode") or "sandbox",
+    tenants=tuple(tenants),   # phase 107/108: one tenant_<id> group per tenant (hybrid multi-tenant)
     federation={
         "issuer_url": app.node.try_get_context("oidc_issuer_url") or "",
         "client_id": app.node.try_get_context("oidc_client_id") or "",

@@ -200,7 +200,7 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     asset = stage_lambda_bundle()
     data = DataStack(app, "d2", prefix="ben-mt", retention_profile="sandbox-demo")
     compute = ComputeStack(app, "c2", prefix="ben-mt", asset_dir=asset, data=data, multitenant=True)
-    identity = IdentityStack(app, "i2", prefix="ben-mt")
+    identity = IdentityStack(app, "i2", prefix="ben-mt", tenants=("pha-oakland", "pha-alameda"))
     gateway = GatewayStack(app, "g2", prefix="ben-mt", compute=compute, identity=identity, multitenant=True)
     gateway_silo = GatewayStack(app, "g3", prefix="ben-mt", compute=compute, identity=identity)  # before synth
     tc, tg = Template.from_stack(compute), Template.from_stack(gateway)
@@ -213,6 +213,10 @@ def test_tenant_interceptor_wired_into_compute_and_gateway():
     assert "InterceptorLambdaArn" in gw, "gateway attachment does not carry the interceptor ARN"
     assert "__aegis_tenant" in gw and "__aegis_tenant_sig" in gw, \
         "tool schemas are missing the reserved signed-tenant fields"
+    # per-tenant identity: one tenant_<id> Cognito group per tenant (membership is what the access token carries)
+    ti = Template.from_stack(identity)
+    ti.has_resource_properties("AWS::Cognito::UserPoolGroup", Match.object_like({"GroupName": "tenant_pha-oakland"}))
+    ti.has_resource_properties("AWS::Cognito::UserPoolGroup", Match.object_like({"GroupName": "tenant_pha-alameda"}))
     # phase 108: require_tenant attaches ONLY in multi-tenant deployments (silo would forbid everything)
     assert "require_tenant" in gw and "custom:tenant" in gw
     assert "require_tenant" not in json.dumps(Template.from_stack(gateway_silo).to_json())

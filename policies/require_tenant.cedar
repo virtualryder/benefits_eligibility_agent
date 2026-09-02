@@ -10,4 +10,7 @@ forbid(
   action,
   resource is AgentCore::Gateway
 )
-unless { principal.hasTag("custom:tenant") };
+unless {
+  principal.hasTag("custom:tenant")
+  || (principal.hasTag("cognito:groups") && principal.getTag("cognito:groups") like "*tenant_*")
+};

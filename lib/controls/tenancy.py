@@ -31,7 +31,9 @@ import os
 
 _ENV = "TENANT_ID"
 _MT_ENV = "MULTITENANT"          # "1"/"true"/"yes" => multi-tenant (claim-derived); else silo
-_CLAIM = "custom:tenant"         # the VERIFIED JWT claim carrying the tenant id
+_CLAIM = "custom:tenant"         # the VERIFIED JWT claim carrying the tenant id (if the IdP emits it)
+_GROUPS_CLAIM = "cognito:groups"  # ALWAYS in a Cognito ACCESS token (custom attrs are not) - Cedar reads it
+TENANT_GROUP_PREFIX = "tenant_"   # tenant membership as a Cognito group: tenant_<id>
 DEFAULT_TENANT = "default"
 
 # Request-scoped VERIFIED claims. The Lambda entrypoint binds these once per invocation at the trusted
@@ -69,6 +71,14 @@ def tenant_from_claims(claims):
     t = claims.get(_CLAIM)
     if isinstance(t, str) and t.strip():
         return t.strip()
+    # Fallback: tenant membership as a group. Cognito ACCESS tokens carry cognito:groups (not custom
+    # attributes), so this is the tier-free path the gateway/Cedar already evaluate. Accepts a list
+    # or a string (space/comma separated). The FIRST tenant_<id> group wins; an identity should hold one.
+    g = claims.get(_GROUPS_CLAIM)
+    groups = g if isinstance(g, (list, tuple)) else (str(g).replace(",", " ").split() if g else [])
+    for grp in groups:
+        if isinstance(grp, str) and grp.startswith(TENANT_GROUP_PREFIX) and grp[len(TENANT_GROUP_PREFIX):].strip():
+            return grp[len(TENANT_GROUP_PREFIX):].strip()
     return None
 
 

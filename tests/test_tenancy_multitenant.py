@@ -51,6 +51,13 @@ def test_multitenant_derives_from_verified_claim(monkeypatch):
     assert tenancy.resolve_tenant(claims=claims) == "pha-oakland"
     # the pinned env is NOT used in multi-tenant mode
     assert tenancy.resolve_tenant(claims=claims) != "pha-ignored-in-mt"
+    # tenant membership as a Cognito GROUP (access tokens carry cognito:groups, not custom attrs)
+    assert tenancy.resolve_tenant(claims={"cognito:groups": ["benefits_caseworker", "tenant_pha-alameda"]}) == "pha-alameda"
+    assert tenancy.resolve_tenant(claims={"cognito:groups": "benefits_caseworker tenant_pha-fresno"}) == "pha-fresno"
+    # custom:tenant takes precedence when both are present; a non-tenant group alone is not a tenant
+    assert tenancy.resolve_tenant(claims={"custom:tenant": "pha-x", "cognito:groups": ["tenant_pha-y"]}) == "pha-x"
+    with pytest.raises(tenancy.TenantError):
+        tenancy.resolve_tenant(claims={"cognito:groups": ["benefits_caseworker"]})
 
 
 def test_multitenant_fail_closed_without_claim(monkeypatch):
