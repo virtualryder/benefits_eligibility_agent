@@ -24,6 +24,8 @@ rejection. The multi-tenant claim path is the documented Gate-B extension, now i
 import base64
 import binascii
 import contextvars
+import hashlib
+import hmac
 import json
 import os
 
@@ -138,3 +140,41 @@ def route_store(silo_name, logical, claims=None):
     suffix = "-" + logical
     prefix = silo_name[:-len(suffix)] if silo_name.endswith(suffix) else silo_name
     return f"{prefix}-{tenant}-{logical}"
+
+
+# ---- interceptor-injected tenant (phase 107 routing correction) --------------------------------
+# AgentCore Gateway does NOT forward JWT claims to a Lambda target, so the gateway REQUEST interceptor
+# (tenant_interceptor.py) derives the tenant from the validated JWT and injects it into the tool
+# arguments as a reserved, HMAC-SIGNED pair. The target trusts it ONLY if the signature verifies, so a
+# caller/model-supplied tenant (unsigned or wrong key) is refused even if the interceptor were bypassed.
+TENANT_FIELD = "__aegis_tenant"
+TENANT_SIG_FIELD = "__aegis_tenant_sig"
+
+
+def sign_tenant(tenant, secret):
+    """HMAC-SHA256 over the tenant with the per-deploy provenance secret (same trust domain as
+    mask_pii's sanitized_ref signature)."""
+    return hmac.new(str(secret).encode("utf-8"), ("tenant|" + str(tenant)).encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def verified_tenant_from_args(args, secret):
+    """The interceptor-injected tenant, accepted ONLY if its HMAC verifies. None otherwise (fail-closed)."""
+    if not isinstance(args, dict) or not secret:
+        return None
+    t, sig = args.get(TENANT_FIELD), args.get(TENANT_SIG_FIELD)
+    if not isinstance(t, str) or not t.strip() or not isinstance(sig, str):
+        return None
+    t = t.strip()
+    if not hmac.compare_digest(sign_tenant(t, secret), sig):
+        return None
+    return t
+
+
+def bind_tenant_from_args(args, secret=None):
+    """Tool-Lambda entrypoint helper: verify the injected tenant and bind it for routing
+    (set_request_claims). Returns the tenant or None; multi-tenant callers treat None as fail-closed."""
+    secret = secret if secret is not None else os.environ.get("PROVENANCE_SECRET", "")
+    t = verified_tenant_from_args(args, secret)
+    set_request_claims({_CLAIM: t} if t else None)
+    return t
