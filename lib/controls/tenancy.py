@@ -154,8 +154,8 @@ TENANT_SIG_FIELD = "__aegis_tenant_sig"
 def sign_tenant(tenant, secret):
     """HMAC-SHA256 over the tenant with the per-deploy provenance secret (same trust domain as
     mask_pii's sanitized_ref signature)."""
-    return hmac.new(str(secret).encode("utf-8"), ("tenant|" + str(tenant)).encode("utf-8"),
-                    hashlib.sha256).hexdigest()
+    key = bytes(secret) if isinstance(secret, (bytes, bytearray)) else str(secret).encode("utf-8")
+    return hmac.new(key, ("tenant|" + str(tenant)).encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def verified_tenant_from_args(args, secret):

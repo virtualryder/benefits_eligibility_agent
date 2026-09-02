@@ -123,6 +123,9 @@ def main():
             props = {}
             for pname, pspec in (mt.get("input") or {}).items():
                 props[pname] = {"type": pspec["type"], "description": pspec.get("description", "")}
+            # phase 107 reserved fields (gateway REQUEST interceptor, HMAC-signed tenant) - see gateway_stack
+            props["__aegis_tenant"] = {"type": "string", "description": "Set by the gateway interceptor from the verified identity; caller values overwritten, unsigned refused."}
+            props["__aegis_tenant_sig"] = {"type": "string", "description": "HMAC over __aegis_tenant, set by the gateway interceptor."}
             inline.append({
                 "name": mt["name"],
                 "description": mt.get("description", ""),

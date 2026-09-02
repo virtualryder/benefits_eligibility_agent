@@ -43,6 +43,18 @@ def _find_engine(cc, name):
     return None
 
 
+def _interceptors(p):
+    """Phase 107: attach the REQUEST interceptor when provided. passRequestHeaders=True is REQUIRED so
+    the interceptor receives the validated JWT (AgentCore does not forward claims to Lambda targets)."""
+    arn = p.get("InterceptorLambdaArn")
+    if not arn:
+        return {}
+    return {"interceptorConfigurations": [{
+        "interceptor": {"lambda": {"arn": arn}},
+        "interceptionPoints": ["REQUEST"],
+        "inputConfiguration": {"passRequestHeaders": True}}]}
+
+
 def _create(cc, ssm, p, region, acct):
     # Live-run find: a failed CreateGateway can orphan the policy engine (created first). Reuse an
     # existing engine with our name instead of ConflictException-failing forever.
@@ -58,7 +70,7 @@ def _create(cc, ssm, p, region, acct):
                            protocolType="MCP", authorizerType="CUSTOM_JWT",
                            authorizerConfiguration=authz,
                            policyEngineConfiguration={"arn": engine_arn, "mode": "LOG_ONLY"},
-                           description=p.get("GatewayDesc", ""))
+                           description=p.get("GatewayDesc", ""), **_interceptors(p))
     gw_id = gw["gatewayId"]
     _wait(lambda: cc.get_gateway(gatewayIdentifier=gw_id)["status"], "READY")
     g = cc.get_gateway(gatewayIdentifier=gw_id)
@@ -87,7 +99,7 @@ def _create(cc, ssm, p, region, acct):
     cc.update_gateway(gatewayIdentifier=gw_id, name=p["GatewayName"], roleArn=p["GatewayRoleArn"],
                       protocolType="MCP", authorizerType="CUSTOM_JWT",
                       authorizerConfiguration=authz,
-                      policyEngineConfiguration={"arn": engine_arn, "mode": "ENFORCE"})
+                      policyEngineConfiguration={"arn": engine_arn, "mode": "ENFORCE"}, **_interceptors(p))
     _wait(lambda: cc.get_gateway(gatewayIdentifier=gw_id)["status"], "READY")
     return {"GatewayId": gw_id, "GatewayArn": gw_arn, "GatewayUrl": gw_url,
             "PolicyEngineId": engine_id, "Enforcement": "ENFORCE"}

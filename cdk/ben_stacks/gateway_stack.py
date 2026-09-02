@@ -41,6 +41,11 @@ def _targets_from_manifest(compute):
         for tool in t["mcp_tools"]:
             props = {k: {"type": v["type"], "description": v.get("description", "")}
                      for k, v in (tool.get("input") or {}).items()}
+            # Phase 107: reserved fields the gateway REQUEST interceptor injects (HMAC-signed tenant). In
+            # the schema ONLY so the gateway maps them through to the Lambda event; the target trusts them
+            # ONLY if the signature verifies (tenancy.verified_tenant_from_args). Caller values are overwritten.
+            props["__aegis_tenant"] = {"type": "string", "description": "Set by the gateway interceptor from the verified identity; caller-supplied values are overwritten and unsigned values are refused."}
+            props["__aegis_tenant_sig"] = {"type": "string", "description": "HMAC over __aegis_tenant, set by the gateway interceptor."}
             tools.append({"name": tool["name"], "description": tool["description"],
                           "inputSchema": {"type": "object", "properties": props,
                                           "required": tool.get("required", [])}})
@@ -72,7 +77,8 @@ class GatewayStack(cdk.Stack):
         targets = _targets_from_manifest(compute)
         gw_role.add_to_policy(iam.PolicyStatement(
             actions=["lambda:InvokeFunction"],
-            resources=[t["lambda_arn"] for t in targets]))   # exact ARNs only (P0-7)
+            resources=[t["lambda_arn"] for t in targets]
+                      + [compute.tenant_interceptor.function_arn]))   # exact ARNs only (P0-7) + the REQUEST interceptor
         # Live-run find (the val2 mystery failure): CreateGateway VALIDATES that the gateway role can
         # read + evaluate its policy engine; without these, creation fails with AccessDenied.
         gw_role.add_to_policy(iam.PolicyStatement(
@@ -120,6 +126,8 @@ class GatewayStack(cdk.Stack):
                 "TargetsJson": json.dumps(targets, default=str),
                 "PoliciesJson": json.dumps(_policies()),
                 "Enforcement": "ENFORCE",
+                # Phase 107: the REQUEST interceptor (passRequestHeaders so it sees the validated JWT)
+                "InterceptorLambdaArn": compute.tenant_interceptor.function_arn,
             })
 
         cdk.CfnOutput(self, "GatewayUrl", value=attachment.get_att_string("GatewayUrl"))

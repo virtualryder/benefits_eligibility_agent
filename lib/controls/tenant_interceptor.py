@@ -65,5 +65,11 @@ def build_output(event, secret, multitenant):
 
 
 def handler(event, context):
-    secret = os.environ.get("PROVENANCE_SECRET", "")
+    # Same trust domain + resolver as mask_pii's sanitized_ref signing (Secrets Manager ARN in
+    # pilot/production; plaintext env only for disposable sandbox validation).
+    try:
+        import provenance
+        secret = provenance._secret()
+    except Exception:
+        secret = (os.environ.get("PROVENANCE_SECRET") or "").encode("utf-8")
     return build_output(event, secret, tenancy.multitenant_enabled())

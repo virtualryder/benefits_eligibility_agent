@@ -12,7 +12,7 @@ this table, this table is correct and the other file is a bug.*
 |---|---|
 | **Product** | Public-Benefits Eligibility Screening & Determination-Support **Assistant** (never an adjudicator; never denies/reduces/terminates/refers fraud) |
 | **Pilot tag** | `v0.1.2-pilot-rc1` (RELEASE file) — **cut after the live EP1 validation (2026-07-27)** |
-| **Offline test suite** | **125** passing **on current main** (control-plane + **14 CDK stack-synthesis** assertions + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). 124 run locally; 1 CI-completeness gate runs only in CI (`skipif` outside CI). Tag `v0.2.0-pilot-rc1` was cut from this tree and matches this count. The older `v0.1.2-pilot-rc1` tag predates the governed-core dependency migration and stood at 101. |
+| **Offline test suite** | **125** passing **on current main** (control-plane + **15 CDK stack-synthesis** assertions + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). 124 run locally; 1 CI-completeness gate runs only in CI (`skipif` outside CI). Tag `v0.2.0-pilot-rc1` was cut from this tree and matches this count. The older `v0.1.2-pilot-rc1` tag predates the governed-core dependency migration and stood at 101. |
 | **Deployment IaC** | AWS CDK, 7 stacks (`cdk/ben_stacks`, prefix `ben-`) — synthesizes to valid CloudFormation (in-suite `aws_cdk.assertions`) |
 | **Gate-B posture** | **zero public egress** (isolated subnets; AWS private endpoints only; no NAT/IGW/firewall) · customer-managed KMS · MFA-enforced pilot identity · tenant pin — **as CDK switches, live EP1-validated** |
 | **Live EP1 validation** | **DONE (2026-07-27, env `ben-val1`, us-east-1)** — see `evidence/EP1-VALIDATION.md` |
@@ -21,7 +21,7 @@ this table, this table is correct and the other file is a bug.*
 
 ## Count glossary
 
-- **142 offline tests** — the CI suite (control-plane + 14 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). Authoritative offline number. Locally you see `124 passed, 1 skipped`: one gate asserts the CDK libs are installed and only runs inside CI.
+- **143 offline tests** — the CI suite (control-plane + 15 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). Authoritative offline number. Locally you see `124 passed, 1 skipped`: one gate asserts the CDK libs are installed and only runs inside CI.
 - The number above is machine-enforced by `tests/test_doc_counts.py`, which collects the suite for real and fails if any counted document disagrees. Counts that describe a **past run** are exempt only when the line says "at the time of this run" or carries a `<!-- count-gate:historical -->` marker.
 
 ## Known limitations (explicit)

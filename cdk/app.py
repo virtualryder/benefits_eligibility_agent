@@ -96,6 +96,8 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        provenance_secret=app.node.try_get_context("provenance_secret") or "",
                        network=network,
                        tenant=app.node.try_get_context("tenant") or "",
+                       # phase 107 hybrid: -c multitenant=1 -> tenant derived per request (gateway interceptor)
+                       multitenant=str(app.node.try_get_context("multitenant") or "").lower() in ("1", "true", "yes"),
                        # G1 guardrail-pinned drafting: pass the platform guardrail so DraftNotice
                        # generations are guardrail-assessed (-c guardrail_id=... -c guardrail_version=1)
                        guardrail_id=app.node.try_get_context("guardrail_id") or "",

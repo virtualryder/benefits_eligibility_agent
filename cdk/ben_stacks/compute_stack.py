@@ -20,7 +20,7 @@ class ComputeStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, asset_dir: str, data,
                  provenance_secret: str = "", network=None, tenant: str = "",
                  guardrail_id: str = "", guardrail_version: str = "1",
-                 identity=None, approvals_client_id: str = "", **kw):
+                 identity=None, approvals_client_id: str = "", multitenant: bool = False, **kw):
         super().__init__(scope, cid, **kw)
         code = lambda_.Code.from_asset(asset_dir)
         cmk = None
@@ -43,6 +43,10 @@ class ComputeStack(cdk.Stack):
         # is DERIVED from this env, never from a request body (lib/controls/tenancy.py).
         if tenant:
             common_env["TENANT_ID"] = tenant
+        # Hybrid multi-tenant (phase 107): tenant is derived per request from the gateway interceptor's
+        # HMAC-signed injection (never the pinned env); MULTITENANT=1 makes the routing fail-closed.
+        if multitenant:
+            common_env["MULTITENANT"] = "1"
         # Per-deploy signing secret (P0-1). DEFAULT: a generated AWS Secrets Manager secret referenced
         # by ARN — never plaintext in the template. A context-supplied plaintext secret remains available
         # for disposable sandbox validation ONLY.
@@ -114,6 +118,9 @@ class ComputeStack(cdk.Stack):
         self.signoff_register = fn("signoff-register", "signoff_register")
         self.finalize = fn("finalize", "finalize_signoff")
         self.guards = fn("workflow-guards", "workflow_guards")
+        # Phase 107: the AgentCore Gateway REQUEST interceptor - derives the tenant from the VALIDATED JWT
+        # and injects it HMAC-signed for the targets (a pass-through in silo mode).
+        self.tenant_interceptor = fn("tenant-interceptor", "tenant_interceptor")
         # approve-signoff (G2, 2026-08-29): the human approver's OUT-OF-BAND door — verifies a
         # Cognito ACCESS token (RS256/JWKS), enforces separation of duties, consumes the single-use
         # approval (PENDING -> CONSUMED + recorded approver), and only then releases the task token.
@@ -132,7 +139,7 @@ class ComputeStack(cdk.Stack):
         # (assess / redetermine / overpayment / core / guards). No external source signer exists.
         if self.signing_secret is not None:
             for f in (self.mask, self.assess, self.redetermine, self.overpayment,
-                      self.core, self.guards):
+                      self.core, self.guards, self.tenant_interceptor):   # interceptor SIGNS the tenant
                 self.signing_secret.grant_read(f)
         # R3-2 case store: ingest WRITES raw content; intake + mask READ it (the only two consumers of
         # raw text); the drafter WRITES the notice. Nothing else touches raw content; only opaque refs

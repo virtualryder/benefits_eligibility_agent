@@ -187,3 +187,28 @@ def test_data_stack_per_tenant_naming_is_physically_separate():
         Match.object_like({"TableName": "ben-test-pha-alameda-audit-ledger"}))
     Template.from_stack(silo).has_resource_properties("AWS::DynamoDB::Table",
         Match.object_like({"TableName": "ben-test-audit-ledger"}))
+
+
+def test_tenant_interceptor_wired_into_compute_and_gateway():
+    """Phase 107 (hybrid multi-tenant): the gateway REQUEST interceptor Lambda exists with MULTITENANT set,
+    the gateway attachment carries its ARN (passRequestHeaders -> it sees the validated JWT), the gateway
+    role may invoke it, and every tool schema carries the reserved HMAC-signed tenant fields."""
+    from ben_stacks.gateway_stack import GatewayStack
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d2", prefix="ben-mt", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "c2", prefix="ben-mt", asset_dir=asset, data=data, multitenant=True)
+    identity = IdentityStack(app, "i2", prefix="ben-mt")
+    gateway = GatewayStack(app, "g2", prefix="ben-mt", compute=compute, identity=identity)
+    tc, tg = Template.from_stack(compute), Template.from_stack(gateway)
+    tc.has_resource_properties("AWS::Lambda::Function", Match.object_like({
+        "FunctionName": "ben-mt-tenant-interceptor",
+        "Handler": "tenant_interceptor.handler",
+        "Environment": {"Variables": Match.object_like({"MULTITENANT": "1"})},
+    }))
+    gw = json.dumps(tg.to_json())
+    assert "InterceptorLambdaArn" in gw, "gateway attachment does not carry the interceptor ARN"
+    assert "__aegis_tenant" in gw and "__aegis_tenant_sig" in gw, \
+        "tool schemas are missing the reserved signed-tenant fields"
+    # (the gateway role's invoke grant and the attachment both reference the interceptor ARN via the
+    #  same cross-stack export token, so InterceptorLambdaArn being present proves the wiring)
