@@ -46,6 +46,8 @@ def test_masked_before_model_check():
 def test_timeline_merges_every_source_with_join_keys_and_verdict():
     tr = tc.build_timeline("C-1", "pha-a", WORM, SPANS, [{"ts": 999_100, "summary": "tools/call mask_pii", "keys": {"session_id": "s1", "mcp_session_id": "m1"}}],
                            LAMBDA, MODEL, [{"timestamp": "1970-01-01T00:16:50Z", "type": "TaskStateEntered", "name": "AuditIntent", "execution_arn": "arn:exec:1"}])
+    tr2 = tc.build_timeline("C-1", "pha-a", [], [{"traceId": "t", "spanId": "x", "name": "chat m", "startTimeUnixNano": 1, "endTimeUnixNano": None, "attributes": {}}], [], [], [], [])
+    assert tr2["timeline"][0]["detail"]["duration_ms"] is None                                       # in-flight span tolerated
     srcs = [r["source"] for r in tr["timeline"]]
     assert set(srcs) == {"worm", "runtime-span", "gateway", "lambda", "bedrock-model-log", "stepfunctions"}
     assert [r["ts"] for r in tr["timeline"]] == sorted(r["ts"] for r in tr["timeline"])          # time-ordered

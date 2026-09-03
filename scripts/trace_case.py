@@ -38,6 +38,10 @@ def span_kind(span):
     for prefix, kind in SPAN_KINDS:
         if name.startswith(prefix) or op == prefix:
             return kind
+    # Transaction Search puts the tool Lambdas' X-Ray segments into aws/spans under the SAME trace id
+    # (the gateway propagates the runtime's trace to the Lambda invoke) - name them for the reader
+    if "/LambdaService" in name or "/LambdaExecutionEnvironment" in name or name.startswith("Overhead/"):
+        return "lambda-segment"
     return "span"
 
 
@@ -87,12 +91,13 @@ def build_timeline(case_id, tenant, worm_rows, spans, gateway_rows, lambda_calls
             summ += " tool=%s" % a["gen_ai.tool.name"]
         if a.get("gen_ai.request.model"):
             summ += " model=%s in=%s out=%s" % (a["gen_ai.request.model"], a.get("gen_ai.usage.input_tokens"), a.get("gen_ai.usage.output_tokens"))
-        tl.append(_row(int(s.get("startTimeUnixNano", 0)) // 1_000_000, "runtime-span", kind, summ,
+        t0, t1 = int(s.get("startTimeUnixNano") or 0), int(s.get("endTimeUnixNano") or 0)   # in-flight spans: end=None
+        tl.append(_row(t0 // 1_000_000, "runtime-span", kind, summ,
                        {"trace_id": s.get("traceId"), "span_id": s.get("spanId"), "session_id": a.get("session.id"),
                         "tenant": a.get("tenant"), "case_id": a.get("case_id"),
                         # the Bedrock client span's aws.request_id == the model-invocation log's requestId
                         "request_id": a.get("aws.request_id") if "bedrock" in str(a.get("server.address", "")) or a.get("gen_ai.request.model") else None},
-                       {"duration_ms": (int(s.get("endTimeUnixNano", 0)) - int(s.get("startTimeUnixNano", 0))) // 1_000_000,
+                       {"duration_ms": (t1 - t0) // 1_000_000 if t1 else None,
                         "reasoning": s.get("_reasoning")}))
     for g in gateway_rows:
         tl.append(_row(g.get("ts", 0), "gateway", "request", g.get("summary", ""), g.get("keys", {}), g.get("detail")))
@@ -239,7 +244,10 @@ def read_spans(logs, groups, session_ids, trace_ids, start, end):
     seen = set()
     for row in _insights(logs, groups, q, start, end, 5000):
         s = _parse(row)
-        if s and s.get("spanId") and s["spanId"] not in seen:
+        # OTEL LOG records in the runtime group carry traceId/spanId too (the span they were emitted
+        # under) - only a record with a name + start time is a span; the log record would otherwise
+        # shadow its span in the dedup (found live 2026-09-02: invoke_agent "missing").
+        if s and s.get("spanId") and s.get("name") and s.get("startTimeUnixNano") and s["spanId"] not in seen:
             seen.add(s["spanId"])
             out.append(s)
     return out
@@ -278,7 +286,7 @@ def read_gateway_rows(logs, group, session_ids, mcp_ids, trace_ids, start, end):
 
 
 def read_lambda_calls(logs, groups, case_id, keys, start, end):
-    cond = ['@message like "\\"aegis\\": \\"call\\""', '(@message like "%s"' % case_id]
+    cond = ['@message like "aegis" and @message like "args_sha256"', '(@message like "%s"' % case_id]
     for t in keys.get("trace_id", []) + keys.get("execution_arn", []) + keys.get("session_id", []):
         cond[1] += ' or @message like "%s"' % t
     cond[1] += ")"
