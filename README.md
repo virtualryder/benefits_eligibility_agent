@@ -6,7 +6,7 @@
 
 > **SUPPORTED DEPLOYMENT PATH — read this first.** The ONE supported path is **AWS CDK at the validated
 > release tag [`v0.1.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.2-pilot-rc1)**
-> (`cdk/ben_stacks`, 7 stacks, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
+> (`cdk/ben_stacks`, 7 stacks + one data stack per tenant in multi-tenant mode, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
 > per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md); the
 > tag was cut AFTER the EP1 live validation captured its evidence (2026-07-27 — `evidence/EP1-VALIDATION.md`).
 > The shell engine (`lib/engine/`) is **legacy/internal reference only**. Product framing: a governed
@@ -66,6 +66,19 @@ from a reusable, manifest-driven template.
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
 > Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **154 offline tests**
 > Tag `v0.2.0-pilot-rc1` was cut from this tree, after the governed-core dependency migration.
+>
+> **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
+> Fresh from-zero ENFORCE re-proof (`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`); **hybrid multi-tenant**
+> control plane — one shared AgentCore Gateway + Cedar engine, physically separate per-tenant data stacks,
+> tenant DERIVED from the verified identity by a gateway request interceptor, cross-tenant deny proven with
+> two tenants (`evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md`); **per-tenant audit ledger / WORM vault /
+> approvals routing** across both the gateway and the Step Functions hop, fail-closed
+> (`evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`, governed-core 1.6.0); and **full per-case
+> transparency** through the real AgentCore Runtime — the agent's reasoning spans, every gateway / tool /
+> model API call and the WORM record joined by session + trace id, tagged per tenant, masked-before-model
+> measured on every model invocation (`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`, governed-core
+> 1.7.1). Design: platform `docs/MULTI-TENANT-SAAS-DESIGN.md` + `docs/OBSERVABILITY-CORRELATION.md`.
+> Multi-tenant is the SaaS roadmap path; the per-customer single-tenant silo remains the default deployment.
 
 ---
 
@@ -147,6 +160,31 @@ The higher-risk the action, the stronger the governance. Beyond intake/screening
 
 All three are proven live in the 29-check demo.
 
+## Hybrid multi-tenant + full transparency (2026-09-02)
+
+Both are CDK context switches on the same stacks (see `DEPLOYMENT-GUIDE.md` §1b); silo deployments
+are unchanged when the switches are off.
+
+```bash
+cd cdk && npx --yes aws-cdk@2.1139.0 deploy --all --require-approval never \
+  -c env=mt -c retention_profile=sandbox-demo -c tenants=pha-a,pha-b -c model_logging=1
+python scripts/mt_two_tenant_proof.py  --env mt --tenants pha-a,pha-b          # cross-tenant deny + per-tenant routing (12 checks)
+python scripts/obs_two_tenant_proof.py --env mt --tenants pha-a,pha-b \
+  --runtime-arn <runtime arn> --runtime-log-group /aws/bedrock-agentcore/runtimes/<agent>-DEFAULT   # 13 checks per tenant
+python scripts/trace_case.py --env mt --case-id <id> --tenant pha-a --session-id <runtime session>  # one auditor timeline
+```
+
+- **Tenant is derived, never requested.** Cognito `tenant_<id>` group → gateway REQUEST interceptor →
+  HMAC-signed pair in the tool arguments → every Lambda verifies it before routing to
+  `<prefix>-<tenant>-{case-store,sanitized-artifacts,audit-ledger,pending-approvals}` and the tenant's own
+  Object-Lock vault; `require_tenant` (Cedar, multi-tenant only) refuses un-tenanted identities at the gateway.
+- **The workflow hop** (no interceptor) carries the signed pair in the execution input; an execution
+  started without it fails at the first state. `ingest` derives the tenant from a verified access token.
+- **Transparency.** One correlation set (tenant · session · trace · request · case) on every runtime span
+  (Strands `trace_attributes`), every Bedrock call (`requestMetadata`), every tool Lambda's `aegis.call`
+  log line, the gateway's request rows and the hash-chained WORM record (`correlation` block); the
+  Bedrock model-invocation log (`-c model_logging=1`, account-level, opt-in) holds the exact bodies.
+
 ## Deploy / prove / run / tear down
 
 Requirements: AWS CLI v2 (admin, us-east-1), Python 3.12 + `pyyaml`, Bedrock model access, Bash
@@ -176,7 +214,8 @@ placeholder defaults (`ChangeMe-*1!`) — rotate before shared use. Region/accou
 
 ```
 lib/engine/     manifest-driven engine: render.py + deploy/demo/destroy + deploy_identity + signoff.asl.tmpl
-lib/controls/   shared control tools: mask_pii, write_audit, request/approve/finalize sign-off, mcp_client
+lib/controls/   this agent's domain-shaped controls: mask_pii, provenance (declared overrides), sanitized, case_store, ingest_case, workflow_guards
+                (evidence, write_audit, sign-off, identity, tenancy, tenant_interceptor, telemetry come from the PINNED governed-core wheel - requirements-core.txt)
 lib/runtime/    generic Strands agent on AgentCore Runtime (agent.py + Dockerfile + toolkit helpers)
 lib/connector/  reusable governed OAuth connector: verify_source (token via AgentCore Identity, no stored secret) + deploy/prove scripts + RS256/JWKS-verified mock SoR
 agents/benefits-eligibility/

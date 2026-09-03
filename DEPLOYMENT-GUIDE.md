@@ -45,6 +45,23 @@ Guidelines compiled in as configuration, so there is no runtime external depende
 | `guardrail_id=<id>` `guardrail_version=<v>` | Arms the platform Bedrock guardrail on the drafter (`draft_notice`). Every generation is guardrail-assessed; an intervention fails closed (no `notice_ref`) and the case routes to `ManualReview`. Omit → drafting is unguarded (sandbox only). |
 | `approvals_client_id=<cognito-client-id>` | Client id the `approve-signoff` Lambda verifies caseworker access tokens against. The identity pool/reviewer group are wired from the identity stack automatically; this is only needed when approvals use a different app client than the gateway (e.g. a CLI/native client). |
 
+### 1b. Hybrid multi-tenant + full transparency switches (2026-09-02)
+
+| Switch | Effect |
+|---|---|
+| `tenants=<a>,<b>,…` | **Hybrid multi-tenant**: one shared control plane (identity, compute, workflow, gateway + Cedar engine) and ONE physically separate data stack per tenant (`ben-<env>-<tenant>-data`: tenant-scoped tables + the tenant's own Object-Lock vault `<prefix>-<tenant>-worm-<account>`). Creates a `tenant_<id>` Cognito group per tenant, deploys the gateway REQUEST interceptor (`tenant-interceptor`), attaches `require_tenant` (Cedar), sets `MULTITENANT=1` + `WORM_BUCKET_TEMPLATE` on the governed Lambdas, threads the signed tenant pair through the workflow, and mirrors least-privilege grants onto `<prefix>-*-<logical>`. Mutually exclusive in spirit with `tenant=` (silo). |
+| `model_logging=1` | **Bedrock model-invocation logging** for the account+region (an account-level singleton — it REPLACES any existing configuration, hence opt-in): CloudWatch group `/aws/bedrock/modelinvocations/<prefix>` + S3 large-data bucket + the `bedrock.amazonaws.com` role; removed on teardown. Also delivers the AgentCore gateway's vended request logs to `/aws/vendedlogs/bedrock-agentcore/gateway/<prefix>`. |
+
+Multi-tenant contracts: the tenant is **derived, never requested** (verified identity → interceptor →
+HMAC-signed `__aegis_tenant`/`__aegis_tenant_sig` → every Lambda verifies before routing); `ingest`
+(direct IAM invocation) derives it from a verified caseworker access token (`access_token` in the
+payload) and returns `tenant_binding`, which the workflow starter MUST splat into the execution input
+(`{case_id, requester, case_ref, redetermination, **tenant_binding}`) — an execution without it fails
+at the first state. Proofs: `scripts/mt_two_tenant_proof.py` (cross-tenant deny, per-tenant routing,
+audit/WORM/approvals routing on both hops) and `scripts/obs_two_tenant_proof.py` + `scripts/trace_case.py`
+(one per-case timeline across runtime spans, gateway rows, Lambda `aegis.call` lines, model-invocation
+rows and the WORM record). Evidence: `evidence/AGENTCORE-MULTITENANT-*.md`, `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`.
+
 ### Observability & governance evidence (verify the claims)
 
 Deployed as IaC by the stacks above — no post-deploy instrumentation:
@@ -52,7 +69,8 @@ Deployed as IaC by the stacks above — no post-deploy instrumentation:
 - **X-Ray** — `Tracing.ACTIVE` on every governed tool Lambda and the gateway; one execution is a single connected trace (ingest → guards → mask → assess → draft → audit → finalize).
 - **Step Functions execution logging** — `loggingConfiguration` level `ALL`, `includeExecutionData=false` (R3-2: references only, no case content), 1-year CMK-when-present log group at `/aws/states/<prefix>-determination-workflow`.
 - **Lambda logs** — unconditional 1-year retention on every `/aws/lambda/<prefix>-*` group (decoupled from the KMS switch).
-- **Model prompts & responses** — account-level **Bedrock model-invocation logging** (a platform runbook one-time step) captures full request/response bodies; because masking runs *before* the model, the logged prompt is de-identified (`[REDACTED:NAME]` / `[REDACTED:SSN]`).
+- **Model prompts & responses** — account-level **Bedrock model-invocation logging** (`-c model_logging=1`, or the platform runbook one-time step) captures full request/response bodies, tagged per tenant / session / case via `requestMetadata`; because masking runs *before* the model, the logged prompt is de-identified — `scripts/trace_case.py` measures `masked_before_model` on every row.
+- **Correlation (phase 110, governed-core ≥ 1.7.1)** — every runtime span, gateway row, tool-Lambda `aegis.call` line, model-invocation row and WORM record carries the same tenant · session · trace · request · case keys; `scripts/trace_case.py` joins them into one auditor timeline.
 - **Data-source touches** — the platform **evidence trail** records management-write events + DynamoDB data events for all tables; each agent adds a **data-only CloudTrail** on its own WORM vault (`<prefix>-worm-data-events`). Answers "who touched the evidence" independent of the app's own logging.
 - **Approval integrity (governed-core ≥ 1.5.0)** — approvals go through `approve-signoff` (Cognito access-token verified, separation-of-duties, single-use). `finalize` verifies the **approval path**: a task token released around that Lambda (e.g. a raw `send-task-success`) is refused fail-closed to `ManualReview` and recorded `DENIED` — never `COMMITTED`.
 
@@ -191,5 +209,5 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 
 ```bash
 python -m pytest tests/ -q                    # 124 pass locally (+1 CI-only gate = 154 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
-python -m pytest tests/test_cdk_stacks.py -q  # 16 CDK assertions (synthesizes all 7 stacks)
+python -m pytest tests/test_cdk_stacks.py -q  # 16 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```
