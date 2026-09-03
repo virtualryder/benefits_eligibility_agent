@@ -59,8 +59,10 @@ tools:
     mcp_tools:
       - name: intake_application
         description: "Extract the non-PII decision fields (household size, monthly income, liquid resources, categorical flag) from a raw benefits application."
-        input: { application: { type: string, description: "Raw benefits application text or JSON." } }
-        required: [application]
+        input:
+          application: { type: string, description: "Raw benefits application text or JSON (dev/direct calls only)." }
+          case_ref: { type: string, description: "R3-2 pass-by-reference: the opaque case_ref from ingest; the tool loads the application server-side." }
+        required: []
 
   - target: mask-pii
     lambda: ben-mask-pii
@@ -69,8 +71,10 @@ tools:
     mcp_tools:
       - name: mask_pii
         description: "Fail-closed PII de-identification of an application (name, SSN, address, DOB, etc.); sets deidentified=true only if masking succeeded."
-        input: { case: { type: string, description: "Application text that may contain PII." } }
-        required: [case]
+        input:
+          case: { type: string, description: "Application text that may contain PII (dev/direct calls only)." }
+          case_ref: { type: string, description: "R3-2 pass-by-reference: the opaque case_ref from ingest; the tool loads the application server-side." }
+        required: []
 
   - target: assess-eligibility
     lambda: ben-assess-eligibility
@@ -85,7 +89,8 @@ tools:
           liquid_resources: { type: number, description: "Liquid resources (cash/savings)." }
           categorical_eligibility: { type: boolean, description: "True if the household receives SSI/TANF/GA." }
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
-        required: [deidentified]
+          sanitized_ref: { type: object, description: "The signed sanitized_ref returned by mask_pii (proof of de-identification; pass it verbatim)." }
+        required: [deidentified, sanitized_ref]
 
   - target: redetermine
     lambda: ben-redetermine
@@ -101,7 +106,8 @@ tools:
           prior_determination: { type: string, description: "The prior determination (e.g. 'ELIGIBLE')." }
           prior_eligible: { type: boolean, description: "Prior eligibility, if known (overrides prior_determination)." }
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
-        required: [deidentified]
+          sanitized_ref: { type: object, description: "The signed sanitized_ref returned by mask_pii (proof of de-identification; pass it verbatim)." }
+        required: [deidentified, sanitized_ref]
 
   - target: overpayment
     lambda: ben-overpayment
@@ -115,7 +121,8 @@ tools:
           corrected_monthly_benefit: { type: number, description: "Corrected monthly entitlement." }
           months: { type: integer, description: "Number of months in the overpayment period." }
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
-        required: [deidentified]
+          sanitized_ref: { type: object, description: "The signed sanitized_ref returned by mask_pii (proof of de-identification; pass it verbatim)." }
+        required: [deidentified, sanitized_ref]
 
   - target: ben-core
     lambda: ben-core-tools
@@ -126,9 +133,10 @@ tools:
       - name: draft_notice
         description: "Draft a de-identified benefits determination notice; case must be masked first."
         input:
-          case: { type: string, description: "De-identified case + determination JSON/text." }
+          case: { type: string, description: "De-identified case + determination JSON/text (optional when sanitized_ref is given: the drafter loads the masked text server-side)." }
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
-        required: [case, deidentified]
+          sanitized_ref: { type: object, description: "The signed sanitized_ref returned by mask_pii (proof of de-identification; pass it verbatim)." }
+        required: [deidentified, sanitized_ref]
       - name: finalize_determination
         description: "Commit a benefits determination; agent must never call this directly."
         input: { case_id: { type: string, description: "Case id." } }

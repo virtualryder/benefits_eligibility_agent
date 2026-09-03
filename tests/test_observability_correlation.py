@@ -34,6 +34,10 @@ def test_runtime_correlation_and_request_metadata_hook(monkeypatch):
     corr = agent._correlation(ctx, "pha-a", "C-1", "cw-a")
     assert corr == {"session.id": "rt-sess-1", "case_id": "C-1", "requester": "cw-a", "tenant": "pha-a"}
     assert "tenant" not in agent._correlation(ctx, None, "C-1", "cw-a")           # silo: no tenant tag
+    # the runtime's session-tenant mirror honours the tenant_<id> group (what Cognito access tokens carry)
+    import base64
+    tok = "h." + base64.urlsafe_b64encode(json.dumps({"cognito:groups": ["benefits_caseworker", "tenant_pha-b"]}).encode()).decode().rstrip("=") + ".s"
+    assert agent._session_tenant(tok) == "pha-b"
     assert agent._meta_value("a b;c<d>") == "a b_c_d_" and len(agent._meta_value("x" * 300)) == 256
     # the boto session injects requestMetadata on Converse - the model-invocation log row is tagged
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "x"); monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "y")

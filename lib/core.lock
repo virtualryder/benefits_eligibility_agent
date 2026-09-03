@@ -5,10 +5,10 @@
 # 'identical core' while the trees differed is how the exactly-once finalization gap hid for weeks.
 # The 'version' below means: derived from governed-core <version>. CROSS-repo parity is a separate
 # question answered by tools/check_core_parity.py. CI runs both and fails on either.
-version: 1.7.0
+version: 1.7.1
 files: 34
-tree_sha256: 1c7031964956bfe548e70429890304faa587905b4fb97c90cf80e16e03a1a9bf
-bb7320d831e7a151aa901c35e7326c752fa2ef5024f30768c42319b8bed171ed  lib/CORE_VERSION
+tree_sha256: ebd32766b01eae778c0bc14ec1cf22e4b6ad5a539337ade6c9b7e2770b3ffb0a
+249182a01164b81a5f7af87e5c5cdbd3344a80a7a66dfca624cecfb1501b2420  lib/CORE_VERSION
 2490c78e8067798930870fcb6be5b99fb6316602f0e6958662970c6823cd4c2d  lib/connector/deploy_connector.sh
 56df0cb5464b5a5ca41766350382cdc63d9a6718fae69b08c73fd87724cd3e14  lib/connector/prove_connector.sh
 9b7968373ad47e2a6ceb7c83be44ba416c21117d4146470b38c00389a8864424  lib/connector/sor_api.py
@@ -33,11 +33,11 @@ fecb2b2420eb2e419a4e292c333ed3b469abba7699b1bdbaefc701545fef1718  lib/runtime/Do
 81710a1004d7c91b845282455e6d287a578eee1723a7ed313cd265813e330802  lib/runtime/_configure.sh
 dca20614bb97fc036db1524bcd7fb1055fb6b19e23fadb3632fbe888a2943339  lib/runtime/_env.sh
 9ae2147adcb3444d2d09ecdb2d2d6ffeb486f939abd89db1fd5c21aa2c520cbd  lib/runtime/_invoke.sh
-87d1a45ab734e2b67d663faec5b0ab65bcfa5fd76228b05acf5a21bb82dada99  lib/runtime/_launch.sh
+a7313db362b0fa3733db1f1454b83ec87307d1e7f2fda2485e61185b53338664  lib/runtime/_launch.sh
 8fc4644e89de801f79b281c7fa0f0dcf649fed4070fac080cc0a847c05bfd14c  lib/runtime/_obs_setup.sh
 c559c3405ce9d603190fba821dd5400874a5562c22363e5f546dc00677412a8d  lib/runtime/_smoke.sh
 508b49b10002c6b6c7a421bd3360e8732d4be4f4b368dfe7e16775c755d98359  lib/runtime/_verify_rt.sh
-718447ad0c9d61566f624f02f5cf419045220185eb554dff4b9cf1229f2e9b18  lib/runtime/agent.py
+8415e021470ec8f6f3bb1008ee27115268ffef2214b4eb12b1fe94ce729d0344  lib/runtime/agent.py
 0609a0b145604efd05d45e34f59b044002ce71b96f6ca807cf226fb8322d7800  lib/runtime/requirements.txt
 a20960c97b7b9aba6b84c848ff74d1fb4363ed00c6fab654a63a21cc05841f48  lib/runtime/setup_venv.sh
 e1c1048cbc99df0fa70a998dec634fb4921a6e37acc682a0f1808fb0ea5bd04b  lib/runtime/token_boundary.py

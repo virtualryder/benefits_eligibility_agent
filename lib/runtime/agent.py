@@ -66,7 +66,17 @@ def _session_tenant(token):
     except (binascii.Error, ValueError, UnicodeDecodeError):
         return None
     t = claims.get("custom:tenant")
-    return t.strip() if isinstance(t, str) and t.strip() else None
+    if isinstance(t, str) and t.strip():
+        return t.strip()
+    # Cognito ACCESS tokens carry cognito:groups (not custom attributes): tenant membership is the
+    # tenant_<id> group - the same rule as tenancy.tenant_from_claims (found while wiring phase 110:
+    # this mirror only read custom:tenant and would have refused every group-tenanted identity).
+    g = claims.get("cognito:groups")
+    groups = g if isinstance(g, (list, tuple)) else (str(g).replace(",", " ").split() if g else [])
+    for grp in groups:
+        if isinstance(grp, str) and grp.startswith("tenant_") and grp[len("tenant_"):].strip():
+            return grp[len("tenant_"):].strip()
+    return None
 
 
 _MULTITENANT = os.environ.get("MULTITENANT", "").strip().lower() in ("1", "true", "yes", "on")
@@ -150,8 +160,8 @@ def invoke(payload, context=None):
     if not gw:
         return {"error": "gateway URL not available (SSM and env both empty)"}
 
-    model = BedrockModel(model_id=MODEL_ID, region_name=REGION, temperature=0.2,
-                         boto_session=_bedrock_session(corr))
+    # region comes from the session (Strands refuses region_name + boto_session together - found live)
+    model = BedrockModel(model_id=MODEL_ID, temperature=0.2, boto_session=_bedrock_session(corr))
     mcp_client = MCPClient(lambda: streamablehttp_client(gw, headers={"Authorization": "Bearer %s" % token}))
     with mcp_client:
         tools = mcp_client.list_tools_sync()

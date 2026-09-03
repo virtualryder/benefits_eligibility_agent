@@ -21,7 +21,7 @@ this table, this table is correct and the other file is a bug.*
 
 ## Count glossary
 
-- **150 offline tests** — the CI suite (control-plane + 16 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). Authoritative offline number. Locally you see `124 passed, 1 skipped`: one gate asserts the CDK libs are installed and only runs inside CI.
+- **154 offline tests** — the CI suite (control-plane + 16 CDK synthesis + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). Authoritative offline number. Locally you see `124 passed, 1 skipped`: one gate asserts the CDK libs are installed and only runs inside CI.
 - The number above is machine-enforced by `tests/test_doc_counts.py`, which collects the suite for real and fails if any counted document disagrees. Counts that describe a **past run** are exempt only when the line says "at the time of this run" or carries a `<!-- count-gate:historical -->` marker.
 
 ## Known limitations (explicit)
