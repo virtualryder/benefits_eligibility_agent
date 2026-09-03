@@ -50,6 +50,15 @@ published pricing and marked UNCONFIRMED-ON-BEDROCK until confirmed per region.
 - Tenant B (cap 0): gateway 403 `budget exceeded (pha-b): the tenant's period cap is reached; refused`; runtime refused (`budget_exceeded`); workflow states ['Extract', 'GuardExtracted', 'ExtractedOk', 'MaskPii', 'GuardDeidentified', 'DeidentifiedOk', 'AssessEligibility', 'GuardRulesExecuted', 'RulesOk', 'CheckAdverseNotice', 'AdverseNoticeOk', 'DraftNotice', 'DraftOk', 'ManualReview']; DENIED `budget.deny` rows in B's ledger: 6, of which by the drafter (joined by execution ARN): 2.
 - USD backstop: budget action {'ActionType': 'APPLY_IAM_POLICY', 'ApprovalModel': 'AUTOMATIC', 'Status': 'STANDBY', 'NotificationType': 'ACTUAL'}; execute attempt {'executed': False, 'error': 'ResourceLockedException: An error occurred (ResourceLockedException) when calling the ExecuteBudgetAction operation: This method is not allowed during [ActionStatus: Standby]', 'note': "ExecuteBudgetAction refused outside a real threshold breach - the action's wiring is proven by describe-budget-action; billing-triggered firing is not exercisable in a test"}; engaged record {'actor': 'arn:aws:sts::111122223333:assumed-role/ben-mt6-observability-BudgetBreachServiceRole183A35-i6df3Ez48d0Y/ben-mt6-budget-breach', 'actor_user_id': 'AROA4SN3H3366OB6JAU3U:ben-mt6-budget-breach', 'at': 1788459052, 'engaged': True, 'reason': 'AWS Budgets ben-mt6-bedrock-usd-ceiling: USD ceiling threshold reached - automatic containment (AWS Budgets: ben-mt6-bedrock-usd-ceiling has exceeded your alert threshold)'}.
 
+## End-to-end regression sweep after the gate
+
+`AGENTCORE-BUDGET-2026-09-03-regression.json` (`scripts/e2e_regression.py --env mt6 --since-minutes 45`, run after
+run 4 on the final deployment): **PASS, 0 unexpected** across 23 log groups, all
+4 Step Functions executions (SUCCEEDED), alarms, DLQs and every
+Lambda's Errors metric. The only error-shaped events are the deliberate budget refusals the gate provokes
+(classified EXPECTED by name). The earlier sweep after run 2 is what surfaced finding A (`stored: false` on
+the drafter's DENIED record) — the sweep is part of the gate for exactly that reason.
+
 ## Price table used (pinned, provenance stated)
 
 ```json

@@ -1,0 +1,230 @@
+{
+ "prefix": "ben-mt6",
+ "since_minutes": 45,
+ "log_groups": {
+  "/aws/lambda/ben-mt6-approve-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-assess-eligibility": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-budget-breach": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-core-tools": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-finalize": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-gateway-AttachmentProviderEF56056D-AOKPWtIOwEqr": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-ingest-application": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-intake-application": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-kill-switch-disengage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-kill-switch-engage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-mask-pii": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-observability-AWS679f53fac002430cb0da5b798-niY2D7gsspVt": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-observability-CustomS3AutoDeleteObjectsCus-FvPCcyZaaLgP": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-overpayment": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-redetermine": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-request-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-signoff-register": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-tenant-interceptor": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-workflow-guards": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-mt6-write-audit": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/states/ben-mt6-determination-workflow": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/vendedlogs/bedrock-agentcore/gateway/ben-mt6": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-fQNtc76D8c-DEFAULT": {
+   "events": 4,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1788458331921,
+     "stream": "otel-rt-logs",
+     "kind": "expected",
+     "why": "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"telemetry.sdk.language\":\"python\",\"telemetry.sdk.name\":\"opentelemetry\",\"telemetry.sdk.version\":\"1.42.1\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"aws.log.group.names\":\"/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-fQN"
+    },
+    {
+     "ts": 1788458331921,
+     "stream": "2026/09/03/[runtime-logs]9961b766-0501-4d15-8ea2-7b680613479",
+     "kind": "expected",
+     "why": "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)",
+     "excerpt": "2026-09-03 17:58:51,921 ERROR [strands.event_loop.event_loop] [event_loop.py:394] [trace_id=6a99b55555b7028e6999afd50b38b0c5 span_id=d43c08f4489bbd5e resource.service.name=benefits_runtime_agent.DEFAULT trace_sampled=True] - exception=<BudgetExceeded> | event "
+    },
+    {
+     "ts": 1788459001676,
+     "stream": "otel-rt-logs",
+     "kind": "expected",
+     "why": "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"telemetry.sdk.language\":\"python\",\"telemetry.sdk.name\":\"opentelemetry\",\"telemetry.sdk.version\":\"1.42.1\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"aws.log.group.names\":\"/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-fQN"
+    },
+    {
+     "ts": 1788459001676,
+     "stream": "2026/09/03/[runtime-logs]220c402d-6df5-4905-8b46-87dec1f041a",
+     "kind": "expected",
+     "why": "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)",
+     "excerpt": "2026-09-03 18:10:01,676 ERROR [strands.event_loop.event_loop] [event_loop.py:394] [trace_id=6a99b7f141ab535d71e496d3206375ba span_id=c2f9541399c1f965 resource.service.name=benefits_runtime_agent.DEFAULT trace_sampled=True] - exception=<BudgetExceeded> | event "
+    }
+   ]
+  }
+ },
+ "executions": [
+  {
+   "name": "bgproof-bg-wf-fcb515",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  },
+  {
+   "name": "bgproof-bg-wf-196524",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  },
+  {
+   "name": "bgproof-bg-wf-b9a569",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  },
+  {
+   "name": "bgproof-bg-wf-d5b638",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  }
+ ],
+ "alarms": [],
+ "dlqs": {},
+ "lambda_errors_metric": {
+  "ben-mt6-intake-application": 0,
+  "ben-mt6-kill-switch-disengage": 0,
+  "ben-mt6-overpayment": 0,
+  "ben-mt6-write-audit": 0,
+  "ben-mt6-redetermine": 0,
+  "ben-mt6-observability-CustomS3AutoDeleteObjectsCus-FvPCcyZaaLgP": 0,
+  "ben-mt6-observability-AWS679f53fac002430cb0da5b798-niY2D7gsspVt": 0,
+  "ben-mt6-budget-breach": 0,
+  "ben-mt6-tenant-interceptor": 0,
+  "ben-mt6-kill-switch-engage": 0,
+  "ben-mt6-gateway-AttachmentProviderEF56056D-AOKPWtIOwEqr": 0,
+  "ben-mt6-mask-pii": 0,
+  "ben-mt6-approve-signoff": 0,
+  "ben-mt6-core-tools": 0,
+  "ben-mt6-workflow-guards": 0,
+  "ben-mt6-assess-eligibility": 0,
+  "ben-mt6-signoff-register": 0,
+  "ben-mt6-finalize": 0,
+  "ben-mt6-request-signoff": 0,
+  "ben-mt6-ingest-application": 0
+ },
+ "lambda_errors_note": "Errors>0 on intake-application/assess-eligibility/write-audit are the deliberate fail-closed TenantError refusals; see log_groups classification",
+ "unexpected_total": 0,
+ "verdict": "PASS"
+}

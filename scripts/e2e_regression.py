@@ -129,17 +129,28 @@ def main():
             if kind == "unexpected":
                 unexpected_total += 1
 
+    def _alarm_why(al):
+        name = al["AlarmName"]
+        if "WorkflowFailed" in name:
+            return "WorkflowFailed fires on the DELIBERATE no-binding execution (fail-closed proof)"
+        if "-budget-" in name and ("TokensUsedPct" in name or "UsdUsedPct" in name):
+            # task 128: scripts/budget_proof.py caps tenant A just above its usage and drives it to >= 85 % on
+            # purpose - the gate ASSERTS these alarms reach ALARM. They stay in ALARM until the next datapoint
+            # (the cap is cleared at the end of the proof; the metric is only published on a commit).
+            return "task 128: per-tenant budget alarm provoked by scripts/budget_proof.py (the gate asserts it fires)"
+        return ""
+
     # alarms
     for al in cw.describe_alarms(AlarmNamePrefix=prefix)["MetricAlarms"] + cw.describe_alarms(AlarmNamePrefix=prefix.replace("ben-", "ben"))["MetricAlarms"]:
         if al["StateValue"] == "ALARM":
-            why = "WorkflowFailed fires on the DELIBERATE no-binding execution (fail-closed proof)" if "WorkflowFailed" in al["AlarmName"] else ""
+            why = _alarm_why(al)
             rep["alarms"].append({"name": al["AlarmName"], "state": al["StateValue"], "kind": "expected" if why else "unexpected", "why": why, "reason": al.get("StateReason", "")[:160]})
             if not why:
                 unexpected_total += 1
     # alarms created with CDK ids may not carry the prefix: scan all alarms whose dimensions reference the prefix
     for al in cw.describe_alarms()["MetricAlarms"]:
         if al["StateValue"] == "ALARM" and prefix in json.dumps(al.get("Dimensions", [])) and not any(x["name"] == al["AlarmName"] for x in rep["alarms"]):
-            why = "WorkflowFailed fires on the DELIBERATE no-binding execution (fail-closed proof)" if "WorkflowFailed" in al["AlarmName"] else ""
+            why = _alarm_why(al)
             rep["alarms"].append({"name": al["AlarmName"], "state": "ALARM", "kind": "expected" if why else "unexpected", "why": why, "reason": al.get("StateReason", "")[:160]})
             if not why:
                 unexpected_total += 1
