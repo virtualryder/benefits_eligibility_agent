@@ -2,7 +2,7 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.3.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.3.0-pilot-rc1)**
+**Validated release: [`v0.4.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.4.0-pilot-rc1)** (2026-09-03; supersedes `v0.3.0-pilot-rc1` with the kill switch + per-tenant budget)
 — cut 2026-09-02 from the tree the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit
 routing and full-transparency runs validated live (governed-core 1.9.0, hash-pinned). The EP1 Gate-B
 validation (2026-07-27/28, `ben-val1`/`ben-val2`, full runbook re-walk) was captured on `v0.1.2-pilot-rc1`.
@@ -97,7 +97,7 @@ Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-2
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual), then on 2026-09-02
 **AgentCore ENFORCE re-proven from zero, hybrid multi-tenant (2 tenants) with per-tenant audit/WORM
 routing, and full per-case transparency through the real AgentCore Runtime — all live, all torn down**
-(governed-core 1.9.0, hash-pinned). Tag **`v0.3.0-pilot-rc1`** was cut from that tree (2026-09-02).
+(governed-core 1.9.0, hash-pinned). Tag **`v0.4.0-pilot-rc1`** was cut from that tree (2026-09-03); `v0.3.0-pilot-rc1` (2026-09-02) is the 111-gate tree it builds on.
 Suite: **173 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
 stood at 101; do not re-align). Next, in order: the consolidated 111 gate on the tag (one deployment
 proving isolation + audit routing + transparency + PII canary), independent redeploy of the tag,

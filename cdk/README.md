@@ -1,6 +1,6 @@
 # CDK — THE supported customer deployment path
 
-*Reviewable, parameterized IaC. Deploy the validated release tag (`v0.3.0-pilot-rc1`), never `main`, per
+*Reviewable, parameterized IaC. Deploy the validated release tag (`v0.4.0-pilot-rc1`), never `main`, per
 [`../DEPLOYMENT-GUIDE.md`](../DEPLOYMENT-GUIDE.md). The shell engine (`lib/engine/`) is
 **legacy/internal reference only** and must not be used for customer deployments.*
 
@@ -44,7 +44,7 @@ kill switch via its AWS_IAM URL. Asserted by `tests/test_cdk_stacks.py::test_bud
 ## Deploy
 
 ```
-git checkout v0.3.0-pilot-rc1            # deploy the validated release, never main
+git checkout v0.4.0-pilot-rc1            # deploy the validated release, never main
 cd cdk && pip install -r requirements.txt
 npx aws-cdk@2 deploy --all --require-approval never \
   -c env=pilot -c retention_profile=pilot -c kms=customer-managed \
