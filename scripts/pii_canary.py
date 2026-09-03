@@ -64,15 +64,15 @@ def verdict(hits):
 
 
 # ── live sweeps (boto3 only inside these; offline tests never import them) ────
-def sweep_cloudwatch_logs(prefix, marker, since_ms, session=None, extra_groups=()):
+def sweep_cloudwatch_logs(prefix, marker, since_ms, session=None, extra_groups=(), only_extra=False):
     """Every /aws/lambda/<prefix>-* group plus any EXTRA groups (phase 110: the AgentCore runtime's
     group, aws/spans, the gateway's vended request log, the Bedrock model-invocation log) - so the
     canary also proves the MODEL and the runtime's telemetry never saw the marker."""
     import boto3
     logs = (session or boto3).client("logs")
     total = 0
-    names = [g["logGroupName"] for page in logs.get_paginator("describe_log_groups").paginate(logGroupNamePrefix=f"/aws/lambda/{prefix}-")
-             for g in page["logGroups"]] + [g for g in extra_groups if g]
+    names = ([] if only_extra else [g["logGroupName"] for page in logs.get_paginator("describe_log_groups").paginate(logGroupNamePrefix=f"/aws/lambda/{prefix}-")
+                                    for g in page["logGroups"]]) + [g for g in extra_groups if g]
     for name in names:
         try:
             r = logs.filter_log_events(logGroupName=name, startTime=since_ms, filterPattern=f'"{marker}"')
@@ -134,7 +134,8 @@ def main():
     ap.add_argument("--wait", type=int, default=120, help="seconds to wait after --execute before sweeping")
     # hybrid multi-tenant / phase 110 additions (harness only; product code unchanged):
     ap.add_argument("--access-token", default="", help="multi-tenant: a tenant caseworker's Cognito access token (ingest derives the tenant; the execution carries the signed pair)")
-    ap.add_argument("--extra-log-group", action="append", default=[], help="additional log groups to sweep (e.g. the gateway's vended request log, the model-invocation log); repeatable. NOTE: the MODEL path is measured by scripts/trace_case.py (masked_before_model, realistic PII canaries) - a synthetic marker string is not something Comprehend recognises as PII, so it is not a fair model-path probe.")
+    ap.add_argument("--extra-log-group", action="append", default=[], help="additional log groups to sweep AND gate on (e.g. the gateway's vended request log); repeatable.")
+    ap.add_argument("--info-log-group", action="append", default=[], help="log groups to sweep and REPORT but not gate on: the Bedrock model-invocation log. The MODEL path is measured by scripts/trace_case.py (masked_before_model, realistic PII canaries) - a synthetic marker token is not something Comprehend reliably classifies as a NAME (seen live: the same marker masked on one run and not the next), so a hit here is recorded as informational, never as a pass-by-reference leak.")
     args = ap.parse_args()
 
     import datetime
@@ -174,8 +175,12 @@ def main():
         "xray": sweep_xray(marker, since, until),
         "dlq": sweep_dlqs(args.prefix, marker),
     }
+    info = {g: sweep_cloudwatch_logs(args.prefix, marker, int(since.timestamp() * 1000), extra_groups=[g], only_extra=True)
+            for g in args.info_log_group}
     v = strict_verdict(hits) if args.strict else verdict(hits)
     v.update({"marker": marker, "prefix": args.prefix, "swept_at": until.isoformat()})
+    if info:
+        v["informational_model_path"] = {"hits": info, "note": "not gated: synthetic marker vs Comprehend NAME recall; the model-path control is masked_before_model (trace_case, realistic PII)"}
     print(json.dumps(v, indent=2))
     sys.exit(0 if v["verdict"] == "PASS" else 2)
 
