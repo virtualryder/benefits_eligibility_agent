@@ -38,7 +38,7 @@ dollars. **Everything is torn down at the end**; you confirm zero residual befor
 ```bash
 git clone https://github.com/virtualryder/benefits_eligibility_agent
 cd benefits_eligibility_agent
-git checkout v0.1.2-pilot-rc1          # the tag, never main — the harness enforces this
+git checkout v0.3.0-pilot-rc1          # the tag, never main — the harness enforces this
 pip install -r cdk/requirements.txt
 
 # 1) sanity check first: no AWS calls, no spend
@@ -67,7 +67,7 @@ distinguishable without disclosing the account.
 
 | Step | Expected result | What it proves |
 |---|---|---|
-| `preflight.on_release_tag` | you are on `v0.1.2-pilot-rc1` with a clean tree | you verified the *released* artifact, not a working copy |
+| `preflight.on_release_tag` | you are on `v0.3.0-pilot-rc1` with a clean tree | you verified the *released* artifact, not a working copy |
 | `offline.pytest` | all tests pass | the suite is honest about its own count |
 | `deploy.cdk_all` | 7 stacks reach `*_COMPLETE` | the IaC deploys unaided, incl. the AgentCore/Cedar **ENFORCE** attachment |
 | `validate.deployment` | `deployment_status: PASS` | masking is proven by a signed ref; a **forged ref is refused**; ingest is pass-by-reference; the workflow reaches the human gate |

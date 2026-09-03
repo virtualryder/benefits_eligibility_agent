@@ -3,8 +3,9 @@
 *The single page that says exactly what is proven, how it was proven, and what is not. If any other
 document in this repo disagrees with this table, **this table is correct and the other file is a bug.***
 
-Release `v0.1.2-pilot-rc1` · live EP1 run 2026-07-27 (env `ben-val1`, us-east-1). Current offline
-suite: **154 tests**, matching tag `v0.2.0-pilot-rc1`, which was cut from this tree.
+Release `v0.3.0-pilot-rc1` (2026-09-02) · EP1 Gate-B run 2026-07-27 on `v0.1.2-pilot-rc1` (env `ben-val1`,
+us-east-1) · AgentCore multi-tenant / transparency runs 2026-09-02 (`ben-e2e`, `ben-mt`, `ben-mt2`, `ben-mt3`).
+Current offline suite: **154 tests**, matching tag `v0.3.0-pilot-rc1`, which was cut from this tree.
 
 ---
 

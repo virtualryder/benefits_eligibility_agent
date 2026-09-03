@@ -3,12 +3,26 @@
 *Single source of truth for the current release tag is the repo-root `RELEASE` file, enforced by
 `tests/test_release_consistency.py`. Authoritative counts + limitations: `RELEASE-MANIFEST.md`.*
 
+## Current release — `v0.3.0-pilot-rc1` (2026-09-02)
+
 | Field | Value |
 |---|---|
-| Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. Single source of truth: `RELEASE`. |
+| Tag | `v0.3.0-pilot-rc1` — single source of truth: `RELEASE`. Cut from the tree the 2026-09-02 runs validated. |
+| Commit SHA | `git rev-list -n1 v0.3.0-pilot-rc1` |
+| Test count at the tag | **154** offline tests (153 local + 1 CI-only) |
+| Governance core | `governed-core` **1.7.1**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`) |
+| Validated live on this tree (each deployed from zero, exercised, torn down) | AgentCore ENFORCE from-zero re-proof (`ben-e2e`) — `evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md` · hybrid multi-tenant, 2 tenants, cross-tenant deny + per-tenant routing (`ben-mt`, 5/5) — `evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md` · per-tenant audit ledger / WORM vault / approvals routing on the gateway AND workflow hops, fail-closed (`ben-mt2`, 12/12) — `evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md` · full per-case transparency through the real AgentCore Runtime (`ben-mt3`, 13/13 per tenant) — `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md` |
+| Consolidated 111 gate on this tag | **pending** — one deployment of the tag proving isolation + audit routing + transparency + PII canary together; recorded below when run |
+| Not re-run on this tree | the EP1 Gate-B posture walk (zero-egress private networking, CMK, MFA identity) — last captured 2026-07-27/28 on `v0.1.2-pilot-rc1`; the switches are unchanged and synth-tested, but the live re-walk is owed |
+
+## EP1 record — `v0.1.2-pilot-rc1` (2026-07-27)
+
+| Field | Value |
+|---|---|
+| Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. |
 | Commit SHA | the commit carrying tag `v0.1.2-pilot-rc1` (`git rev-list -n1 v0.1.2-pilot-rc1`) |
 | Test count at the tag | **101** offline tests at the moment `v0.1.2-pilot-rc1` was cut — a record of that tag, not a claim about the current tree <!-- count-gate:historical --> |
-| Test count on current main | **154 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). Tag `v0.2.0-pilot-rc1` was cut from this tree and matches this count. |
+| Test count on current main | **154 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |

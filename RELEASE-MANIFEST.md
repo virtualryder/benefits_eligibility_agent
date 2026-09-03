@@ -11,8 +11,8 @@ this table, this table is correct and the other file is a bug.*
 | Field | Value |
 |---|---|
 | **Product** | Public-Benefits Eligibility Screening & Determination-Support **Assistant** (never an adjudicator; never denies/reduces/terminates/refers fraud) |
-| **Pilot tag** | `v0.1.2-pilot-rc1` (RELEASE file) — **cut after the live EP1 validation (2026-07-27)** |
-| **Offline test suite** | **125** passing **on current main** (control-plane + **15 CDK stack-synthesis** assertions + 3 doc-integrity gates + 4 independent-verification gates + 3 CI-completeness gates + the doc-count gate). 124 run locally; 1 CI-completeness gate runs only in CI (`skipif` outside CI). Tag `v0.2.0-pilot-rc1` was cut from this tree and matches this count. The older `v0.1.2-pilot-rc1` tag predates the governed-core dependency migration and stood at 101. |
+| **Pilot tag** | `v0.3.0-pilot-rc1` (RELEASE file) — **cut 2026-09-02 from the tree validated by the AgentCore from-zero, hybrid multi-tenant, per-tenant audit routing and full-transparency runs**; `v0.1.2-pilot-rc1` is the EP1 Gate-B tag (2026-07-27) |
+| **Offline test suite** | **154** passing **on current main** (control-plane + **16 CDK stack-synthesis** assertions + doc-integrity, independent-verification, CI-completeness and doc-count gates). 153 run locally; 1 CI-completeness gate runs only in CI (`skipif` outside CI). Tag `v0.3.0-pilot-rc1` was cut from this tree and matches this count. The older `v0.1.2-pilot-rc1` tag predates the governed-core dependency migration and stood at 101. |
 | **Deployment IaC** | AWS CDK, 7 stacks + one data stack per tenant in multi-tenant mode (`cdk/ben_stacks`, prefix `ben-`) — synthesizes to valid CloudFormation (in-suite `aws_cdk.assertions`) |
 | **Gate-B posture** | **zero public egress** (isolated subnets; AWS private endpoints only; no NAT/IGW/firewall) · customer-managed KMS · MFA-enforced pilot identity · tenant pin — **as CDK switches, live EP1-validated** |
 | **Live EP1 validation** | **DONE (2026-07-27, env `ben-val1`, us-east-1)** — see `evidence/EP1-VALIDATION.md` |

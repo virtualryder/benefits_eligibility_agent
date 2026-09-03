@@ -5,10 +5,11 @@
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
 > **SUPPORTED DEPLOYMENT PATH — read this first.** The ONE supported path is **AWS CDK at the validated
-> release tag [`v0.1.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.2-pilot-rc1)**
+> release tag [`v0.3.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.3.0-pilot-rc1)**
 > (`cdk/ben_stacks`, 7 stacks + one data stack per tenant in multi-tenant mode, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
-> per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md); the
-> tag was cut AFTER the EP1 live validation captured its evidence (2026-07-27 — `evidence/EP1-VALIDATION.md`).
+> per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md). `v0.3.0-pilot-rc1`
+> (2026-09-02) is the tree the AgentCore from-zero, hybrid multi-tenant, per-tenant audit routing and full-transparency
+> runs validated live; the older `v0.1.2-pilot-rc1` is the EP1 Gate-B tag (2026-07-27 — `evidence/EP1-VALIDATION.md`).
 > The shell engine (`lib/engine/`) is **legacy/internal reference only**. Product framing: a governed
 > eligibility **screening & determination-support Assistant** — it never adjudicates, denies, reduces,
 > terminates, or refers fraud (`PILOT-SCOPE.md`).
@@ -64,8 +65,8 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **154 offline tests**
-> Tag `v0.2.0-pilot-rc1` was cut from this tree, after the governed-core dependency migration.
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **154 offline tests**;
+> tag `v0.3.0-pilot-rc1` was cut from this tree (2026-09-02); `v0.2.0-pilot-rc1` marked the governed-core dependency migration.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
 > Fresh from-zero ENFORCE re-proof (`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`); **hybrid multi-tenant**

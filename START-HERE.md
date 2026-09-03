@@ -2,10 +2,11 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.1.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.1.2-pilot-rc1)**
-— cut after a **full runbook re-walk and clean-account re-validation on 2026-07-28** (env `ben-val2`),
-run from the hardened code with the whole `DEPLOYMENT-GUIDE.md` followed step by step as an SA would.
-**Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks);
+**Validated release: [`v0.3.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.3.0-pilot-rc1)**
+— cut 2026-09-02 from the tree the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit
+routing and full-transparency runs validated live (governed-core 1.7.1, hash-pinned). The EP1 Gate-B
+validation (2026-07-27/28, `ben-val1`/`ben-val2`, full runbook re-walk) was captured on `v0.1.2-pilot-rc1`.
+**Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks + one data stack per tenant);
 the shell engine (`lib/engine/`) is legacy/internal only.
 
 > The earlier `v0.1.0-pilot-rc1` tag is **superseded — do not deploy it.** It predates the security
@@ -93,8 +94,9 @@ Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-2
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual), then on 2026-09-02
 **AgentCore ENFORCE re-proven from zero, hybrid multi-tenant (2 tenants) with per-tenant audit/WORM
 routing, and full per-case transparency through the real AgentCore Runtime — all live, all torn down**
-(governed-core 1.7.1, hash-pinned). Tag `v0.2.0-pilot-rc1` was cut before the 2026-09-02 work; `main`
-is ahead of it. Suite: **154 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency
-migration and stood at 101; do not re-align). Next, in order: cut a tag from the 2026-09-02 tree,
-independent redeploy of that tag, enterprise IdP round-trip, a one-state SNAP rule set with
-benefits-program SME sign-off, and independent security testing — before any real data.
+(governed-core 1.7.1, hash-pinned). Tag **`v0.3.0-pilot-rc1`** was cut from that tree (2026-09-02).
+Suite: **154 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
+stood at 101; do not re-align). Next, in order: the consolidated 111 gate on the tag (one deployment
+proving isolation + audit routing + transparency + PII canary), independent redeploy of the tag,
+enterprise IdP round-trip, a one-state SNAP rule set with benefits-program SME sign-off, and
+independent security testing — before any real data.
