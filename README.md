@@ -79,7 +79,7 @@ from a reusable, manifest-driven template.
 > model API call and the WORM record joined by session + trace id, tagged per tenant, masked-before-model
 > measured on every model invocation (`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`, governed-core
 > 1.7.1). Design: platform `docs/MULTI-TENANT-SAAS-DESIGN.md` + `docs/OBSERVABILITY-CORRELATION.md`.
-> **2026-09-03:** the **Kill Switch** (governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`, 29/29, 13.9 s to effect) and the **per-tenant token + USD budget** (governed-core 1.9.0; `evidence/AGENTCORE-BUDGET-2026-09-03.md`, 23/23) are live on the AgentCore path — see the sections below.
+> **2026-09-03:** the **Kill Switch** (governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`, 29/29, 13.9 s to effect) and the **per-tenant token + USD budget** (governed-core 1.9.0; `evidence/AGENTCORE-BUDGET-2026-09-03.md`, 24/24) are live on the AgentCore path — see the sections below.
 > Multi-tenant is the SaaS roadmap path; the per-customer single-tenant silo remains the default deployment.
 
 ---
