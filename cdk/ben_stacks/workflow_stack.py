@@ -40,6 +40,10 @@ class WorkflowStack(cdk.Stack):
         # path) — fail-closed, never a silent write to the base stores. Silo: nothing is threaded.
         tenant_fields = ({"__aegis_tenant.$": "$.__aegis_tenant",
                           "__aegis_tenant_sig.$": "$.__aegis_tenant_sig"} if multitenant else {})
+        # Phase 110 (governed-core 1.7.0): every Lambda payload carries the execution ARN (always
+        # available - no dependency on the execution input) so each tool's aegis.call log line and each
+        # WORM record's correlation block join back to this execution and its X-Ray trace.
+        tenant_fields = {**tenant_fields, "__aegis_execution.$": "$$.Execution.Id"}
 
         def invoke(name, fn, payload, result_path):
             return tasks.LambdaInvoke(self, name, lambda_function=fn,

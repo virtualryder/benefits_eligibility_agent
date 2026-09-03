@@ -23,8 +23,10 @@ def _coerce(e):
     return e
 
 import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+import telemetry  # noqa: E402  (phase 110: correlation keys -> one aegis.call log line per invocation)
 
 
+@telemetry.instrument('mask_pii')
 def handler(event, context):
     # Phase 107 (hybrid multi-tenant): bind the gateway-interceptor-injected, HMAC-SIGNED tenant for
     # per-tenant store routing. Unsigned/forged values are refused; multi-tenant mode fails closed.

@@ -1,0 +1,96 @@
+"""Phase 110 — full transparency: the runtime binds ONE correlation set (session.id, tenant, case_id,
+requester) as Strands trace_attributes, OTEL baggage, and Bedrock `requestMetadata` on every Converse
+call; the workflow carries the execution ARN to every Lambda; every benefits tool handler emits one
+`aegis.call` log line with the keys. Offline: the AgentCore/Strands SDKs are stubbed at import."""
+import json
+import pathlib
+import sys
+import types
+
+import boto3
+from botocore.stub import Stubber
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+def _load_agent(monkeypatch):
+    for name in ("bedrock_agentcore", "bedrock_agentcore.runtime", "strands", "strands.models",
+                 "strands.tools", "strands.tools.mcp", "mcp", "mcp.client", "mcp.client.streamable_http"):
+        monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
+    sys.modules["bedrock_agentcore.runtime"].BedrockAgentCoreApp = lambda: types.SimpleNamespace(entrypoint=lambda f: f, run=lambda: None)
+    sys.modules["strands"].Agent = object
+    sys.modules["strands.models"].BedrockModel = object
+    sys.modules["strands.tools.mcp"].MCPClient = object
+    sys.modules["mcp.client.streamable_http"].streamablehttp_client = object
+    sys.path.insert(0, str(ROOT / "lib" / "runtime"))
+    sys.modules.pop("agent", None)
+    import agent
+    return agent
+
+
+def test_runtime_correlation_and_request_metadata_hook(monkeypatch):
+    agent = _load_agent(monkeypatch)
+    ctx = types.SimpleNamespace(session_id="rt-sess-1")
+    corr = agent._correlation(ctx, "pha-a", "C-1", "cw-a")
+    assert corr == {"session.id": "rt-sess-1", "case_id": "C-1", "requester": "cw-a", "tenant": "pha-a"}
+    assert "tenant" not in agent._correlation(ctx, None, "C-1", "cw-a")           # silo: no tenant tag
+    assert agent._meta_value("a b;c<d>") == "a b_c_d_" and len(agent._meta_value("x" * 300)) == 256
+    # the boto session injects requestMetadata on Converse - the model-invocation log row is tagged
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "x"); monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "y")
+    sess = agent._bedrock_session(corr)
+    c = sess.client("bedrock-runtime")
+    st = Stubber(c)
+    st.add_response("converse",
+                    {"output": {"message": {"role": "assistant", "content": [{"text": "ok"}]}}, "stopReason": "end_turn",
+                     "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}, "metrics": {"latencyMs": 1}},
+                    {"modelId": "m", "messages": [{"role": "user", "content": [{"text": "q"}]}],
+                     "requestMetadata": {"tenant": "pha-a", "session_id": "rt-sess-1", "case_id": "C-1",
+                                         "requester": "cw-a", "governed_by": "aegis"}})
+    st.activate()
+    assert c.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])["stopReason"] == "end_turn"
+    st.assert_no_pending_responses()
+
+
+def test_workflow_carries_execution_arn_and_gateway_schema_has_trace_field():
+    import aws_cdk
+    from aws_cdk.assertions import Template
+    sys.path.insert(0, str(ROOT / "cdk"))
+    from app import stage_lambda_bundle
+    from ben_stacks.data_stack import DataStack
+    from ben_stacks.compute_stack import ComputeStack
+    from ben_stacks.workflow_stack import WorkflowStack
+    from ben_stacks.identity_stack import IdentityStack
+    from ben_stacks.gateway_stack import GatewayStack
+    app = aws_cdk.App()
+    data = DataStack(app, "d5", prefix="ben-obs", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "c5", prefix="ben-obs", asset_dir=stage_lambda_bundle(), data=data)
+    workflow = WorkflowStack(app, "w5", prefix="ben-obs", compute=compute, data=data)
+    identity = IdentityStack(app, "i5", prefix="ben-obs")
+    gateway = GatewayStack(app, "g5", prefix="ben-obs", compute=compute, identity=identity)
+    wj = json.dumps(Template.from_stack(workflow).to_json())
+    # (the definition is a JSON string inside the template, so match the two tokens, not the pair)
+    assert wj.count("__aegis_execution.$") == 11 and wj.count("$$.Execution.Id") == 11   # every Lambda-backed state, silo too
+    assert "__aegis_trace" in json.dumps(Template.from_stack(gateway).to_json())
+
+
+def test_every_benefits_handler_emits_one_aegis_call_line(monkeypatch, capsys):
+    """Each governed tool handler is instrumented: one structured line, keys present, no argument values."""
+    import telemetry
+    import workflow_guards
+    monkeypatch.setenv("TENANT_ID", "agency-1"); monkeypatch.delenv("MULTITENANT", raising=False)
+    ctx = types.SimpleNamespace(aws_request_id="r-1", invoked_function_arn="arn:aws:lambda:us-east-1:123456789012:function:g")
+    workflow_guards.handler({"guard": "extracted", "fields": {"household_size": 3},
+                             "__aegis_execution": "arn:aws:states:us-east-1:123456789012:execution:sm:e9"}, ctx)
+    lines = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.startswith("{")]
+    calls = [l for l in lines if l.get("aegis") == "call"]
+    assert len(calls) == 1 and calls[0]["tool"] == "workflow_guards"
+    assert calls[0]["execution_arn"].endswith(":e9") and calls[0]["request_id"] == "r-1" and calls[0]["tenant"] == "agency-1"
+    assert "household_size" not in json.dumps(calls[0]) and calls[0]["arg_keys"] == ["fields", "guard"]
+    assert telemetry.current() == {}
+    # every handler module in the bundle is decorated
+    import inspect
+    for mod in ("mask_pii", "ingest_case", "workflow_guards", "intake_application", "assess_eligibility",
+                "benefits_core", "overpayment", "redetermine", "write_audit", "request_signoff",
+                "signoff_register", "finalize_signoff", "approve_signoff"):
+        m = __import__(mod)
+        assert getattr(m.handler, "__wrapped__", None) is not None, "%s.handler is not instrumented" % mod

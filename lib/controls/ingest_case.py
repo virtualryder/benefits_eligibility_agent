@@ -22,6 +22,7 @@ def _coerce(e):
 
 
 import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
+import telemetry  # noqa: E402  (phase 110: correlation keys -> one aegis.call log line per invocation)
 
 
 def _bind_tenant(e):
@@ -48,6 +49,7 @@ def _bind_tenant(e):
     return t, None
 
 
+@telemetry.instrument('ingest_application')
 def handler(event, context):
     e = _coerce(event)
     # Phase 107 / governed-core 1.6.0 (hybrid multi-tenant): bind the DERIVED tenant for per-tenant

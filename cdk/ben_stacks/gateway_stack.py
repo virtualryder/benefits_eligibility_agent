@@ -46,6 +46,9 @@ def _targets_from_manifest(compute):
             # ONLY if the signature verifies (tenancy.verified_tenant_from_args). Caller values are overwritten.
             props["__aegis_tenant"] = {"type": "string", "description": "Set by the gateway interceptor from the verified identity; caller-supplied values are overwritten and unsigned values are refused."}
             props["__aegis_tenant_sig"] = {"type": "string", "description": "HMAC over __aegis_tenant, set by the gateway interceptor."}
+            # Phase 110: correlation keys (trace/span/session/mcp-session, JSON) the interceptor derives
+            # from the request headers; observability only - caller values are overwritten.
+            props["__aegis_trace"] = {"type": "string", "description": "Set by the gateway interceptor from the request's trace/session headers (observability correlation); caller-supplied values are overwritten."}
             tools.append({"name": tool["name"], "description": tool["description"],
                           "inputSchema": {"type": "object", "properties": props,
                                           "required": tool.get("required", [])}})

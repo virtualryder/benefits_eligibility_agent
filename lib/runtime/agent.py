@@ -10,6 +10,7 @@ import base64
 import binascii
 import json
 import logging
+import re
 import boto3
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent
@@ -69,6 +70,56 @@ def _session_tenant(token):
 
 
 _MULTITENANT = os.environ.get("MULTITENANT", "").strip().lower() in ("1", "true", "yes", "on")
+_META_OK = re.compile(r"[^a-zA-Z0-9\s:_@$#=/+,\-.]")
+
+
+def _meta_value(v):
+    """Converse.requestMetadata values: ≤256 chars from [a-zA-Z0-9\s:_@$#=/+,-.] (API reference)."""
+    return _META_OK.sub("_", str(v or ""))[:256]
+
+
+def _correlation(context, session_tenant, case_id, requester):
+    """Phase 110: the ONE correlation set every signal of this invocation carries. The runtime session
+    id comes from AgentCore (X-Amzn-Bedrock-AgentCore-Runtime-Session-Id -> context.session_id) and is
+    the mandatory `session.id` span attribute; tenant is the DERIVED session tenant."""
+    sid = getattr(context, "session_id", None) or os.environ.get("AGENTCORE_SESSION_ID") or ""
+    c = {"session.id": sid, "case_id": case_id, "requester": requester}
+    if session_tenant:
+        c["tenant"] = session_tenant
+    return {k: v for k, v in c.items() if v}
+
+
+def _attach_baggage(corr):
+    """Propagate session.id + tenant as OTEL baggage so ADOT puts them on the outbound MCP call headers
+    (the gateway interceptor reads them into __aegis_trace) and on every child span."""
+    try:
+        from opentelemetry import baggage, context as otel_ctx
+        ctx = otel_ctx.get_current()
+        for k in ("session.id", "tenant", "case_id"):
+            if corr.get(k):
+                ctx = baggage.set_baggage(k, corr[k], context=ctx)
+        return otel_ctx.attach(ctx)
+    except Exception as exc:               # observability must never change control flow
+        log.warning("baggage not attached: %s", type(exc).__name__)
+        return None
+
+
+def _bedrock_session(corr):
+    """A boto3 session whose bedrock-runtime Converse/ConverseStream calls carry `requestMetadata`
+    (tenant, session_id, case_id, requester) - the model-invocation LOG rows become filterable per
+    tenant/session without reading bodies (Bedrock model invocation logging: requestMetadata)."""
+    session = boto3.Session(region_name=REGION)
+    meta = {"tenant": corr.get("tenant", "silo"), "session_id": corr.get("session.id", ""),
+            "case_id": corr.get("case_id", ""), "requester": corr.get("requester", ""),
+            "governed_by": "aegis"}
+    meta = {k: _meta_value(v) for k, v in meta.items() if v}
+
+    def _inject(params, **_kw):
+        params.setdefault("requestMetadata", {}).update(meta)
+
+    for op in ("Converse", "ConverseStream"):
+        session.events.register("provide-client-params.bedrock-runtime.%s" % op, _inject)
+    return session
 
 
 @app.entrypoint
@@ -91,12 +142,16 @@ def invoke(payload, context=None):
         return {"error": "multi-tenant: your identity carries no tenant (custom:tenant); refusing",
                 "governed": True}
     log.info("session_tenant=%s multitenant=%s", session_tenant, _MULTITENANT)
+    corr = _correlation(context, session_tenant, case_id, requester)
+    _attach_baggage(corr)
+    log.info(json.dumps({"aegis": "invocation", **corr}, sort_keys=True))
 
     gw = _gateway_url()
     if not gw:
         return {"error": "gateway URL not available (SSM and env both empty)"}
 
-    model = BedrockModel(model_id=MODEL_ID, region_name=REGION, temperature=0.2)
+    model = BedrockModel(model_id=MODEL_ID, region_name=REGION, temperature=0.2,
+                         boto_session=_bedrock_session(corr))
     mcp_client = MCPClient(lambda: streamablehttp_client(gw, headers={"Authorization": "Bearer %s" % token}))
     with mcp_client:
         tools = mcp_client.list_tools_sync()
@@ -110,7 +165,9 @@ def invoke(payload, context=None):
                           "masked, audited, or submitted.",
                 "tools_available": [], "governed": True, "tenant": session_tenant,
             }
-        agent = Agent(model=model, tools=tools, system_prompt=SYSTEM)
+        # trace_attributes land on EVERY Strands span of this invocation (invoke_agent, cycles, model
+        # invoke, execute_tool): session.id (mandatory for AgentCore observability) + tenant + case.
+        agent = Agent(model=model, tools=tools, system_prompt=SYSTEM, trace_attributes=corr)
         result = agent(prompt)
     log.info("invocation_complete requester=%s case_id=%s result_chars=%d", requester, case_id, len(str(result)))
     return {"result": str(result), "tools_available": names, "tenant": session_tenant}
