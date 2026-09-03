@@ -62,6 +62,46 @@ audit/WORM/approvals routing on both hops) and `scripts/obs_two_tenant_proof.py`
 (one per-case timeline across runtime spans, gateway rows, Lambda `aegis.call` lines, model-invocation
 rows and the WORM record). Evidence: `evidence/AGENTCORE-MULTITENANT-*.md`, `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`.
 
+### 1c. Kill Switch — one-command containment (task 127, governed-core ≥ 1.8.0)
+
+Every deployment gets ONE SSM Parameter Store flag, `/ben-<env>-eligibility/kill-switch`, that every
+component on the agent path reads **first** — before tenancy, before Cedar, before masking, before the
+human sign-off gate. Containment precedes evaluation. When engaged:
+
+| Component | What happens | Evidence it leaves |
+|---|---|---|
+| Gateway REQUEST interceptor | `tools/list` + `tools/call` → 403 JSON-RPC error (`transformedGatewayResponse`; the target Lambda is never invoked) | `DENIED kill_switch.deny` record + WORM object in the **acting tenant's** ledger / vault; `aegis.kill_switch` log line |
+| Every governed tool Lambda | `telemetry.instrument` raises `KillSwitchEngaged` before the handler runs (workflow hop, direct invoke) | a Step Functions execution FAILS at its next state with error `KillSwitchEngaged`; `aegis.call` line `denied:kill_switch` |
+| AgentCore Runtime | a new invocation is refused before the tenant is derived or the gateway is contacted; a **running** session stops at its next model call (`stopped: mid-session`) | `aegis.kill_switch` line in the runtime log group; structured refusal (`guardrail_action: KILL_SWITCH`) |
+
+Rules (mirroring the platform reference gateway): **fail-closed** — an unreadable or malformed
+parameter counts as engaged; **15 s TTL cache** per execution environment, so time-to-effect ≤ 15 s and
+Parameter Store stays far under its 40 TPS default (the AWS-documented caching pattern for Lambda reads);
+**many-to-one** — `-c global_kill_switch=/aegis/kill-switch` makes the pack honour the platform-wide
+parameter too (engaged if either is engaged).
+
+**Engage / disengage** are two Lambda **function URLs with `AuthType: AWS_IAM`** (stack outputs
+`KillSwitchEngageUrl` / `KillSwitchDisengageUrl`), one managed policy each
+(`ben-<env>-killswitch-engage` / `-disengage`, `lambda:InvokeFunctionUrl` on one function only) — assign
+them to **different** roles. The actor recorded in the parameter and in the WORM ledger is the IAM-verified
+caller (`requestContext.authorizer.iam.userArn`), never a body field, and the controller refuses to let the
+engaging identity (same ARN or same assumed role) release its own engagement — the refusal is itself a
+`DENIED` ledger record. Nothing else in the app holds `ssm:PutParameter` on the flag.
+
+```bash
+# engage (SigV4-signed POST; service name "lambda"). Any SigV4 client works; e.g. awscurl:
+awscurl --service lambda --region us-east-1 -X POST -d '{"reason":"SEV-1: runaway agent"}' "$KILL_SWITCH_ENGAGE_URL"
+# status
+awscurl --service lambda --region us-east-1 "$KILL_SWITCH_ENGAGE_URL"
+# release — a DIFFERENT identity, via the disengage URL
+awscurl --service lambda --region us-east-1 -X POST -d '{"reason":"security lead sign-off"}' "$KILL_SWITCH_DISENGAGE_URL"
+```
+
+Live gate: `scripts/kill_switch_proof.py` (21 checks: IAM SoD, code SoD, IAM-verified actor,
+interceptor time-to-effect, tool Lambda + workflow refusal, runtime fresh + in-flight refusal, base-ledger
+`KILL-SWITCH` chain, per-tenant denials, recovery, log lines). Evidence:
+`evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`. Runbook: platform `docs/ops/KILL-SWITCH.md`.
+
 ### Observability & governance evidence (verify the claims)
 
 Deployed as IaC by the stacks above — no post-deploy instrumentation:
@@ -70,6 +110,7 @@ Deployed as IaC by the stacks above — no post-deploy instrumentation:
 - **Step Functions execution logging** — `loggingConfiguration` level `ALL`, `includeExecutionData=false` (R3-2: references only, no case content), 1-year CMK-when-present log group at `/aws/states/<prefix>-determination-workflow`.
 - **Lambda logs** — unconditional 1-year retention on every `/aws/lambda/<prefix>-*` group (decoupled from the KMS switch).
 - **Model prompts & responses** — account-level **Bedrock model-invocation logging** (`-c model_logging=1`, or the platform runbook one-time step) captures full request/response bodies, tagged per tenant / session / case via `requestMetadata`; because masking runs *before* the model, the logged prompt is de-identified — `scripts/trace_case.py` measures `masked_before_model` on every row.
+- **Kill Switch (task 127, governed-core ≥ 1.8.0)** — §1c: engaged ⇒ interceptor 403 + DENIED WORM record, tool Lambdas + runtime refuse; engage/disengage via AWS_IAM function URLs with IAM-verified actors and separation of duties.
 - **Correlation (phase 110, governed-core ≥ 1.7.1)** — every runtime span, gateway row, tool-Lambda `aegis.call` line, model-invocation row and WORM record carries the same tenant · session · trace · request · case keys; `scripts/trace_case.py` joins them into one auditor timeline.
 - **Data-source touches** — the platform **evidence trail** records management-write events + DynamoDB data events for all tables; each agent adds a **data-only CloudTrail** on its own WORM vault (`<prefix>-worm-data-events`). Answers "who touched the evidence" independent of the app's own logging.
 - **Approval integrity (governed-core ≥ 1.5.0)** — approvals go through `approve-signoff` (Cognito access-token verified, separation-of-duties, single-use). `finalize` verifies the **approval path**: a task token released around that Lambda (e.g. a raw `send-task-success`) is refused fail-closed to `ManualReview` and recorded `DENIED` — never `COMMITTED`.
@@ -208,6 +249,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 124 pass locally (+1 CI-only gate = 154 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
-python -m pytest tests/test_cdk_stacks.py -q  # 16 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
+python -m pytest tests/ -q                    # 124 pass locally (+1 CI-only gate = 168 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
+python -m pytest tests/test_cdk_stacks.py -q  # 17 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```

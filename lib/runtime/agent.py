@@ -11,6 +11,7 @@ import binascii
 import json
 import logging
 import re
+import time
 import boto3
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent
@@ -27,6 +28,10 @@ MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 GATEWAY_URL_ENV = os.environ.get("GATEWAY_URL", "")
 GATEWAY_SSM_PARAM = os.environ.get("GATEWAY_SSM_PARAM", "")
+# Kill Switch (task 127): the deployment's containment flag(s), comma-separated SSM parameter names
+# (the CDK's /<prefix>-eligibility/kill-switch, optionally + the platform-wide /aegis/kill-switch).
+KILL_SWITCH_PARAMS = [p.strip() for p in os.environ.get("KILL_SWITCH_PARAMS", "").split(",") if p.strip()]
+KILL_SWITCH_TTL = int(os.environ.get("KILL_SWITCH_TTL_SECONDS", "15") or 15)
 
 # The governed workflow prompt is manifest-driven (passed via --env at launch). Fallback below keeps
 # the agent safe/generic if it is missing.
@@ -37,6 +42,61 @@ SYSTEM = os.environ.get("SYSTEM_PROMPT") or (
     "directly (that is owned by the human sign-off gate), and if any tool is denied by policy, STOP and "
     "report exactly which control blocked you. End with a short summary and the sign-off status."
 )
+
+
+class KillSwitchEngaged(Exception):
+    """Containment is engaged: the session is refused / the in-flight agent loop is stopped."""
+
+
+_ks_cache = {}   # param -> (fetched_at, record)
+
+
+def _kill_switch(now=None):
+    """The RUNTIME analog of governed-core kill_switch.state() (the runtime image carries only
+    agent.py, so the rules are restated here and unit-tested in tests/test_runtime_kill_switch.py):
+    read each configured parameter FIRST, 15 s TTL cache, FAIL-CLOSED on an unreadable / malformed
+    value, engaged if ANY parameter is engaged. Returns the engaged record or None."""
+    if not KILL_SWITCH_PARAMS:
+        return None
+    now = time.time() if now is None else now
+    for name in KILL_SWITCH_PARAMS:
+        hit = _ks_cache.get(name)
+        if hit and now - hit[0] < KILL_SWITCH_TTL:
+            rec = hit[1]
+        else:
+            try:
+                raw = boto3.client("ssm", region_name=REGION).get_parameter(Name=name)["Parameter"]["Value"]
+                rec = json.loads(raw)
+                if not isinstance(rec, dict) or not isinstance(rec.get("engaged"), bool):
+                    rec = {"engaged": True, "reason": "malformed kill-switch record (fail-closed)"}
+            except Exception as exc:          # AccessDenied / not found / throttled / bad JSON => ENGAGED
+                rec = {"engaged": True, "reason": "unreadable: %s" % type(exc).__name__}
+            rec = dict(rec, source=name)
+            _ks_cache[name] = (now, rec)
+        if rec.get("engaged"):
+            return rec
+    return None
+
+
+def _contained(exc):
+    """True when this exception is (or wraps) KillSwitchEngaged, or the switch is engaged right now."""
+    seen, e = set(), exc
+    while e is not None and id(e) not in seen:
+        if isinstance(e, KillSwitchEngaged):
+            return True
+        seen.add(id(e))
+        e = e.__cause__ or e.__context__
+    return _kill_switch() is not None
+
+
+def _refusal(engaged, corr=None):
+    line = {"aegis": "kill_switch", "component": "runtime", "outcome": "denied:kill_switch",
+            "source": engaged.get("source"), "engaged_by": engaged.get("actor", ""),
+            "engaged_reason": engaged.get("reason", ""), **(corr or {})}
+    log.warning(json.dumps(line, sort_keys=True, default=str))
+    return {"error": "containment engaged (kill switch %s): every agent action is refused" % engaged.get("source"),
+            "refused": True, "reason": "kill_switch_engaged", "guardrail_action": "KILL_SWITCH",
+            "engaged_by": engaged.get("actor", ""), "engaged_reason": engaged.get("reason", ""), "governed": True}
 
 
 def _gateway_url():
@@ -125,10 +185,17 @@ def _bedrock_session(corr):
     meta = {k: _meta_value(v) for k, v in meta.items() if v}
 
     def _inject(params, **_kw):
+        # Kill switch (task 127): checked before EVERY model call, so an in-flight agent loop stops at
+        # its next model call (<= TTL after engage) - not just at the next session.
+        engaged = _kill_switch()
+        if engaged:
+            _refusal(engaged, corr)
+            raise KillSwitchEngaged(engaged.get("reason", "engaged"))
         params.setdefault("requestMetadata", {}).update(meta)
 
     for op in ("Converse", "ConverseStream"):
         session.events.register("provide-client-params.bedrock-runtime.%s" % op, _inject)
+    session.aegis_inject = _inject        # exposed for the unit test (tests/test_runtime_kill_switch.py)
     return session
 
 
@@ -145,6 +212,11 @@ def invoke(payload, context=None):
     log.info("invocation requester=%s case_id=%s token_present=%s", requester, case_id, bool(token))
     if not token:
         return {"error": "no access_token provided; a human identity is required to drive governed tools"}
+    # Kill switch (task 127): CONTAINMENT FIRST - before the tenant is derived, before the gateway is
+    # contacted, before the first model call. Fail-closed on an unreadable switch.
+    engaged = _kill_switch()
+    if engaged:
+        return _refusal(engaged, {"case_id": case_id, "requester": requester})
 
     session_tenant = _session_tenant(token)
     if _MULTITENANT and not session_tenant:
@@ -178,7 +250,17 @@ def invoke(payload, context=None):
         # trace_attributes land on EVERY Strands span of this invocation (invoke_agent, cycles, model
         # invoke, execute_tool): session.id (mandatory for AgentCore observability) + tenant + case.
         agent = Agent(model=model, tools=tools, system_prompt=SYSTEM, trace_attributes=corr)
-        result = agent(prompt)
+        try:
+            result = agent(prompt)
+        except Exception as exc:              # engaged mid-session: stop, report, never retry
+            # Strands wraps a hook exception in strands.types.exceptions.EventLoopException (seen live
+            # 2026-09-03: "Invocation failed ... exception.type EventLoopException, message = our reason"),
+            # so walk the cause chain and ALSO re-read the switch: either one proves containment.
+            if _contained(exc):
+                engaged = _kill_switch() or {"reason": str(exc), "source": ",".join(KILL_SWITCH_PARAMS)}
+                return {**_refusal(engaged, corr), "tools_available": names, "tenant": session_tenant,
+                        "stopped": "mid-session"}
+            raise
     log.info("invocation_complete requester=%s case_id=%s result_chars=%d", requester, case_id, len(str(result)))
     return {"result": str(result), "tools_available": names, "tenant": session_tenant}
 

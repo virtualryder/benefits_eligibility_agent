@@ -25,6 +25,9 @@ EXPECTED = [
     (r"case_ref unresolved|unknown ref or wrong tenant", "cross-tenant / unknown case_ref refused"),
     (r"refused|DENIED|not authorized|AccessDenied.*tools/call", "a governed refusal"),
     (r"DeprecationWarning: `url\.parse\(\)`", "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure"),
+    # task 127: every refusal the kill-switch proof deliberately provokes (interceptor 403, tool Lambda
+    # KillSwitchEngaged, workflow FAILED at Extract, runtime session stopped, SoD-refused release)
+    (r"KillSwitchEngaged|kill_switch|containment engaged|separation of duties|SEV-1 drill", "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)"),
 ]
 # warnings that are NOT errors but must be REPORTED (a working fallback hid a misconfiguration once)
 WARN_ONLY = [(r"SSM gateway lookup failed", "runtime fell back to the GATEWAY_URL env (the SSM grant did not cover the deployment's parameter path) - fixed in lib/runtime/_obs_setup.sh 2026-09-02")]

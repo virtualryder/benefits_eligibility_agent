@@ -268,3 +268,59 @@ def test_multitenant_audit_routing_wired_through_compute_and_workflow():
     assert wj.count("__aegis_tenant.$") == 11 and wj.count("__aegis_tenant_sig.$") == 11, wj.count("__aegis_tenant.$")
     silo = json.dumps(T_WORKFLOW.to_json()) + json.dumps(T_COMPUTE.to_json())
     assert "__aegis_tenant" not in silo and "WORM_BUCKET_TEMPLATE" not in silo
+
+
+def test_kill_switch_wired_into_every_lambda_and_the_controller_has_sod(monkeypatch):
+    """Task 127 (governed-core 1.8.0): ONE SSM parameter per deployment under the gateway-discovery root;
+    EVERY governed Lambda (incl. the interceptor and the controller) reads it (KILL_SWITCH_PARAMS + an
+    ssm:GetParameter grant scoped to that parameter); ONLY the two controller functions may write it;
+    the controller is two functions (engage / disengage) behind AWS_IAM function URLs with one
+    managed policy each (IAM separation of duties); the interceptor may write DENIED records to the
+    ledger + vault; -c global_kill_switch adds the platform-wide parameter to every reader."""
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d4", prefix="ben-ks", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "c4", prefix="ben-ks", asset_dir=asset, data=data, multitenant=True,
+                           global_kill_switch="/aegis/kill-switch")
+    t = Template.from_stack(compute)
+    t.has_resource_properties("AWS::SSM::Parameter", Match.object_like({
+        "Name": "/ben-ks-eligibility/kill-switch", "Type": "String",
+        "Value": '{"engaged": false, "actor": "", "reason": "", "at": 0}'}))
+    fns = t.find_resources("AWS::Lambda::Function")
+    names = {v["Properties"]["FunctionName"] for v in fns.values()}
+    assert {"ben-ks-kill-switch-engage", "ben-ks-kill-switch-disengage", "ben-ks-tenant-interceptor"} <= names
+    for v in fns.values():
+        env = v["Properties"]["Environment"]["Variables"]
+        assert env["KILL_SWITCH_PARAMS"] == "/ben-ks-eligibility/kill-switch,/aegis/kill-switch", v["Properties"]["FunctionName"]
+        assert env["KILL_SWITCH_TTL_SECONDS"] == "15"
+    for mode in ("engage", "disengage"):
+        t.has_resource_properties("AWS::Lambda::Function", Match.object_like({
+            "FunctionName": f"ben-ks-kill-switch-{mode}", "Handler": "kill_switch_control.handler",
+            "Environment": {"Variables": Match.object_like({"KILL_SWITCH_MODE": mode,
+                                                            "KILL_SWITCH_PARAM": "/ben-ks-eligibility/kill-switch"})}}))
+        t.has_resource_properties("AWS::IAM::ManagedPolicy", Match.object_like({
+            "ManagedPolicyName": f"ben-ks-killswitch-{mode}",
+            "PolicyDocument": Match.object_like({"Statement": [Match.object_like({
+                "Action": ["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],   # both: Lambda dev guide, urls-auth
+                "Condition": {"StringEquals": {"lambda:FunctionUrlAuthType": "AWS_IAM"},
+                              "Bool": {"lambda:InvokedViaFunctionUrl": "true"}}})]})}))
+    urls = t.find_resources("AWS::Lambda::Url")
+    assert len(urls) == 2 and all(u["Properties"]["AuthType"] == "AWS_IAM" for u in urls.values())
+    # ssm:PutParameter on the switch appears in EXACTLY the two controller roles; GetParameter everywhere
+    pols = json.dumps(t.find_resources("AWS::IAM::Policy"))
+    assert pols.count('"ssm:PutParameter"') == 2
+    assert pols.count("ReadKillSwitch") == len(fns)
+    # the interceptor can write the DENIED evidence: base ledger transact + vault put, mirrored per tenant
+    ipol = [p for p in t.find_resources("AWS::IAM::Policy").values()
+            if any("TenantInterceptor" in r.get("Ref", "") for r in p["Properties"]["Roles"])]
+    ij = json.dumps(ipol)
+    assert "dynamodb:TransactWriteItems" in ij and "s3:PutObject" in ij and "table/ben-ks-*-audit-ledger" in ij
+    outs = t.to_json()["Outputs"]
+    assert {"KillSwitchParameter", "KillSwitchEngageUrl", "KillSwitchDisengageUrl",
+            "KillSwitchEngagePolicyArn", "KillSwitchDisengagePolicyArn"} <= set(outs)
+    # silo / no global switch: exactly the deployment's own parameter
+    app2 = aws_cdk.App()                                       # a fresh app: the first one is already synthesized
+    data2 = DataStack(app2, "d5", prefix="ben-ks2", retention_profile="sandbox-demo")
+    c2 = Template.from_stack(ComputeStack(app2, "c5", prefix="ben-ks2", asset_dir=asset, data=data2))
+    for v in c2.find_resources("AWS::Lambda::Function").values():
+        assert v["Properties"]["Environment"]["Variables"]["KILL_SWITCH_PARAMS"] == "/ben-ks2-eligibility/kill-switch"

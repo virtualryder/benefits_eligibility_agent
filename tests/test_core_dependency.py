@@ -45,6 +45,8 @@ CORE_MODULES = [
     # governed-core 1.6.0: hybrid multi-tenant routing was PROMOTED into the core from this repo's
     # phase-107 modules; the local copies were deleted so the ledger/WORM/approvals routing cannot drift.
     "tenancy", "tenant_interceptor",
+    # governed-core 1.7.0 / 1.8.0: correlation + the kill switch (containment) live in the core too.
+    "telemetry", "kill_switch", "kill_switch_control",
 ]
 
 # `mcp_client` is a CLI entry point, not a library: it reads sys.argv at module scope, so importing

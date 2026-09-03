@@ -65,7 +65,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **154 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **168 offline tests**;
 > tag `v0.3.0-pilot-rc1` was cut from this tree (2026-09-02); `v0.2.0-pilot-rc1` marked the governed-core dependency migration.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -79,6 +79,7 @@ from a reusable, manifest-driven template.
 > model API call and the WORM record joined by session + trace id, tagged per tenant, masked-before-model
 > measured on every model invocation (`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`, governed-core
 > 1.7.1). Design: platform `docs/MULTI-TENANT-SAAS-DESIGN.md` + `docs/OBSERVABILITY-CORRELATION.md`.
+> **2026-09-03:** the **Kill Switch** is live on the AgentCore path (governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`, 29/29, 13.9 s to effect) — see the section below.
 > Multi-tenant is the SaaS roadmap path; the per-customer single-tenant silo remains the default deployment.
 
 ---
@@ -133,8 +134,8 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 154 tests**
-> (control-plane + 16 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 168 tests**
+> (control-plane + 17 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
 
@@ -185,6 +186,26 @@ python scripts/trace_case.py --env mt --case-id <id> --tenant pha-a --session-id
   (Strands `trace_attributes`), every Bedrock call (`requestMetadata`), every tool Lambda's `aegis.call`
   log line, the gateway's request rows and the hash-chained WORM record (`correlation` block); the
   Bedrock model-invocation log (`-c model_logging=1`, account-level, opt-in) holds the exact bodies.
+
+## Kill Switch — one-command containment (2026-09-03, governed-core 1.8.0)
+
+Every deployment carries `/ben-<env>-eligibility/kill-switch` (SSM Parameter Store). Every component on
+the agent path reads it **first**, fail-closed, with a 15 s TTL cache: the gateway REQUEST interceptor
+short-circuits `tools/list` + `tools/call` with a 403 **and** writes a `DENIED` record + WORM object into
+the acting tenant's ledger; every governed tool Lambda refuses at `telemetry.instrument` (a Step Functions
+execution fails at its next state with `KillSwitchEngaged`); the Runtime refuses new invocations and stops a
+**running** session at its next model call. Engage / disengage are two Lambda function URLs with
+`AuthType: AWS_IAM` behind separate managed policies (IAM separation of duties); the actor is the
+IAM-verified caller, and the engaging identity can never release its own engagement (a `DENIED` record).
+Every state change is a `COMMITTED` row in the base ledger's `KILL-SWITCH` chain.
+
+```bash
+python scripts/kill_switch_proof.py --env mt --tenants pha-a,pha-b --runtime-arn <arn> \
+  --runtime-log-group /aws/bedrock-agentcore/runtimes/<agent>-DEFAULT --out evidence/AGENTCORE-KILL-SWITCH-<date>   # 21 checks
+```
+
+Details: `DEPLOYMENT-GUIDE.md` §1c; evidence `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`; runbook:
+platform `docs/ops/KILL-SWITCH.md`.
 
 ## Deploy / prove / run / tear down
 

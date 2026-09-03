@@ -16,6 +16,20 @@
 | `ben-<env>-observability` | CloudWatch alarms → SNS ops topic (CMK-encrypted) + operations dashboard; guard-failure security metric. **Deploy AFTER workflow** | GA-6 · R3-3 |
 | `ben-<env>-gateway` | **the full AgentCore attachment AS IaC** (GA-1, live-validated): custom-resource provider creates the Cedar policy engine → MCP gateway (CUSTOM_JWT via the identity pool) → SSM discovery param → one target per governed tool (exact ARNs, schemas synthesized from the manifest) → all Cedar policies → **ENFORCE**; stack delete reverses everything | GA-1 |
 
+## Kill Switch (task 127, governed-core 1.8.0)
+
+`ComputeStack` also provisions the deployment's containment control: the SSM parameter
+`/ben-<env>-eligibility/kill-switch` (default disengaged), `KILL_SWITCH_PARAMS` + a read-only
+`ssm:GetParameter` grant on every governed Lambda (incl. the gateway interceptor), and the controller —
+`kill-switch-engage` / `kill-switch-disengage` (one governed-core module, `KILL_SWITCH_MODE`) behind Lambda
+function URLs with `AuthType: AWS_IAM`, each with its own managed policy (`ben-<env>-killswitch-engage|disengage`:
+`lambda:InvokeFunctionUrl` + `lambda:InvokeFunction`, conditioned on `lambda:FunctionUrlAuthType=AWS_IAM` and
+`lambda:InvokedViaFunctionUrl=true`). Only those two function roles hold `ssm:PutParameter` on the flag; the
+interceptor gets ledger + vault put grants (mirrored per tenant) for its `DENIED` records; the controller writes
+to the base ledger/vault. `-c global_kill_switch=/aegis/kill-switch` adds the platform-wide parameter. Outputs:
+`KillSwitchParameter`, `KillSwitchEngageUrl`, `KillSwitchDisengageUrl`, `KillSwitch{Engage,Disengage}PolicyArn`.
+Asserted by `tests/test_cdk_stacks.py::test_kill_switch_wired_into_every_lambda_and_the_controller_has_sod`.
+
 ## Deploy
 
 ```

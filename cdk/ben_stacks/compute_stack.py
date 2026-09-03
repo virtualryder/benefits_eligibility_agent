@@ -10,7 +10,7 @@ authoritative source to sign), so a single per-deploy HMAC key suffices (GA-2 do
 Exact ARNs are exported — nothing downstream discovers by name (P0-7)."""
 import aws_cdk as cdk
 from aws_cdk import (aws_ec2 as ec2, aws_iam as iam, aws_kms as kms, aws_lambda as lambda_,
-                     aws_logs as logs, aws_secretsmanager as sm)
+                     aws_logs as logs, aws_secretsmanager as sm, aws_ssm as ssm)
 from constructs import Construct
 
 RUNTIME = lambda_.Runtime.PYTHON_3_12
@@ -20,13 +20,41 @@ class ComputeStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, asset_dir: str, data,
                  provenance_secret: str = "", network=None, tenant: str = "",
                  guardrail_id: str = "", guardrail_version: str = "1",
-                 identity=None, approvals_client_id: str = "", multitenant: bool = False, **kw):
+                 identity=None, approvals_client_id: str = "", multitenant: bool = False,
+                 global_kill_switch: str = "", **kw):
         super().__init__(scope, cid, **kw)
         code = lambda_.Code.from_asset(asset_dir)
         cmk = None
         if getattr(data, "cmk", None) is not None:
             cmk = kms.Key.from_key_arn(self, "DataCmk", data.cmk.key_arn)
+
+        # ── Kill Switch (task 127, governed-core 1.8.0) ──────────────────────
+        # ONE SSM Parameter Store flag per deployment, under the same root as the gateway-discovery
+        # parameter (/<prefix>-eligibility/*) so the Runtime's existing ssm:GetParameter grant covers
+        # it. Every governed Lambda (incl. the gateway interceptor) and the Runtime read it FIRST,
+        # fail-closed, with a 15 s in-process TTL cache (time-to-effect <= TTL; Parameter Store stays
+        # far under its 40 TPS default). Optional -c global_kill_switch=/aegis/kill-switch adds the
+        # platform-wide parameter: engaged if EITHER is engaged. Only the two controller functions
+        # below may write the deployment parameter (see their roles) - nothing else in this app holds
+        # ssm:PutParameter on it, and the CloudTrail PutParameter event names the true principal.
+        ks_name = f"/{prefix}-eligibility/kill-switch"
+        self.kill_switch_param = ssm.StringParameter(
+            self, "KillSwitchParam",
+            parameter_name=ks_name,
+            string_value='{"engaged": false, "actor": "", "reason": "", "at": 0}',
+            description="Benefits pack Kill Switch (containment). engaged=true => every agent action "
+                        "is refused: gateway interceptor 403 + WORM DENIED record, tool Lambdas refuse, "
+                        "Runtime refuses. Change ONLY via the engage/disengage function URLs "
+                        "(IAM-verified actor, separation of duties). docs/ops/KILL-SWITCH.md")
+        kill_params = [ks_name]
+        kill_param_arns = [self.kill_switch_param.parameter_arn]
+        if global_kill_switch:
+            kill_params.append(global_kill_switch)
+            kill_param_arns.append(f"arn:aws:ssm:{self.region}:{self.account}:parameter{global_kill_switch}")
+
         common_env = {
+            "KILL_SWITCH_PARAMS": ",".join(kill_params),
+            "KILL_SWITCH_TTL_SECONDS": "15",
             "AUDIT_TABLE": data.audit_table.table_name,
             "WORM_BUCKET": data.worm_bucket.bucket_name,
             # The pinned governed-core evidence writer reads AUDIT_BUCKET
@@ -91,6 +119,9 @@ class ComputeStack(cdk.Stack):
             )
             if cmk is not None:
                 cmk.grant_decrypt(f)
+            # Kill switch: READ the switch parameter(s) and nothing else in Parameter Store.
+            f.add_to_role_policy(iam.PolicyStatement(
+                sid="ReadKillSwitch", actions=["ssm:GetParameter"], resources=kill_param_arns))
             return f
 
         # Benefits governed tool set (manifest targets).
@@ -146,6 +177,50 @@ class ComputeStack(cdk.Stack):
                 "CLIENT_ID": approvals_client_id or identity.client.user_pool_client_id,
                 "REVIEWER_GROUP": "benefits_caseworker",
             })
+
+        # Kill Switch controller (task 127): TWO functions from ONE governed-core module, each behind
+        # its own Lambda FUNCTION URL with AuthType AWS_IAM. Lambda puts the IAM-verified caller into
+        # requestContext.authorizer.iam.userArn for AWS_IAM URLs (AWS Lambda dev guide, "Invoking
+        # function URLs"), so the actor recorded in the parameter + the WORM ledger is never
+        # self-declared, and separation of duties on release is enforced on that identity. IAM SoD:
+        # two managed policies (engage-only / disengage-only) grant lambda:InvokeFunctionUrl on ONE
+        # function each - the runbook assigns them to different roles.
+        self.kill_switch_fns = {}
+        self.kill_switch_urls = {}
+        self.kill_switch_policies = {}
+        for mode in ("engage", "disengage"):
+            f = fn(f"kill-switch-{mode}", "kill_switch_control",
+                   env={"KILL_SWITCH_MODE": mode, "KILL_SWITCH_PARAM": ks_name})
+            f.add_to_role_policy(iam.PolicyStatement(
+                sid="WriteKillSwitch", actions=["ssm:PutParameter"],
+                resources=[self.kill_switch_param.parameter_arn]))
+            # state changes are COMMITTED / DENIED records in the BASE ledger + vault (platform scope)
+            data.audit_table.grant(f, "dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:TransactWriteItems")
+            data.worm_bucket.grant_put(f)
+            url = f.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM)
+            pol = iam.ManagedPolicy(
+                self, f"KillSwitch{mode.title()}Policy",
+                managed_policy_name=f"{prefix}-killswitch-{mode}",
+                description=f"Grants ONLY lambda:InvokeFunctionUrl on the {mode} function of the "
+                            f"{prefix} Kill Switch (AWS_IAM function URL). Assign to a different "
+                            f"role than the other mode (separation of duties).",
+                # Lambda dev guide, "Control access to function URLs": a same-account principal needs BOTH
+                # lambda:InvokeFunctionUrl AND lambda:InvokeFunction in its identity policy (found live on
+                # ben-mt5: URL-only => 403 at the front door). lambda:InvokedViaFunctionUrl=true keeps
+                # this grant usable ONLY through the URL (not a direct Invoke), so the IAM-verified caller
+                # context is always present.
+                statements=[iam.PolicyStatement(
+                    sid=f"{mode.title()}KillSwitch",
+                    actions=["lambda:InvokeFunctionUrl", "lambda:InvokeFunction"],
+                    resources=[f.function_arn],
+                    conditions={"StringEquals": {"lambda:FunctionUrlAuthType": "AWS_IAM"},
+                                "Bool": {"lambda:InvokedViaFunctionUrl": "true"}})])
+            self.kill_switch_fns[mode], self.kill_switch_urls[mode], self.kill_switch_policies[mode] = f, url, pol
+        # The gateway interceptor writes a DENIED record for every refused call into the ACTING
+        # tenant's ledger + vault (mirror grants below in multi-tenant mode), base stores in silo mode.
+        data.audit_table.grant(self.tenant_interceptor, "dynamodb:PutItem", "dynamodb:GetItem",
+                               "dynamodb:TransactWriteItems")
+        data.worm_bucket.grant_put(self.tenant_interceptor)
 
         # ── explicit least-privilege wiring ──────────────────────────────────
         # Signing secret: readable ONLY by the minter (mask_pii) + the sanitized_ref verifiers
@@ -248,7 +323,7 @@ class ComputeStack(cdk.Stack):
             _mt(self.mask, _tbl("sanitized-artifacts"), "dynamodb:PutItem")
             for f in (self.core, self.guards, self.assess):
                 _mt(f, _tbl("sanitized-artifacts"), "dynamodb:GetItem")
-            for f in (self.write_audit, self.request_signoff, self.finalize):
+            for f in (self.write_audit, self.request_signoff, self.finalize, self.tenant_interceptor):
                 _mt(f, _tbl("audit-ledger"), *AUD)
                 _mt(f, worm, "s3:PutObject", "s3:Abort*")
             if self.approve_signoff is not None:
@@ -271,6 +346,12 @@ class ComputeStack(cdk.Stack):
             "RequestSignoffArn": self.request_signoff, "GuardsArn": self.guards,
         }.items():
             cdk.CfnOutput(self, name, value=f.function_arn)   # exact ARNs (P0-7)
+        cdk.CfnOutput(self, "KillSwitchParameter", value=ks_name)
+        for mode in ("engage", "disengage"):
+            cdk.CfnOutput(self, f"KillSwitch{mode.title()}Url", value=self.kill_switch_urls[mode].url,
+                          description=f"POST {{reason}} with SigV4 (AWS_IAM) to {mode} the Kill Switch; GET = status")
+            cdk.CfnOutput(self, f"KillSwitch{mode.title()}PolicyArn",
+                          value=self.kill_switch_policies[mode].managed_policy_arn)
         if self.approve_signoff is not None:
             cdk.CfnOutput(self, "ApproveSignoffArn", value=self.approve_signoff.function_arn,
                           description="The ONLY working approve path: verifies the approver's Cognito "

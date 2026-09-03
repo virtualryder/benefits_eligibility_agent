@@ -116,7 +116,10 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        # (Cognito token verification). approvals_client_id lets a sandbox pass a
                        # CLI-auth demo client without touching the IaC gateway client.
                        identity=identity,
-                       approvals_client_id=app.node.try_get_context("approvals_client_id") or "")
+                       approvals_client_id=app.node.try_get_context("approvals_client_id") or "",
+                       # task 127: optional platform-wide switch honoured IN ADDITION to the pack's own
+                       # (-c global_kill_switch=/aegis/kill-switch, the reference stack's parameter)
+                       global_kill_switch=app.node.try_get_context("global_kill_switch") or "")
 workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data,
                          multitenant=multitenant)
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,

@@ -9,9 +9,13 @@ echo "GATEWAY_URL=$GW_URL runtime=$RUNTIME_NAME"
 # Hybrid multi-tenant (phase 107): MULTITENANT=1 makes the runtime bind the session to the identity's
 # tenant and refuse un-tenanted identities (agent.py). Unset = silo.
 MT_ENV=(); [ -n "${MULTITENANT:-}" ] && MT_ENV=(--env MULTITENANT="$MULTITENANT")
+# Kill switch (task 127): the pack's parameter lives beside the gateway-url one (same SSM root, same
+# runtime read grant); GLOBAL_KILL_SWITCH (optional) adds the platform-wide parameter.
+KS="${SSM_PARAM%/*}/kill-switch"; [ -n "${GLOBAL_KILL_SWITCH:-}" ] && KS="$KS,$GLOBAL_KILL_SWITCH"
 "$AC" launch \
   --env GATEWAY_URL="$GW_URL" \
   --env GATEWAY_SSM_PARAM="$SSM_PARAM" \
+  --env KILL_SWITCH_PARAMS="$KS" \
   --env MODEL_ID="$MODEL" \
   --env SYSTEM_PROMPT="$WORKFLOW_PROMPT" \
   "${MT_ENV[@]}" \
