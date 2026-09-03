@@ -19,6 +19,7 @@ this table, this table is correct and the other file is a bug.*
 | **AgentCore ENFORCE from-zero re-proof** | **DONE (2026-09-02, `ben-e2e`)** — `evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md` |
 | **Hybrid multi-tenant + per-tenant audit routing** | **DONE (2026-09-02, `ben-mt` 5/5, `ben-mt2` 12/12)** — `evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md`, `evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`; governed-core 1.6.0 |
 | **Full transparency through the AgentCore Runtime** | **DONE (2026-09-02, `ben-mt3`, 13/13 per tenant)** — `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`; governed-core 1.7.1 |
+| **Consolidated 111 gate on `v0.3.0-pilot-rc1`** | **PASS (2026-09-02, `ben-mt4`)** — all proofs on one deployment + strict PII canary + 0-unexpected-errors sweep — `evidence/AGENTCORE-111-GATE-2026-09-02.md` |
 | **Governance core** | `governed-core` **1.7.1**, pinned by URL + sha256 in `requirements-core.txt` (`--require-hashes`); `lib/core.lock` derived from it |
 | **Control plane** | signed `sanitized_ref` masking proof (P0-1) · token boundary (P0-3) · deterministic Step Functions controller + guards incl. the **due-process advance-notice HOLD** (P0-2) · R3-2 pass-by-reference **both directions** (application + notice) · WORM hash-chained audit · human sign-off (separation of duties) |
 | **Evidence source** | author-produced, synthetic data only — not independently audited or pen-tested |

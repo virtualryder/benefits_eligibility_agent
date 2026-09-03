@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build + deploy the Runtime for an agent. Usage: _launch.sh <agent_dir>
-SELF="$(cd "$(dirname "$0")" && pwd)"
+SELF="$(cd "$(dirname "$0")" && pwd)"; export MSYS_NO_PATHCONV=1   # Git-Bash: keep "/ben-.../gateway-url" a parameter NAME, not a Windows path (found 2026-09-02: GATEWAY_SSM_PARAM became C:/Program Files/Git/...)
 AGENT="$(cd "${1:?usage: _launch.sh <agent_dir>}" && pwd)"; cd "$SELF"; source "$SELF/_env.sh"
 [ -f "$STATE" ] || { echo "spine-state not found ($STATE)."; exit 1; }
 source "$STATE"

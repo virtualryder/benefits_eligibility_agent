@@ -2,6 +2,10 @@
 # Grant the Runtime exec role ssm:GetParameter for gateway discovery. Usage: _obs_setup.sh <agent_dir>
 SELF="$(cd "$(dirname "$0")" && pwd)"; export MSYS_NO_PATHCONV=1
 AGENT="$(cd "${1:?usage: _obs_setup.sh <agent_dir>}" && pwd)"; cd "$SELF"; source "$SELF/_env.sh"
+# The DEPLOYMENT's discovery parameter (spine-state, e.g. /ben-<env>-eligibility/gateway-url) overrides the
+# manifest default (/ben-eligibility/...): found 2026-09-02 (mt4 gate) - the grant covered the manifest
+# path while the runtime looked up the CDK one -> AccessDenied -> silent fallback to the GATEWAY_URL env.
+[ -f "$STATE" ] && source "$STATE"
 ACC="$(aws sts get-caller-identity --query Account --output text | tr -d '\r')"
 # P0-7: use the EXACT runtime exec role (emitted at runtime deploy; export RUNTIME_EXEC_ROLE via _env.sh
 # or the environment). NEVER discover the role by name prefix — a prefix match can silently attach a
