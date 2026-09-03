@@ -28,6 +28,9 @@ EXPECTED = [
     # task 127: every refusal the kill-switch proof deliberately provokes (interceptor 403, tool Lambda
     # KillSwitchEngaged, workflow FAILED at Extract, runtime session stopped, SoD-refused release)
     (r"KillSwitchEngaged|kill_switch|containment engaged|separation of duties|SEV-1 drill", "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)"),
+    # task 128: every refusal the budget proof deliberately provokes (capped tenant at gateway / runtime /
+    # drafter, mid-session stop, synthetic AWS Budgets breach -> kill switch) + the STANDBY-locked action
+    (r"BudgetExceeded|budget exceeded|denied:budget|budget_exceeded|AWS Budgets|ResourceLockedException", "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)"),
 ]
 # warnings that are NOT errors but must be REPORTED (a working fallback hid a misconfiguration once)
 WARN_ONLY = [(r"SSM gateway lookup failed", "runtime fell back to the GATEWAY_URL env (the SSM grant did not cover the deployment's parameter path) - fixed in lib/runtime/_obs_setup.sh 2026-09-02")]

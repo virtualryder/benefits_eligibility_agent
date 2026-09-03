@@ -108,9 +108,10 @@ def chain_rows(ddb, table, case_id):
         except Exception as exc:
             return [{"error": type(exc).__name__}]
         for it in r.get("Items", []):
-            d = {k: list(v.values())[0] for k, v in it.items() if k in ("action", "phase", "actor", "seq", "tenant_id", "chain_hash", "prev_hash", "audit_id")}
+            d = {k: list(v.values())[0] for k, v in it.items() if k in ("action", "phase", "actor", "seq", "tenant_id", "case_id", "chain_hash", "prev_hash", "audit_id")}
             pay = it.get("payload", {}).get("M", {})
             d["payload_keys"] = sorted(pay)
+            d["execution_arn"] = (it.get("correlation", {}).get("M", {}).get("execution_arn") or {}).get("S")
             d["engaged_by"] = (pay.get("engaged_by") or {}).get("S")
             rows.append(d)
         if "LastEvaluatedKey" not in r:

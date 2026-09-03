@@ -65,7 +65,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **168 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **173 offline tests**;
 > tag `v0.3.0-pilot-rc1` was cut from this tree (2026-09-02); `v0.2.0-pilot-rc1` marked the governed-core dependency migration.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -79,7 +79,7 @@ from a reusable, manifest-driven template.
 > model API call and the WORM record joined by session + trace id, tagged per tenant, masked-before-model
 > measured on every model invocation (`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`, governed-core
 > 1.7.1). Design: platform `docs/MULTI-TENANT-SAAS-DESIGN.md` + `docs/OBSERVABILITY-CORRELATION.md`.
-> **2026-09-03:** the **Kill Switch** is live on the AgentCore path (governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`, 29/29, 13.9 s to effect) — see the section below.
+> **2026-09-03:** the **Kill Switch** (governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`, 29/29, 13.9 s to effect) and the **per-tenant token + USD budget** (governed-core 1.9.0; `evidence/AGENTCORE-BUDGET-2026-09-03.md`, 23/23) are live on the AgentCore path — see the sections below.
 > Multi-tenant is the SaaS roadmap path; the per-customer single-tenant silo remains the default deployment.
 
 ---
@@ -134,8 +134,8 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 168 tests**
-> (control-plane + 17 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 173 tests**
+> (control-plane + 18 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
 
@@ -206,6 +206,22 @@ python scripts/kill_switch_proof.py --env mt --tenants pha-a,pha-b --runtime-arn
 
 Details: `DEPLOYMENT-GUIDE.md` §1c; evidence `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`; runbook:
 platform `docs/ops/KILL-SWITCH.md`.
+
+## Per-tenant token budget + USD ceiling (2026-09-03, governed-core 1.9.0)
+
+Every model call is metered per tenant per month (`ben-<env>-budgets`): one conditional reservation before the
+call, the real Converse `usage` committed after — proven equal to the Bedrock model-invocation log. A tenant
+at/over its hard cap is refused before the spend at the Runtime (mid-session if needed), at the gateway
+interceptor (403 + DENIED WORM record) and at the drafter (→ `ManualReview`); 60/85/100 % alarms per tenant;
+`-c budget_usd` adds the USD cap and the AWS Budgets ceiling whose breach engages the kill switch. Prices are
+pinned with stated provenance (`lib/model_prices.json`) — an estimate; the CUR is the financial truth.
+
+```bash
+python scripts/budget_proof.py --env mt --tenants pha-a,pha-b --runtime-arn <arn> \
+  --runtime-log-group /aws/bedrock-agentcore/runtimes/<agent>-DEFAULT --out evidence/AGENTCORE-BUDGET-<date>   # 24 checks
+```
+
+Details: `DEPLOYMENT-GUIDE.md` §1d; evidence `evidence/AGENTCORE-BUDGET-2026-09-03.md`.
 
 ## Deploy / prove / run / tear down
 

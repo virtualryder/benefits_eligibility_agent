@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -32,6 +33,26 @@ def _coerce(event):
     return e
 
 
+_META_OK = re.compile(r"[^a-zA-Z0-9\s:_@$#=/+,\-.]")
+
+
+def _request_metadata(tenant):
+    r"""Converse.requestMetadata: <= 16 items, keys/values <= 256 chars from [a-zA-Z0-9\s:_@$#=/+,-.] (API
+    reference). Correlation keys only - the same set telemetry puts on the aegis.call line."""
+    meta = {"component": "draft_notice"}
+    if tenant:
+        meta["tenant"] = tenant
+    try:
+        import telemetry
+        cur = telemetry.current()
+        for k in ("trace_id", "session_id", "execution_arn", "request_id"):
+            if cur.get(k):
+                meta[k] = cur[k]
+    except Exception:
+        pass
+    return {k: _META_OK.sub("_", str(v))[:256] for k, v in meta.items() if v}
+
+
 def _draft(e):
     # P0-1: draft ONLY from content proven de-identified by a mask_pii-signed sanitized_ref, and only if
     # the case text binds to the signed digest (the model cannot substitute unmasked content).
@@ -55,9 +76,28 @@ def _draft(e):
     )
     if GUARDRAIL_ID:
         kwargs["guardrailConfig"] = {"guardrailIdentifier": GUARDRAIL_ID, "guardrailVersion": GUARDRAIL_VERSION}
+    # task 128 (governed-core 1.9.0): the budget meter on the SERVER-SIDE model call. reserve() before the
+    # spend (the workflow hop has no gateway interceptor, so this is where a capped tenant is stopped on
+    # the DraftNotice state -> ManualReview, fail-closed); commit() the real Converse usage after.
+    tenant = _metered_tenant()
+    # The drafter's model-invocation log row must be per-tenant filterable like the Runtime's: tag the
+    # Converse call with requestMetadata {tenant, component, trace/execution/session ids} (never content,
+    # never a case id here - R3-2: the DraftNotice payload carries refs only). Found on the mt6 budget
+    # gate: an untagged drafter row could not be joined to the tenant's meter from the model log.
+    meta = _request_metadata(tenant)
+    if meta:
+        kwargs["requestMetadata"] = meta
+    try:
+        reservation = budget.reserve(tenant)
+    except budget.BudgetExceeded as exc:
+        audit = budget.record_denial(exc.decision, {"case_id": e.get("case_id"), "tool": "draft_notice"}, None, component="draft_notice")
+        budget.log_line(exc.decision, component="draft_notice", audit=audit)
+        return {"error": "refused: budget exceeded - the tenant's period cap is reached (hard cap); no draft was generated",
+                "drafted_by": None, "guardrail_action": budget.GUARDRAIL_ACTION, "budget": budget.refusal(exc.decision)}
     try:
         br = boto3.client("bedrock-runtime")
         resp = br.converse(**kwargs)
+        metered = budget.commit(tenant, resp.get("usage"), DRAFT_MODEL_ID, reserved=reservation.get("reserved", 0))
         notice = resp["output"]["message"]["content"][0]["text"].strip()
         if resp.get("stopReason") == "guardrail_intervened":
             # ANY intervention is fail-closed — including when the guardrail substitutes its
@@ -68,7 +108,8 @@ def _draft(e):
             return {"error": "guardrail blocked the draft (fail-closed)", "drafted_by": None,
                     "guardrail": "BLOCKED", "guardrail_version": GUARDRAIL_VERSION}
         out = {"drafted_by": DRAFT_MODEL_ID, "chars": len(notice),
-               "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True}
+               "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True,
+               "budget": {k: metered.get(k) for k in ("metered", "tokens", "usd_micro", "used_tokens", "pct_tokens", "price_version")}}
         # R3-2 pass-by-reference for the DRAFT OUTPUT: even though the notice is drafted from
         # de-identified content, a redaction gap could leave PII in the text — so it must never travel
         # in Step Functions state or telemetry. With a case store configured, store the notice
@@ -84,8 +125,17 @@ def _draft(e):
         return {"error": "draft failed: " + type(exc).__name__ + ": " + str(exc), "drafted_by": None}
 
 
+import budget  # noqa: E402  (task 128: per-tenant token + USD meter, governed-core 1.9.0)
 import tenancy  # noqa: E402  (phase 107: interceptor-injected, HMAC-signed tenant)
 import telemetry  # noqa: E402  (phase 110: correlation keys -> one aegis.call log line per invocation)
+
+
+def _metered_tenant():
+    """The tenant the meter charges: the request-bound one (multi-tenant) or the pinned silo id."""
+    try:
+        return tenancy.resolve_tenant()
+    except Exception:
+        return os.environ.get("TENANT_ID") or "default"
 
 
 @telemetry.instrument('benefits_core')

@@ -5,7 +5,7 @@ document in this repo disagrees with this table, **this table is correct and the
 
 Release `v0.3.0-pilot-rc1` (2026-09-02) · EP1 Gate-B run 2026-07-27 on `v0.1.2-pilot-rc1` (env `ben-val1`,
 us-east-1) · AgentCore multi-tenant / transparency runs 2026-09-02 (`ben-e2e`, `ben-mt`, `ben-mt2`, `ben-mt3`).
-Current offline suite: **168 tests**, matching tag `v0.3.0-pilot-rc1`, which was cut from this tree.
+Current offline suite: **173 tests** on main (tag `v0.3.0-pilot-rc1` stood at 154 <!-- count-gate:historical -->; the kill switch and the per-tenant budget landed after it).
 
 ---
 
@@ -20,6 +20,7 @@ Current offline suite: **168 tests**, matching tag `v0.3.0-pilot-rc1`, which was
 | Full per-case transparency through the real AgentCore Runtime (reasoning spans + every API call + model bodies + WORM record joined by session/trace id, per tenant; masked-before-model measured) | `ben-mt3`, 13/13 per tenant | `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md` |
 | Consolidated 111 gate on the release tag: isolation + audit routing + transparency + strict PII canary on ONE deployment, then a 0-unexpected-errors regression sweep | `ben-mt4`, tag `v0.3.0-pilot-rc1` | `evidence/AGENTCORE-111-GATE-2026-09-02.md` |
 | Kill Switch on the AgentCore path: engaged ⇒ interceptor 403 + DENIED WORM record per tenant, tool Lambdas + workflow fail with `KillSwitchEngaged`, runtime refuses new + stops in-flight sessions; engage/disengage via AWS_IAM function URLs with IAM + code SoD; base-ledger chain; recovery; 0-unexpected-errors sweep | `ben-mt5` (main after `v0.3.0-pilot-rc1`, governed-core 1.8.0) | `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md` |
+| Per-tenant token + USD budget: reserve-before / commit-after on every model call (meter == model-invocation log), capped tenant refused at runtime (incl. mid-session) / gateway (403 + DENIED record) / drafter (→ ManualReview), 60/85/100 % alarms fire, AWS Budgets USD ceiling wired (IAM-deny action) and its breach engages the kill switch; 0-unexpected-errors sweep | `ben-mt6` (main, governed-core 1.9.0) | `evidence/AGENTCORE-BUDGET-2026-09-03.md` |
 | **Masking is proven, not asserted** — a signed `sanitized_ref` is required; a forged/tampered ref is refused | Live probe of `mask-pii` + `workflow-guards` (genuine → `ok:true`, tampered → `ok:false`) | validator `masking_control` / `guard_genuine` / `forged_ref_denied` |
 | **Raw application never enters workflow state** (R3-2) | Execution starts from an opaque `case-…` ref via `ingest-application` | validator `ingest_pass_by_reference` |
 | **Drafted notice never enters workflow state** (R3-2, both directions) | Drafter returns `notice_ref`; strict canary swept clean | `tests/test_draft_pass_by_reference.py` + canary |

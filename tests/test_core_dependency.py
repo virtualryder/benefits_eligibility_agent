@@ -47,6 +47,8 @@ CORE_MODULES = [
     "tenancy", "tenant_interceptor",
     # governed-core 1.7.0 / 1.8.0: correlation + the kill switch (containment) live in the core too.
     "telemetry", "kill_switch", "kill_switch_control",
+    # governed-core 1.9.0: the per-tenant budget meter
+    "budget",
 ]
 
 # `mcp_client` is a CLI entry point, not a library: it reads sys.argv at module scope, so importing

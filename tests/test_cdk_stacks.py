@@ -324,3 +324,70 @@ def test_kill_switch_wired_into_every_lambda_and_the_controller_has_sod(monkeypa
     c2 = Template.from_stack(ComputeStack(app2, "c5", prefix="ben-ks2", asset_dir=asset, data=data2))
     for v in c2.find_resources("AWS::Lambda::Function").values():
         assert v["Properties"]["Environment"]["Variables"]["KILL_SWITCH_PARAMS"] == "/ben-ks2-eligibility/kill-switch"
+
+
+def test_budget_meter_alarms_and_usd_ceiling_are_wired():
+    """Task 128 (governed-core 1.9.0): ONE <prefix>-budgets table; every governed Lambda carries the meter
+    env (caps from the manifest budget: block, pinned price table with its version, deployment dimension);
+    the interceptor may only READ the meter, the drafter may UPDATE it + publish Aegis/Budget metrics;
+    per-tenant 60/85/100 % alarms exist; with -c budget_usd the AWS Budgets USD ceiling exists with an
+    APPLY_IAM_POLICY action (deny bedrock:* on the drafter role, automatic approval) + the budget-breach
+    function subscribed to the ops topic with permission to invoke the kill-switch engage URL."""
+    from ben_stacks.observability_stack import ObservabilityStack
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    prices = json.dumps({"price_version": "test-2026-09-03", "models": {"anthropic.claude-sonnet-4-5": {"input_per_m": 3, "output_per_m": 15}}})
+    data = DataStack(app, "d6", prefix="ben-bg", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "c6", prefix="ben-bg", asset_dir=asset, data=data, multitenant=True,
+                           budget={"monthly_token_cap": 5000000, "cap_behavior": "hard", "monthly_usd": 25.5, "prices_json": prices})
+    workflow = WorkflowStack(app, "w6", prefix="ben-bg", compute=compute, data=data, multitenant=True)
+    obs = ObservabilityStack(app, "o6", prefix="ben-bg", compute=compute, workflow=workflow, data=data,
+                             tenants=("pha-a", "pha-b"), budget_usd=25.5, runtime_role_name="AmazonBedrockAgentCoreSDKRuntime-x")
+    tc, to = Template.from_stack(compute), Template.from_stack(obs)
+    tc.has_resource_properties("AWS::DynamoDB::Table", Match.object_like({
+        "TableName": "ben-bg-budgets", "KeySchema": [{"AttributeName": "budget_key", "KeyType": "HASH"}],
+        "BillingMode": "PAY_PER_REQUEST"}))
+    for v in tc.find_resources("AWS::Lambda::Function").values():
+        env = v["Properties"]["Environment"]["Variables"]
+        assert env["BUDGET_CAP_TOKENS"] == "5000000" and env["BUDGET_CAP_USD_MICRO"] == "25500000", v["Properties"]["FunctionName"]
+        assert env["BUDGET_BEHAVIOR"] == "hard" and env["BUDGET_DEPLOYMENT"] == "ben-bg" and env["BUDGET_RESERVE_TOKENS"] == "4000"
+        assert json.loads(env["BUDGET_PRICES_JSON"])["price_version"] == "test-2026-09-03"
+    pols = tc.find_resources("AWS::IAM::Policy")
+    def _role_pols(marker):
+        return json.dumps([p for p in pols.values() if any(marker in r.get("Ref", "") for r in p["Properties"]["Roles"])])
+    ij, cj = _role_pols("TenantInterceptor"), _role_pols("CoreTools")
+    assert "ben-bg-budgets" not in ij or "dynamodb:UpdateItem" not in ij.split("Budgets")[0]   # interceptor: read-only meter
+    assert "cloudwatch:PutMetricData" in cj and "Aegis/Budget" in cj
+    # the drafter refuses on the workflow hop -> its DENIED records need the append-only ledger grant
+    # (mirrored per tenant), never Update/Delete on a ledger (mt6 sweep finding, 2026-09-03)
+    assert "dynamodb:TransactWriteItems" in cj and "table/ben-bg-*-audit-ledger" in cj and "s3:PutObject" in cj
+    for stmt in (st for p in pols.values() if any("CoreTools" in r.get("Ref", "") for r in p["Properties"]["Roles"])
+                 for st in p["Properties"]["PolicyDocument"]["Statement"]):
+        res = json.dumps(stmt.get("Resource"))
+        if "audit-ledger" in res or "AuditLedger" in res:
+            acts = stmt["Action"] if isinstance(stmt["Action"], list) else [stmt["Action"]]
+            assert not {"dynamodb:UpdateItem", "dynamodb:DeleteItem"} & set(acts), stmt
+    # alarms: 3 thresholds x 2 metrics x 2 tenants
+    alarms = to.find_resources("AWS::CloudWatch::Alarm")
+    names = {a["Properties"].get("AlarmName", "") for a in alarms.values()}
+    assert {f"ben-bg-budget-{t}-{m}-{p}" for t in ("pha-a", "pha-b") for m in ("TokensUsedPct", "UsdUsedPct") for p in (60, 85, 100)} <= names
+    # AWS Budgets USD ceiling + action + breach function
+    to.has_resource_properties("AWS::Budgets::Budget", Match.object_like({"Budget": Match.object_like({
+        "BudgetName": "ben-bg-bedrock-usd-ceiling", "BudgetType": "COST", "TimeUnit": "MONTHLY",
+        "BudgetLimit": {"Amount": 25.5, "Unit": "USD"}, "CostFilters": {"Service": ["Amazon Bedrock"]}})}))
+    to.has_resource_properties("AWS::Budgets::BudgetsAction", Match.object_like({
+        "ActionType": "APPLY_IAM_POLICY", "ApprovalModel": "AUTOMATIC", "NotificationType": "ACTUAL",
+        "ActionThreshold": {"Type": "PERCENTAGE", "Value": 100}}))
+    oj = json.dumps(to.to_json())
+    assert "AmazonBedrockAgentCoreSDKRuntime-x" in oj and "bedrock:InvokeModel" in oj and '"Effect": "Deny"' in oj.replace("\\", "")
+    to.has_resource_properties("AWS::Lambda::Function", Match.object_like({"FunctionName": "ben-bg-budget-breach"}))
+    to.has_resource_properties("AWS::SNS::Subscription", Match.object_like({"Protocol": "lambda"}))
+    assert "lambda:InvokeFunctionUrl" in oj
+    # without -c budget_usd: no Budgets resources, token alarms only
+    app2 = aws_cdk.App()
+    d2 = DataStack(app2, "d7", prefix="ben-bg2", retention_profile="sandbox-demo")
+    c2 = ComputeStack(app2, "c7", prefix="ben-bg2", asset_dir=asset, data=d2, budget={"monthly_token_cap": 10, "prices_json": prices})
+    w2 = WorkflowStack(app2, "w7", prefix="ben-bg2", compute=c2, data=d2)
+    o2 = Template.from_stack(ObservabilityStack(app2, "o7", prefix="ben-bg2", compute=c2, workflow=w2, data=d2))
+    assert not o2.find_resources("AWS::Budgets::Budget")
+    assert "ben-bg2-budget-default-TokensUsedPct-100" in {a["Properties"].get("AlarmName", "") for a in o2.find_resources("AWS::CloudWatch::Alarm").values()}

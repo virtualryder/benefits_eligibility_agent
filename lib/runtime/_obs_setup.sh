@@ -12,7 +12,13 @@ ACC="$(aws sts get-caller-identity --query Account --output text | tr -d '\r')"
 # policy to the WRONG role. Fail-closed: if the exact role is not provided, skip the SSM grant loudly.
 ROLE="${RUNTIME_EXEC_ROLE:-}"
 SSM_ROOT="$(printf '%s' "$SSM_PARAM" | sed 's#/[^/]*$##')"   # /<root>/gateway-url -> /<root>
-printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ssm:GetParameter"],"Resource":"arn:aws:ssm:'"$REGION"':'"$ACC"':parameter'"$SSM_ROOT"'/*"}]}' > ssm-pol.json
+# task 128: the deployment prefix (ben-<env>) from the SSM root (/ben-<env>-eligibility) -> the budget meter
+# table <prefix>-budgets (GetItem + the conditional UpdateItem) and the Aegis/Budget metrics namespace.
+PREFIX="$(printf '%s' "$SSM_ROOT" | sed 's#^/##; s#-eligibility$##')"
+printf '%s' '{"Version":"2012-10-17","Statement":[
+ {"Effect":"Allow","Action":["ssm:GetParameter"],"Resource":"arn:aws:ssm:'"$REGION"':'"$ACC"':parameter'"$SSM_ROOT"'/*"},
+ {"Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:UpdateItem"],"Resource":"arn:aws:dynamodb:'"$REGION"':'"$ACC"':table/'"$PREFIX"'-budgets"},
+ {"Effect":"Allow","Action":["cloudwatch:PutMetricData"],"Resource":"*","Condition":{"StringEquals":{"cloudwatch:namespace":"Aegis/Budget"}}}]}' > ssm-pol.json
 if [ -n "$ROLE" ] && [ "$ROLE" != "None" ]; then
   echo "runtime exec role (explicit): $ROLE"
   aws iam put-role-policy --role-name "$ROLE" --policy-name agent-runtime-ssm --policy-document file://ssm-pol.json --region "$REGION" && echo "  attached ssm:GetParameter to $ROLE"

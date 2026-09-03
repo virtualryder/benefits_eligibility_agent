@@ -102,6 +102,30 @@ interceptor time-to-effect, tool Lambda + workflow refusal, runtime fresh + in-f
 `KILL-SWITCH` chain, per-tenant denials, recovery, log lines). Evidence:
 `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`. Runbook: platform `docs/ops/KILL-SWITCH.md`.
 
+### 1d. Per-tenant token budget + USD ceiling (task 128, governed-core ≥ 1.9.0)
+
+One DynamoDB meter per deployment (`ben-<env>-budgets`, key `<tenant>#<YYYY-MM>`). Before **every** model call
+the Runtime makes one conditional reservation against the tenant's cap and after it commits the real Converse
+`usage`; the gateway interceptor refuses a tenant at/over its cap on every `tools/call` (403 + DENIED WORM
+record); the drafter's own Bedrock call is metered the same way (a refusal routes the workflow to
+`ManualReview` and lands a DENIED record joined by the execution ARN — the drafter carries the same append-only
+ledger grant as the interceptor, never Update/Delete; its `Converse` is tagged with `requestMetadata`
+{tenant, component, trace/execution ids} so the model log reconciles per tenant). Hard caps fail closed (an
+unreadable meter denies); soft caps flag and alert only.
+
+| Switch / knob | Effect |
+|---|---|
+| manifest `budget: monthly_token_cap / cap_behavior` | the deployment default cap (B5 — one place to set the number); read by the CDK and the Runtime launch |
+| `-c budget_usd=<dollars>` | per-tenant USD cap (`cap_usd_micro`, from the pinned price table) **and** the AWS Budgets monthly ceiling on Amazon Bedrock with an `APPLY_IAM_POLICY` action (deny `bedrock:InvokeModel*` on the drafter + `-c runtime_role=` roles) and a notification whose subscriber (`ben-<env>-budget-breach`) engages the kill switch |
+| `-c budget_behavior=soft` | flag-only for the whole deployment |
+| `PutItem <tenant>#<YYYY-MM> {cap_tokens \| cap_usd_micro \| behavior}` | per-tenant override with no redeploy; `cap_tokens 0` switches a tenant off |
+| `lib/model_prices.json` | the pinned price table; its `price_version` is recorded on every commit (confirm against the Bedrock pricing page per region before production — see the file's note) |
+
+Alarms: `Aegis/Budget` `TokensUsedPct` / `UsdUsedPct` per tenant → 60 / 85 / 100 % on the ops topic. AWS Budgets is
+**not** real-time (AWS: updated up to three times a day, 8–12 h after the previous update) — it is the backstop;
+the meter is the real-time guard. Live gate: `scripts/budget_proof.py` (24 checks) —
+`evidence/AGENTCORE-BUDGET-2026-09-03.md`. Design + honest status: platform `docs/TOKEN-BUDGETS-AND-COST-CEILINGS.md`.
+
 ### Observability & governance evidence (verify the claims)
 
 Deployed as IaC by the stacks above — no post-deploy instrumentation:
@@ -110,6 +134,7 @@ Deployed as IaC by the stacks above — no post-deploy instrumentation:
 - **Step Functions execution logging** — `loggingConfiguration` level `ALL`, `includeExecutionData=false` (R3-2: references only, no case content), 1-year CMK-when-present log group at `/aws/states/<prefix>-determination-workflow`.
 - **Lambda logs** — unconditional 1-year retention on every `/aws/lambda/<prefix>-*` group (decoupled from the KMS switch).
 - **Model prompts & responses** — account-level **Bedrock model-invocation logging** (`-c model_logging=1`, or the platform runbook one-time step) captures full request/response bodies, tagged per tenant / session / case via `requestMetadata`; because masking runs *before* the model, the logged prompt is de-identified — `scripts/trace_case.py` measures `masked_before_model` on every row.
+- **Per-tenant budget (task 128, governed-core ≥ 1.9.0)** — §1d: reserve-before / commit-after on every model call, meter == model-invocation log, cap refusals at runtime / gateway / drafter, 60/85/100 % alarms, AWS Budgets USD backstop → kill switch.
 - **Kill Switch (task 127, governed-core ≥ 1.8.0)** — §1c: engaged ⇒ interceptor 403 + DENIED WORM record, tool Lambdas + runtime refuse; engage/disengage via AWS_IAM function URLs with IAM-verified actors and separation of duties.
 - **Correlation (phase 110, governed-core ≥ 1.7.1)** — every runtime span, gateway row, tool-Lambda `aegis.call` line, model-invocation row and WORM record carries the same tenant · session · trace · request · case keys; `scripts/trace_case.py` joins them into one auditor timeline.
 - **Data-source touches** — the platform **evidence trail** records management-write events + DynamoDB data events for all tables; each agent adds a **data-only CloudTrail** on its own WORM vault (`<prefix>-worm-data-events`). Answers "who touched the evidence" independent of the app's own logging.
@@ -249,6 +274,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 124 pass locally (+1 CI-only gate = 168 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
-python -m pytest tests/test_cdk_stacks.py -q  # 17 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
+python -m pytest tests/ -q                    # 172 pass locally (+1 CI-only gate = 173 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
+python -m pytest tests/test_cdk_stacks.py -q  # 18 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```

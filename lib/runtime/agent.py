@@ -32,6 +32,14 @@ GATEWAY_SSM_PARAM = os.environ.get("GATEWAY_SSM_PARAM", "")
 # (the CDK's /<prefix>-eligibility/kill-switch, optionally + the platform-wide /aegis/kill-switch).
 KILL_SWITCH_PARAMS = [p.strip() for p in os.environ.get("KILL_SWITCH_PARAMS", "").split(",") if p.strip()]
 KILL_SWITCH_TTL = int(os.environ.get("KILL_SWITCH_TTL_SECONDS", "15") or 15)
+# Budget meter (task 128): governed-core 1.9.0's budget.py, installed in the image (requirements.txt).
+# BUDGET_TABLE unset => the meter is a no-op (silo demos without a table).
+try:
+    import governed_core  # noqa: F401  (puts the flat control modules on sys.path)
+    import budget as _budget
+except Exception as _exc:  # pragma: no cover - image without the core
+    _budget = None
+    logging.getLogger("agent").warning("governed-core budget meter unavailable: %s", _exc)
 
 # The governed workflow prompt is manifest-driven (passed via --env at launch). Fallback below keeps
 # the agent safe/generic if it is missing.
@@ -46,6 +54,14 @@ SYSTEM = os.environ.get("SYSTEM_PROMPT") or (
 
 class KillSwitchEngaged(Exception):
     """Containment is engaged: the session is refused / the in-flight agent loop is stopped."""
+
+
+class BudgetExceeded(Exception):
+    """The tenant's period budget refuses the next model call (hard cap)."""
+
+    def __init__(self, decision):
+        self.decision = decision
+        super().__init__(str(decision.get("reason", "budget exceeded")))
 
 
 _ks_cache = {}   # param -> (fetched_at, record)
@@ -78,15 +94,34 @@ def _kill_switch(now=None):
     return None
 
 
-def _contained(exc):
-    """True when this exception is (or wraps) KillSwitchEngaged, or the switch is engaged right now."""
+def _find(exc, cls):
     seen, e = set(), exc
     while e is not None and id(e) not in seen:
-        if isinstance(e, KillSwitchEngaged):
-            return True
+        if isinstance(e, cls):
+            return e
         seen.add(id(e))
         e = e.__cause__ or e.__context__
-    return _kill_switch() is not None
+    return None
+
+
+def _contained(exc):
+    """True when this exception is (or wraps) KillSwitchEngaged, or the switch is engaged right now."""
+    return _find(exc, KillSwitchEngaged) is not None or _kill_switch() is not None
+
+
+def _budget_stopped(exc):
+    """The BudgetExceeded in the cause chain (Strands wraps hook exceptions), else None."""
+    return _find(exc, BudgetExceeded)
+
+
+def _budget_refusal(decision, corr=None):
+    line = {"aegis": "budget", "component": "runtime", "outcome": "denied:budget", **(corr or {}),
+            "tenant": decision.get("tenant"), "detail": decision.get("reason")}
+    log.warning(json.dumps(line, sort_keys=True, default=str))
+    return {"error": "budget exceeded: this tenant's period cap is reached; the call is refused (hard cap)",
+            "refused": True, "reason": "budget_exceeded", "guardrail_action": "BUDGET", "governed": True,
+            "tenant": decision.get("tenant"), "detail": decision.get("reason"),
+            "cap_tokens": decision.get("cap_tokens"), "cap_usd_micro": decision.get("cap_usd_micro")}
 
 
 def _refusal(engaged, corr=None):
@@ -184,6 +219,9 @@ def _bedrock_session(corr):
             "governed_by": "aegis"}
     meta = {k: _meta_value(v) for k, v in meta.items() if v}
 
+    tenant = corr.get("tenant") or os.environ.get("TENANT_ID") or "default"
+    pending = {"reserved": 0}
+
     def _inject(params, **_kw):
         # Kill switch (task 127): checked before EVERY model call, so an in-flight agent loop stops at
         # its next model call (<= TTL after engage) - not just at the next session.
@@ -191,11 +229,31 @@ def _bedrock_session(corr):
         if engaged:
             _refusal(engaged, corr)
             raise KillSwitchEngaged(engaged.get("reason", "engaged"))
+        # Budget (task 128): reserve the per-call estimate BEFORE the spend - one conditional write on
+        # the tenant's meter; a hard cap that would be breached refuses this call (mid-session if so).
+        if _budget is not None:
+            try:
+                pending["reserved"] = _budget.reserve(tenant).get("reserved", 0)
+            except _budget.BudgetExceeded as exc:
+                _budget.log_line(exc.decision, component="runtime")
+                raise BudgetExceeded(exc.decision)
         params.setdefault("requestMetadata", {}).update(meta)
+
+    def _commit(parsed, **_kw):
+        # AFTER the call: the real Converse usage replaces the estimate (non-streaming Converse returns
+        # `usage` in the parsed response; the model is configured streaming=False for exactly this).
+        if _budget is not None and isinstance(parsed, dict) and parsed.get("usage"):
+            out = _budget.commit(tenant, parsed["usage"], MODEL_ID, reserved=pending.get("reserved", 0))
+            pending["reserved"] = 0
+            log.info(json.dumps({"aegis": "budget", "component": "runtime", "outcome": "commit", "tenant": tenant,
+                                 **{k: out.get(k) for k in ("metered", "tokens", "usd_micro", "used_tokens", "pct_tokens", "pct_usd", "price_version")}},
+                                sort_keys=True, default=str))
 
     for op in ("Converse", "ConverseStream"):
         session.events.register("provide-client-params.bedrock-runtime.%s" % op, _inject)
-    session.aegis_inject = _inject        # exposed for the unit test (tests/test_runtime_kill_switch.py)
+    session.events.register("after-call.bedrock-runtime.Converse", _commit)
+    session.aegis_inject = _inject        # exposed for the unit tests
+    session.aegis_commit = _commit
     return session
 
 
@@ -232,8 +290,17 @@ def invoke(payload, context=None):
     if not gw:
         return {"error": "gateway URL not available (SSM and env both empty)"}
 
-    # region comes from the session (Strands refuses region_name + boto_session together - found live)
-    model = BedrockModel(model_id=MODEL_ID, temperature=0.2, boto_session=_bedrock_session(corr))
+    # Budget (task 128): a tenant already at/over its cap is refused BEFORE the gateway is contacted.
+    if _budget is not None:
+        try:
+            _budget.check(session_tenant or os.environ.get("TENANT_ID") or "default")
+        except _budget.BudgetExceeded as exc:
+            return {**_budget_refusal(exc.decision, {"case_id": case_id, "requester": requester}), "tenant": session_tenant}
+
+    # region comes from the session (Strands refuses region_name + boto_session together - found live).
+    # streaming=False: Strands then calls Converse (not ConverseStream), whose parsed response carries
+    # `usage`, which the budget meter commits per call (the runtime never streams to its caller anyway).
+    model = BedrockModel(model_id=MODEL_ID, temperature=0.2, boto_session=_bedrock_session(corr), streaming=False)
     mcp_client = MCPClient(lambda: streamablehttp_client(gw, headers={"Authorization": "Bearer %s" % token}))
     with mcp_client:
         tools = mcp_client.list_tools_sync()
@@ -252,10 +319,14 @@ def invoke(payload, context=None):
         agent = Agent(model=model, tools=tools, system_prompt=SYSTEM, trace_attributes=corr)
         try:
             result = agent(prompt)
-        except Exception as exc:              # engaged mid-session: stop, report, never retry
+        except Exception as exc:              # stopped mid-session: report, never retry
             # Strands wraps a hook exception in strands.types.exceptions.EventLoopException (seen live
             # 2026-09-03: "Invocation failed ... exception.type EventLoopException, message = our reason"),
             # so walk the cause chain and ALSO re-read the switch: either one proves containment.
+            b = _budget_stopped(exc)
+            if b is not None:
+                return {**_budget_refusal(b.decision, corr), "tools_available": names, "tenant": session_tenant,
+                        "stopped": "mid-session"}
             if _contained(exc):
                 engaged = _kill_switch() or {"reason": str(exc), "source": ",".join(KILL_SWITCH_PARAMS)}
                 return {**_refusal(engaged, corr), "tools_available": names, "tenant": session_tenant,

@@ -138,3 +138,67 @@ def test_wrapped_hook_exception_counts_as_contained(ssm):
     ssm.values[PARAM] = json.dumps({"engaged": True, "actor": "a", "reason": "r", "at": 1})
     agent._ks_cache.clear()
     assert agent._contained(RuntimeError("anything, while engaged"))
+
+
+# ---- task 128: the runtime budget hooks (governed-core budget.py stubbed at the module seam) --------
+def test_budget_reserve_before_and_commit_after_each_model_call(monkeypatch):
+    calls = []
+
+    class _B:
+        class BudgetExceeded(Exception):
+            def __init__(self, decision):
+                self.decision = decision
+                super().__init__(decision["reason"])
+        GUARDRAIL_ACTION = "BUDGET"
+
+        @staticmethod
+        def reserve(tenant, tokens=None):
+            calls.append(("reserve", tenant)); return {"reserved": 4000}
+
+        @staticmethod
+        def commit(tenant, usage, model_id="", reserved=0):
+            calls.append(("commit", tenant, usage["inputTokens"], usage["outputTokens"], reserved)); return {"metered": True, "tokens": 30}
+
+        @staticmethod
+        def check(tenant):
+            return None
+
+        @staticmethod
+        def log_line(d, component=""):
+            pass
+
+    monkeypatch.setattr(agent, "_budget", _B)
+    monkeypatch.setattr(agent, "KILL_SWITCH_PARAMS", [])
+    session = agent._bedrock_session({"tenant": "cw-a", "session.id": "s", "case_id": "C", "requester": "r"})
+    session.aegis_inject({})
+    session.aegis_commit({"usage": {"inputTokens": 20, "outputTokens": 10}})
+    assert calls == [("reserve", "cw-a"), ("commit", "cw-a", 20, 10, 4000)]
+
+
+def test_budget_refusal_stops_the_next_model_call_and_is_classified(monkeypatch):
+    class _B:
+        class BudgetExceeded(Exception):
+            def __init__(self, decision):
+                self.decision = decision
+                super().__init__(decision["reason"])
+        GUARDRAIL_ACTION = "BUDGET"
+
+        @staticmethod
+        def reserve(tenant, tokens=None):
+            raise _B.BudgetExceeded({"tenant": tenant, "reason": "cap reached", "cap_tokens": 1000})
+
+        @staticmethod
+        def log_line(d, component=""):
+            pass
+
+    monkeypatch.setattr(agent, "_budget", _B)
+    monkeypatch.setattr(agent, "KILL_SWITCH_PARAMS", [])
+    session = agent._bedrock_session({"tenant": "cw-b", "session.id": "s", "case_id": "C", "requester": "r"})
+    with pytest.raises(agent.BudgetExceeded) as ei:
+        session.aegis_inject({})
+    # Strands wraps it; the runtime finds it in the cause chain and returns the structured refusal
+    wrapped = RuntimeError("EventLoopException"); wrapped.__cause__ = ei.value
+    b = agent._budget_stopped(wrapped)
+    assert b is not None and b.decision["cap_tokens"] == 1000
+    out = agent._budget_refusal(b.decision, {"case_id": "C"})
+    assert out["refused"] and out["guardrail_action"] == "BUDGET" and out["tenant"] == "cw-b"

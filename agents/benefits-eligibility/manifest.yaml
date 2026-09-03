@@ -213,9 +213,13 @@ grounding:                       # bar 4 — declared grounding source + thresho
   relevance_threshold: 0.80
 
 budget:                          # bar 5 — hard cap; benefits data fails closed
+  # ENFORCED LIVE since 2026-09-03 (governed-core 1.9.0, task 128): cdk/app.py reads this block into every
+  # governed Lambda + the Runtime (BUDGET_CAP_TOKENS / BUDGET_BEHAVIOR); the per-tenant meter lives in
+  # <prefix>-budgets; alert_thresholds become CloudWatch alarms on Aegis/Budget TokensUsedPct + UsdUsedPct;
+  # the USD ceiling is `-c budget_usd` (AWS Budgets + kill switch). Proof: evidence/AGENTCORE-BUDGET-2026-09-03.md
   monthly_token_cap: 5000000
-  inference_profile: ben-agent
-  cap_behavior: hard
+  inference_profile: ben-agent   # informational — the pinned model id is DRAFT_MODEL_ID / lib/model_prices.json
+  cap_behavior: hard             # hard = fail-closed refusal; soft = flag + continue
   alert_thresholds: [0.6, 0.85, 1.0]
 
 evals:                           # bar 6 — suite + declared rate

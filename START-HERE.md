@@ -4,7 +4,7 @@
 
 **Validated release: [`v0.3.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.3.0-pilot-rc1)**
 — cut 2026-09-02 from the tree the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit
-routing and full-transparency runs validated live (governed-core 1.8.0, hash-pinned). The EP1 Gate-B
+routing and full-transparency runs validated live (governed-core 1.9.0, hash-pinned). The EP1 Gate-B
 validation (2026-07-27/28, `ben-val1`/`ben-val2`, full runbook re-walk) was captured on `v0.1.2-pilot-rc1`.
 **Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks + one data stack per tenant);
 the shell engine (`lib/engine/`) is legacy/internal only.
@@ -37,17 +37,18 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 
 | Claim | Status |
 |---|---|
-| Offline suite | **168 passing** (124 locally + 1 CI-only gate) (control-plane + 16 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Offline suite | **173 passing** (124 locally + 1 CI-only gate) (control-plane + 16 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Live clean-account validation | **Done twice** — EP1 2026-07-27 (`ben-val1`) and a full runbook re-walk 2026-07-28 (`ben-val2`), us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
 | Zero public egress | **Measured, not asserted** — 0 NAT gateways · 0 internet gateways · 9 VPC endpoints on the live `ben-val2` VPC |
 | Deploy-from-IaC of the zero-egress SG fix | **Proven** on `ben-val2`. (In EP1 that rule had to be patched onto the live SG by hand, so the IaC version was previously unexercised.) |
-| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 168 offline tests |
+| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 173 offline tests |
 | AgentCore ENFORCE from-zero re-proof | **Done 2026-09-02** (`ben-e2e`) — [`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`](evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md) |
 | Hybrid multi-tenant (2 tenants, cross-tenant deny + per-tenant routing) | **Done 2026-09-02** (`ben-mt`, 5/5) — [`evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md) |
 | Per-tenant audit ledger / WORM vault / approvals routing (gateway + workflow hop) | **Done 2026-09-02** (`ben-mt2`, 12/12, governed-core 1.6.0) — [`evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md) |
 | Full transparency through the real AgentCore Runtime (reasoning spans + every API call + model bodies + WORM record joined per tenant) | **Done 2026-09-02** (`ben-mt3`, 13/13 per tenant, governed-core 1.7.1) — [`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`](evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md) |
 | Consolidated 111 gate on the release tag (all of the above on ONE deployment + strict PII canary + 0-unexpected-errors regression sweep) | **PASS 2026-09-02** (`ben-mt4`, tag `v0.3.0-pilot-rc1`) — [`evidence/AGENTCORE-111-GATE-2026-09-02.md`](evidence/AGENTCORE-111-GATE-2026-09-02.md) |
 | Kill Switch on the AgentCore path (interceptor 403 + DENIED WORM record, tool Lambdas + workflow refuse, runtime refuses new + stops in-flight sessions; AWS_IAM function-URL controller, IAM + code separation of duties, IAM-verified actors, base-ledger `KILL-SWITCH` chain) + 0-unexpected-errors sweep | **PASS 2026-09-03** (`ben-mt5`, 29/29, time-to-effect 13.9 s, governed-core 1.8.0) — [`evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`](evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md) |
+| Per-tenant token + USD budget (reserve-before / commit-after on every model call; meter == model-invocation log; cap refusals at runtime / gateway / drafter incl. mid-session; 60/85/100 % alarms; AWS Budgets ceiling → kill switch) + 0-unexpected-errors sweep | **PASS 2026-09-03** (`ben-mt6`, 23/23, governed-core 1.9.0) — [`evidence/AGENTCORE-BUDGET-2026-09-03.md`](evidence/AGENTCORE-BUDGET-2026-09-03.md) |
 | Independent deployment by a third party | **Not yet** — all evidence is author-produced. **A verification kit is ready:** [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md) + `python scripts/independent_verify.py`. This is the highest-value next step — if you are that third party, start there. |
 | Independent security test / pen test | **Not yet** |
 | Enterprise IdP round-trip | **Not yet** (federation exists as IaC; no agency IdP integrated) |
@@ -96,8 +97,8 @@ Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-2
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual), then on 2026-09-02
 **AgentCore ENFORCE re-proven from zero, hybrid multi-tenant (2 tenants) with per-tenant audit/WORM
 routing, and full per-case transparency through the real AgentCore Runtime — all live, all torn down**
-(governed-core 1.8.0, hash-pinned). Tag **`v0.3.0-pilot-rc1`** was cut from that tree (2026-09-02).
-Suite: **168 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
+(governed-core 1.9.0, hash-pinned). Tag **`v0.3.0-pilot-rc1`** was cut from that tree (2026-09-02).
+Suite: **173 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
 stood at 101; do not re-align). Next, in order: the consolidated 111 gate on the tag (one deployment
 proving isolation + audit routing + transparency + PII canary), independent redeploy of the tag,
 enterprise IdP round-trip, a one-state SNAP rule set with benefits-program SME sign-off, and

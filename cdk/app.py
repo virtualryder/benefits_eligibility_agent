@@ -73,6 +73,21 @@ def stage_lambda_bundle():
     return out
 
 
+def budget_from_manifest(app):
+    """B5 (task 128): the manifest's budget: block is THE place a customer sets the token cap; the CDK reads
+    it here and every governed Lambda + the Runtime enforce it. -c budget_usd=<dollars per month> adds the
+    USD cap (0 = tokens only); -c budget_behavior=soft downgrades a deployment to flag-only."""
+    import json
+    import yaml
+    m = yaml.safe_load(open(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"), encoding="utf-8"))
+    b = dict((m or {}).get("budget") or {})
+    b["monthly_usd"] = float(app.node.try_get_context("budget_usd") or 0)
+    b["cap_behavior"] = app.node.try_get_context("budget_behavior") or b.get("cap_behavior") or "hard"
+    with open(os.path.join(REPO, "lib", "model_prices.json"), encoding="utf-8") as fh:
+        b["prices_json"] = json.dumps(json.load(fh), separators=(",", ":"))
+    return b
+
+
 app = cdk.App()
 env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
@@ -119,7 +134,9 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        approvals_client_id=app.node.try_get_context("approvals_client_id") or "",
                        # task 127: optional platform-wide switch honoured IN ADDITION to the pack's own
                        # (-c global_kill_switch=/aegis/kill-switch, the reference stack's parameter)
-                       global_kill_switch=app.node.try_get_context("global_kill_switch") or "")
+                       global_kill_switch=app.node.try_get_context("global_kill_switch") or "",
+                       # task 128: caps from the manifest budget: block (+ -c budget_usd / budget_behavior)
+                       budget=budget_from_manifest(app))
 workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data,
                          multitenant=multitenant)
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,
@@ -129,7 +146,12 @@ gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute,
 # opt-in) and delivers the gateway's vended request logs; the runtime's spans/logs are AgentCore-managed.
 observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
                                    compute=compute, workflow=workflow, data=data, gateway=gateway,
-                                   model_logging=bool(app.node.try_get_context("model_logging")))
+                                   model_logging=bool(app.node.try_get_context("model_logging")),
+                                   # task 128: per-tenant 60/85/100 % budget alarms + the AWS Budgets USD
+                                   # backstop (-c budget_usd) with an IAM deny action + kill-switch engage
+                                   tenants=tuple(tenants) or ("default",),
+                                   budget_usd=float(app.node.try_get_context("budget_usd") or 0),
+                                   runtime_role_name=app.node.try_get_context("runtime_role") or "")
 
 for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
         + tuple(tenant_data.values()):

@@ -9,8 +9,8 @@ Benefits has ONE signing trust domain (only mask_pii signs a sanitized_ref — t
 authoritative source to sign), so a single per-deploy HMAC key suffices (GA-2 domain-split N/A).
 Exact ARNs are exported — nothing downstream discovers by name (P0-7)."""
 import aws_cdk as cdk
-from aws_cdk import (aws_ec2 as ec2, aws_iam as iam, aws_kms as kms, aws_lambda as lambda_,
-                     aws_logs as logs, aws_secretsmanager as sm, aws_ssm as ssm)
+from aws_cdk import (aws_dynamodb as ddb, aws_ec2 as ec2, aws_iam as iam, aws_kms as kms,
+                     aws_lambda as lambda_, aws_logs as logs, aws_secretsmanager as sm, aws_ssm as ssm)
 from constructs import Construct
 
 RUNTIME = lambda_.Runtime.PYTHON_3_12
@@ -21,7 +21,7 @@ class ComputeStack(cdk.Stack):
                  provenance_secret: str = "", network=None, tenant: str = "",
                  guardrail_id: str = "", guardrail_version: str = "1",
                  identity=None, approvals_client_id: str = "", multitenant: bool = False,
-                 global_kill_switch: str = "", **kw):
+                 global_kill_switch: str = "", budget: dict = None, **kw):
         super().__init__(scope, cid, **kw)
         code = lambda_.Code.from_asset(asset_dir)
         cmk = None
@@ -52,7 +52,31 @@ class ComputeStack(cdk.Stack):
             kill_params.append(global_kill_switch)
             kill_param_arns.append(f"arn:aws:ssm:{self.region}:{self.account}:parameter{global_kill_switch}")
 
+        # ── Budget meter (task 128, governed-core 1.9.0) ────────────────────
+        # ONE DynamoDB table per deployment: <tenant>#<YYYY-MM> -> used / tokens_in / tokens_out /
+        # usd_micro (+ optional per-tenant cap overrides written by an operator with one PutItem).
+        # The deployment DEFAULTS come from the agent manifest's budget: block (B5: one place to set the
+        # number) and -c budget_usd=<dollars>/month; the pinned price table (lib/model_prices.json) is
+        # passed inline so every commit records which price_version produced the USD figure.
+        budget = budget or {}
+        self.budgets_table = ddb.Table(
+            self, "Budgets", table_name=f"{prefix}-budgets",
+            partition_key=ddb.Attribute(name="budget_key", type=ddb.AttributeType.STRING),
+            billing_mode=ddb.BillingMode.PAY_PER_REQUEST, encryption_key=cmk,
+            encryption=ddb.TableEncryption.CUSTOMER_MANAGED if cmk else ddb.TableEncryption.AWS_MANAGED,
+            removal_policy=cdk.RemovalPolicy.DESTROY)
+        budget_env = {
+            "BUDGET_TABLE": self.budgets_table.table_name,
+            "BUDGET_CAP_TOKENS": str(int(budget.get("monthly_token_cap") or 0)),
+            "BUDGET_CAP_USD_MICRO": str(int(round(float(budget.get("monthly_usd") or 0) * 1_000_000))),
+            "BUDGET_BEHAVIOR": str(budget.get("cap_behavior") or "hard"),
+            "BUDGET_RESERVE_TOKENS": str(int(budget.get("reserve_tokens") or 4000)),
+            "BUDGET_PRICES_JSON": budget.get("prices_json") or "",
+            "BUDGET_DEPLOYMENT": prefix,
+        }
+
         common_env = {
+            **budget_env,
             "KILL_SWITCH_PARAMS": ",".join(kill_params),
             "KILL_SWITCH_TTL_SECONDS": "15",
             "AUDIT_TABLE": data.audit_table.table_name,
@@ -221,6 +245,22 @@ class ComputeStack(cdk.Stack):
         data.audit_table.grant(self.tenant_interceptor, "dynamodb:PutItem", "dynamodb:GetItem",
                                "dynamodb:TransactWriteItems")
         data.worm_bucket.grant_put(self.tenant_interceptor)
+        # Budget meter grants (least privilege): the interceptor only READS the meter (check); the drafter
+        # (server-side Bedrock call) READS + UPDATES it (commit) and publishes the Aegis/Budget metrics.
+        # The Runtime's exec role is granted the same by lib/runtime/_obs_setup.sh (it is created by the
+        # AgentCore toolkit, outside this app).
+        self.budgets_table.grant(self.tenant_interceptor, "dynamodb:GetItem")
+        self.budgets_table.grant(self.core, "dynamodb:GetItem", "dynamodb:UpdateItem")
+        self.core.add_to_role_policy(iam.PolicyStatement(
+            sid="BudgetMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"],
+            conditions={"StringEquals": {"cloudwatch:namespace": "Aegis/Budget"}}))
+        # The drafter refuses on the WORKFLOW hop (no interceptor in front of a Step Functions task), so
+        # its budget / kill-switch refusals must land as DENIED records too: the same append-only ledger
+        # grant the interceptor has (Put + Get head + TransactWrite; no Update/Delete). Found on the
+        # mt6 sweep: the first refusal logged `stored: false` (AccessDenied on GetItem) - fixed here.
+        data.audit_table.grant(self.core, "dynamodb:PutItem", "dynamodb:GetItem",
+                               "dynamodb:TransactWriteItems")
+        data.worm_bucket.grant_put(self.core)
 
         # ── explicit least-privilege wiring ──────────────────────────────────
         # Signing secret: readable ONLY by the minter (mask_pii) + the sanitized_ref verifiers
@@ -323,7 +363,7 @@ class ComputeStack(cdk.Stack):
             _mt(self.mask, _tbl("sanitized-artifacts"), "dynamodb:PutItem")
             for f in (self.core, self.guards, self.assess):
                 _mt(f, _tbl("sanitized-artifacts"), "dynamodb:GetItem")
-            for f in (self.write_audit, self.request_signoff, self.finalize, self.tenant_interceptor):
+            for f in (self.write_audit, self.request_signoff, self.finalize, self.tenant_interceptor, self.core):
                 _mt(f, _tbl("audit-ledger"), *AUD)
                 _mt(f, worm, "s3:PutObject", "s3:Abort*")
             if self.approve_signoff is not None:
@@ -346,6 +386,8 @@ class ComputeStack(cdk.Stack):
             "RequestSignoffArn": self.request_signoff, "GuardsArn": self.guards,
         }.items():
             cdk.CfnOutput(self, name, value=f.function_arn)   # exact ARNs (P0-7)
+        cdk.CfnOutput(self, "BudgetsTableName", value=self.budgets_table.table_name,
+                      description="Per-tenant meter: <tenant>#<YYYY-MM>; PutItem cap_tokens / cap_usd_micro / behavior to override one tenant")
         cdk.CfnOutput(self, "KillSwitchParameter", value=ks_name)
         for mode in ("engage", "disengage"):
             cdk.CfnOutput(self, f"KillSwitch{mode.title()}Url", value=self.kill_switch_urls[mode].url,

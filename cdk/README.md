@@ -30,6 +30,17 @@ to the base ledger/vault. `-c global_kill_switch=/aegis/kill-switch` adds the pl
 `KillSwitchParameter`, `KillSwitchEngageUrl`, `KillSwitchDisengageUrl`, `KillSwitch{Engage,Disengage}PolicyArn`.
 Asserted by `tests/test_cdk_stacks.py::test_kill_switch_wired_into_every_lambda_and_the_controller_has_sod`.
 
+## Budget meter + USD ceiling (task 128, governed-core 1.9.0)
+
+`ComputeStack`: `<prefix>-budgets` (DynamoDB, PAY_PER_REQUEST, CMK when present) + `BUDGET_*` env on every
+governed Lambda (caps from the manifest `budget:` block via `cdk/app.py::budget_from_manifest`, `-c budget_usd`,
+`-c budget_behavior`, the pinned `lib/model_prices.json` inline); grants: interceptor `GetItem` only, drafter
+`GetItem` + `UpdateItem` + `cloudwatch:PutMetricData` (namespace-conditioned). `ObservabilityStack`: per-tenant
+`Aegis/Budget` alarms at 60/85/100 % → ops topic; with `-c budget_usd`: `AWS::Budgets::Budget` (Amazon Bedrock,
+MONTHLY COST) + `AWS::Budgets::BudgetsAction` (`APPLY_IAM_POLICY`, AUTOMATIC, deny `bedrock:*Invoke*/Converse*` on
+the drafter role + `-c runtime_role`) + the inline `budget-breach` function subscribed to the topic that engages the
+kill switch via its AWS_IAM URL. Asserted by `tests/test_cdk_stacks.py::test_budget_meter_alarms_and_usd_ceiling_are_wired`.
+
 ## Deploy
 
 ```

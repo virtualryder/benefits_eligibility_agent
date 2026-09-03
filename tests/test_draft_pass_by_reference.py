@@ -36,3 +36,31 @@ def test_draft_fail_closed_without_proof():
     r = core.handler({"case": "unmasked PII here", "deidentified": True}, None)  # no valid sanitized_ref
     assert r.get("drafted_by") is None
     assert "notice_ref" not in r and "notice" not in r
+
+
+def test_draft_converse_is_tagged_with_correlation_request_metadata(monkeypatch):
+    """Task 128 follow-up (mt6 gate): the drafter's model-invocation log row must be per-tenant filterable
+    like the Runtime's, so requestMetadata carries the correlation keys - and NEVER content or a case id
+    (R3-2). Values must respect the Converse charset / length limits."""
+    core = load("benefits_core")
+    seen = {}
+
+    class _Spy(_FakeBedrock):
+        def converse(self, **kw):
+            seen.update(kw)
+            return super().converse(**kw)
+    monkeypatch.setattr(core.boto3, "client", lambda *a, **k: _Spy())
+    monkeypatch.setenv("CASE_TABLE", "ben-test-case-store")
+    import case_store
+    monkeypatch.setattr(case_store, "put_case", lambda text, kind="application", case_id="": "case-notice-1")
+    import telemetry
+    monkeypatch.setattr(telemetry, "current", lambda: {"trace_id": "6a99b48df6fc6e20d82d074efa877cbd",
+                                                       "execution_arn": "arn:aws:states:us-east-1:111122223333:execution:wf:x-1",
+                                                       "case_id": "CASE-SECRET-1", "request_id": "req-1"})
+    monkeypatch.setattr(core, "_metered_tenant", lambda: "pha-a")
+    core.handler({"sanitized_ref": make_sanitized_ref(CASE), "case": CASE, "deidentified": True}, None)
+    meta = seen.get("requestMetadata")
+    assert meta and meta["tenant"] == "pha-a" and meta["component"] == "draft_notice"
+    assert meta["trace_id"] == "6a99b48df6fc6e20d82d074efa877cbd" and meta["execution_arn"].endswith(":execution:wf:x-1")
+    assert "case_id" not in meta and "CASE-SECRET-1" not in json.dumps(meta), "no case id / content in requestMetadata"
+    assert len(meta) <= 16 and all(len(k) <= 256 and len(v) <= 256 and core._META_OK.search(v) is None for k, v in meta.items())

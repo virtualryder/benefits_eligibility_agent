@@ -12,10 +12,25 @@ MT_ENV=(); [ -n "${MULTITENANT:-}" ] && MT_ENV=(--env MULTITENANT="$MULTITENANT"
 # Kill switch (task 127): the pack's parameter lives beside the gateway-url one (same SSM root, same
 # runtime read grant); GLOBAL_KILL_SWITCH (optional) adds the platform-wide parameter.
 KS="${SSM_PARAM%/*}/kill-switch"; [ -n "${GLOBAL_KILL_SWITCH:-}" ] && KS="$KS,$GLOBAL_KILL_SWITCH"
+# Budget meter (task 128): table + deployment from the SSM root; the token cap from the manifest budget:
+# block (B5: one place to set the number); the pinned price table from lib/model_prices.json. Paths are
+# handed to Windows Python in native form (cygpath) because MSYS_NO_PATHCONV is on for this script.
+PREFIX="$(printf '%s' "$SSM_PARAM" | sed 's#^/##; s#-eligibility/.*$##')"
+MANIFEST="$AGENT/manifest.yaml"; PRICES="$SELF/../model_prices.json"
+if command -v cygpath >/dev/null 2>&1; then MANIFEST="$(cygpath -w "$MANIFEST")"; PRICES="$(cygpath -w "$PRICES")"; fi
+BUDGET_CAP_TOKENS="${BUDGET_CAP_TOKENS:-$(python -c "import yaml,sys;print(int((yaml.safe_load(open(sys.argv[1])).get('budget') or {}).get('monthly_token_cap') or 0))" "$MANIFEST")}"
+BUDGET_PRICES_JSON="$(python -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1])),separators=(',',':')))" "$PRICES")"
+echo "budget: table=$PREFIX-budgets cap_tokens=$BUDGET_CAP_TOKENS usd_micro=${BUDGET_CAP_USD_MICRO:-0} behavior=${BUDGET_BEHAVIOR:-hard}"
 "$AC" launch \
   --env GATEWAY_URL="$GW_URL" \
   --env GATEWAY_SSM_PARAM="$SSM_PARAM" \
   --env KILL_SWITCH_PARAMS="$KS" \
+  --env BUDGET_TABLE="$PREFIX-budgets" \
+  --env BUDGET_CAP_TOKENS="$BUDGET_CAP_TOKENS" \
+  --env BUDGET_CAP_USD_MICRO="${BUDGET_CAP_USD_MICRO:-0}" \
+  --env BUDGET_BEHAVIOR="${BUDGET_BEHAVIOR:-hard}" \
+  --env BUDGET_DEPLOYMENT="$PREFIX" \
+  --env BUDGET_PRICES_JSON="$BUDGET_PRICES_JSON" \
   --env MODEL_ID="$MODEL" \
   --env SYSTEM_PROMPT="$WORKFLOW_PROMPT" \
   "${MT_ENV[@]}" \
