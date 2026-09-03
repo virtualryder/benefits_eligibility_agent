@@ -67,6 +67,18 @@ def test_workflow_carries_execution_arn_and_gateway_schema_has_trace_field():
     workflow = WorkflowStack(app, "w5", prefix="ben-obs", compute=compute, data=data)
     identity = IdentityStack(app, "i5", prefix="ben-obs")
     gateway = GatewayStack(app, "g5", prefix="ben-obs", compute=compute, identity=identity)
+    from ben_stacks.observability_stack import ObservabilityStack
+    obs = ObservabilityStack(app, "o5", prefix="ben-obs", compute=compute, workflow=workflow, data=data,
+                             gateway=gateway, model_logging=True)
+    obs_off = ObservabilityStack(app, "o6", prefix="ben-obs2", compute=compute, workflow=workflow, data=data)
+    oj = json.dumps(Template.from_stack(obs).to_json())
+    # Bedrock model-invocation logging (account-level, opt-in) with a CloudWatch group + S3 large-data
+    # bucket + bedrock.amazonaws.com role; gateway vended request logs via CloudWatch Logs delivery
+    assert "putModelInvocationLoggingConfiguration" in oj and "deleteModelInvocationLoggingConfiguration" in oj
+    assert "/aws/bedrock/modelinvocations/ben-obs" in oj and "textDataDeliveryEnabled" in oj
+    assert '"LogType": "APPLICATION_LOGS"' in oj and "/aws/vendedlogs/bedrock-agentcore/gateway/ben-obs" in oj
+    oj2 = json.dumps(Template.from_stack(obs_off).to_json())
+    assert "putModelInvocationLoggingConfiguration" not in oj2 and "AWS::Logs::DeliverySource" not in oj2
     wj = json.dumps(Template.from_stack(workflow).to_json())
     # (the definition is a JSON string inside the template, so match the two tokens, not the pair)
     assert wj.count("__aegis_execution.$") == 11 and wj.count("$$.Execution.Id") == 11   # every Lambda-backed state, silo too

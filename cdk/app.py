@@ -119,10 +119,14 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        approvals_client_id=app.node.try_get_context("approvals_client_id") or "")
 workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data,
                          multitenant=multitenant)
-observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
-                                   compute=compute, workflow=workflow, data=data)
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,
                        multitenant=multitenant)
+# Phase 110 (full transparency): -c model_logging=1 turns on Bedrock MODEL INVOCATION LOGGING for the
+# account+region (it is an account-level singleton - it replaces any existing configuration, so it is
+# opt-in) and delivers the gateway's vended request logs; the runtime's spans/logs are AgentCore-managed.
+observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
+                                   compute=compute, workflow=workflow, data=data, gateway=gateway,
+                                   model_logging=bool(app.node.try_get_context("model_logging")))
 
 for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
         + tuple(tenant_data.values()):

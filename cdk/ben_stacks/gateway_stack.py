@@ -139,6 +139,7 @@ class GatewayStack(cdk.Stack):
             })
 
         cdk.CfnOutput(self, "GatewayUrl", value=attachment.get_att_string("GatewayUrl"))
+        self.gateway_arn = attachment.get_att_string("GatewayArn")   # phase 110: vended-log delivery source
         cdk.CfnOutput(self, "GatewayArn", value=attachment.get_att_string("GatewayArn"))
         cdk.CfnOutput(self, "PolicyEngineId", value=attachment.get_att_string("PolicyEngineId"))
         cdk.CfnOutput(self, "Enforcement", value=attachment.get_att_string("Enforcement"))
