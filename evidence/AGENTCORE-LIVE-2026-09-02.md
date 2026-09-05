@@ -63,6 +63,6 @@ destroyed with a residual sweep. It therefore incurs ongoing (small, sandbox-pos
 down with `cdk destroy --all --force -c env=demo -c retention_profile=sandbox-demo` when the demo
 window closes; keep it if active demos are scheduled.
 
-*Not legal or compliance advice. AgentCore Policy is an AWS preview service; the reviewed
+*Not legal or compliance advice. AgentCore Policy is GA (2026-03-03); the reviewed
 `platform_core` engine remains the fail-closed fallback + parity oracle (see platform
 docs/AGENTCORE-INTEGRATION.md).*

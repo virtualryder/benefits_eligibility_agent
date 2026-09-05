@@ -44,5 +44,5 @@ on top of the AgentCore Cedar engine in ENFORCE.
 Running human-gate execution stopped, then `cdk destroy --all --force -c env=e2e
 -c retention_profile=sandbox-demo`. Confirmed via CloudFormation: **residual `ben-e2e` stacks = none** (2026-09-02). The retained `ben-e2e-audit-ledger` DynamoDB table is left by design (audit evidence), same as `ben-demo`. Both retained ledgers can be removed with `scripts/cleanup_retained.py` if a full wipe is wanted.
 
-*Not legal or compliance advice. AgentCore Policy is an AWS preview service; the reviewed platform_core
+*Not legal or compliance advice. AgentCore Policy is GA (2026-03-03); the reviewed platform_core
 engine remains the fail-closed fallback + parity oracle.*
