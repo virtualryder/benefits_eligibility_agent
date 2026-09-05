@@ -224,6 +224,38 @@ python scripts/budget_proof.py --env mt --tenants pha-a,pha-b --runtime-arn <arn
 
 Details: `DEPLOYMENT-GUIDE.md` §1d; evidence `evidence/AGENTCORE-BUDGET-2026-09-03.md`.
 
+## Cedar perimeter, output guardrail & contextual grounding (2026-09-05, governed-core 1.10.0)
+
+Four control surfaces added and proven live on the GA AgentCore Cedar engine + a Bedrock guardrail, each
+from a from-zero deploy torn down to zero residue:
+
+- **Zero-default entitlement + action-scoped Cedar (#160/#161).** A caseworker with no `custom:tools`
+  claim and not in a `tools_granted` group is denied *every* tool; the remaining perimeter conditions
+  (service-window, consent+purpose-before-assess, budget-before-draft, a decimal amount cap on
+  overpayment) ship as `scope: perimeter` `.cedar` policies globbed into the gateway by IaC and validated
+  ACTIVE on the GA engine. `scripts/cedar_perimeter_proof.py` — 6/6.
+- **Bedrock output guardrail as IaC (#166).** The compute stack builds the guardrail from the manifest
+  (PROMPT_ATTACK + PII ANONYMIZE + a published immutable version pinned by a config-signature so a policy
+  change republishes) and wires it into the drafter (`ApplyGuardrail`, fail-closed). `scripts/guardrail_proof.py` — 7/7.
+- **Contextual grounding enforced end-to-end (#150/#190).** The guardrail carries a GROUNDING+RELEVANCE
+  policy *and* the drafter enforces it: the model writes only the grounded factual core (case as
+  `grounding_source` + a query via `guardContent`, so a hallucinated determination is grounding-blocked
+  fail-closed) and the fixed notice boilerplate is appended deterministically outside the guardrail scope,
+  so a legitimate notice is never false-blocked. 10/10 live.
+- **Private-VPC posture + WAF (#170).** The tool + drafter Lambdas run in private subnets with VPC
+  endpoints; a live sweep measured 0 NAT gateways / 0 internet gateways. A REGIONAL WAFv2 Web ACL is built
+  as IaC on the Cognito front door. The WAF↔Cognito *association* (#189) and Organizations SCP/RCP (#172)
+  are blocked at the AWS **account** level in this sandbox and require a non-sandbox/Organizations account
+  — code and IaC are in place and tested to the account boundary.
+
+Also on this pin: governed-core **1.10.0** — capture-every-API-call lineage (account CloudTrail → WORM,
+joined into one record per case, zero orphan governed calls — #168), token chargeback reconciled against
+Cost Explorer (#169), audit-before-finalize fail-closed (#159), and args-hash-bound approvals (#162).
+
+Evidence: `evidence/AGENTCORE-CEDAR-PERIMETER-2026-09-05.md`, `evidence/AGENTCORE-GUARDRAIL-2026-09-05.md`,
+`evidence/AGENTCORE-GROUNDING-2026-09-05.md` + `evidence/AGENTCORE-GROUNDING-DRAFTER-190-2026-09-05.md`,
+`evidence/AGENTCORE-NETWORK-WAF-2026-09-05.md`, `evidence/GOVERNED-CORE-1.10.0-LIVE-GATE-2026-09-05.md`.
+
 ## Deploy / prove / run / tear down
 
 Requirements: AWS CLI v2 (admin, us-east-1), Python 3.12 + `pyyaml`, Bedrock model access, Bash
