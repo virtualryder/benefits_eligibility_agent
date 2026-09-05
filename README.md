@@ -66,7 +66,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **264 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **279 offline tests**;
 > tag `v0.5.1-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -135,10 +135,28 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 264 tests**
-> (control-plane + 32 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 279 tests**
+> (control-plane + 35 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
+
+**Run the offline suite** (third external review: the suite imports the *pinned, hash-verified* core — it is
+a dependency, not a PYTHONPATH trick):
+
+```bash
+python -m pip install --require-hashes -r requirements-core.txt   # governed-core 1.10.1, sha256-pinned
+python -m pip install -r cdk/requirements.txt pytest pyyaml cryptography
+python lib/verify_core.py            # governance-core integrity lock (CI gate)
+python -m pytest -q                  # 279 collected on Python 3.12
+```
+
+**Runtime hardening (third external review, 2026-09-05).** The AgentCore runtime entrypoint enforces an
+**input contract** (`lib/runtime/agent.py: validate_input` — a bounded plain-string `prompt`, identifier-shaped
+`case_id`/`requester`; structured content is refused *before* the kill-switch read, tenant derivation, gateway
+and model), and runs on an **IaC execution role** (`<prefix>-agentcore-runtime`, compute stack output
+`RuntimeExecutionRoleArn`: the AWS-documented runtime policy scoped to this deployment + SSM / budget meter /
+ApplyGuardrail, with the same mandatory-guardrail condition as the drafter) — `_configure.sh` refuses to let
+the toolkit generate one. The runtime's own model calls now carry the platform guardrail.
 
 `bash lib/engine/demo.sh agents/benefits-eligibility` exercises the full governed workflow against the
 deployed system with Cedar in **ENFORCE**, and reports `29 passed, 0 failed / GOVERNANCE DEMO: PASS`:

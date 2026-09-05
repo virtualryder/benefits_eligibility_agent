@@ -107,6 +107,15 @@ env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
 
 
+def runtime_name_from_manifest():
+    """The AgentCore runtime name (manifest `runtime.name`, falling back to the render.py default) - the
+    IaC execution role scopes its log-group and workload-identity resources to it."""
+    import yaml
+    m = yaml.safe_load(open(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"), encoding="utf-8"))
+    return ((m.get("runtime") or {}).get("name")
+            or (m.get("agent", {}).get("slug", "agent").replace("-", "_") + "_agent"))
+
+
 def _manifest_verifies():
     """Deep-dive #202: the agent manifest must ship SIGNED and the signature must VERIFY, or production
     synth is refused. Verification is offline (embedded Ed25519 public key over the canonical manifest
@@ -211,6 +220,7 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        # generations are guardrail-assessed (-c guardrail_id=... -c guardrail_version=1)
                        guardrail_id=app.node.try_get_context("guardrail_id") or "",
                        guardrail_version=str(app.node.try_get_context("guardrail_version") or "1"),
+                       runtime_name=runtime_name_from_manifest(),
                        # #166: create the Bedrock guardrail as IaC from the manifest when no external id is given
                        guardrail_config=guardrail_from_manifest(),
                        # G2 approval-path verification: the identity pool/client feed approve-signoff

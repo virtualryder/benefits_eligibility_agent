@@ -251,6 +251,8 @@ class ObservabilityStack(cdk.Stack):
         if lineage is None or getattr(lineage, "capture_log_group", None) is None:
             return
         approved = [compute.core.role.role_arn]
+        if getattr(compute, "runtime_role", None) is not None:
+            approved.append(compute.runtime_role.role_arn)      # the IaC execution role (deterministic name)
         if runtime_role_name:
             approved.append(f"arn:aws:iam::{self.account}:role/{runtime_role_name}")
         approved += [a for a in extra_principals if a]

@@ -664,3 +664,54 @@ def test_private_vpc_azs_are_ones_every_endpoint_service_offers():
     n2 = Template.from_stack(NetworkStack(app, "naz", prefix="ben-az", azs=("us-east-1c", "us-east-1d")))
     assert {v["Properties"]["AvailabilityZone"] for v in n2.find_resources("AWS::EC2::Subnet").values()} == {"us-east-1c", "us-east-1d"}
 
+
+def test_cmk_logs_grant_covers_every_log_group_family():
+    """Live-found (Tier-1 gate, 2026-09-05): the CMK's CloudWatch-Logs grant covered only /aws/lambda/<prefix>-*,
+    so the workflow controller log group (/aws/states/...) was refused the key under kms=customer-managed.
+    Every log-group family the pack encrypts with the CMK must be in the grant's encryption-context list."""
+    d = DataStack(aws_cdk.App(), "dk", prefix="ben-ktest", retention_profile="sandbox-demo", kms_mode="customer-managed")
+    keys = Template.from_stack(d).find_resources("AWS::KMS::Key")
+    assert len(keys) == 1
+    pol = json.dumps(next(iter(keys.values()))["Properties"]["KeyPolicy"])
+    for fam in ("log-group:/aws/lambda/ben-ktest-*", "log-group:/aws/states/ben-ktest-*",
+                "log-group:/aws/bedrock/modelinvocations/ben-ktest*", "log-group:/aws/cloudtrail/ben-ktest-*"):
+        assert fam in pol, f"CMK logs grant does not cover {fam}"
+
+
+
+def test_runtime_execution_role_is_iac_least_privilege_with_mandatory_guardrail():
+    """Third external review (2026-09-05): the AgentCore runtime must NOT run on the CLI-generated role
+    (AWS: development/testing only). The compute stack exports an IaC execution role with the documented
+    runtime policy scoped to this deployment + region + runtime name, the runtime's own governance needs
+    (SSM, budget meter, ApplyGuardrail), a SourceAccount/SourceArn-conditioned trust, and - with a guardrail
+    deployed - the same mandatory-guardrail condition as the drafter on its model invocations."""
+    t = _compute_with_guardrail()
+    roles = {k: v for k, v in t.find_resources("AWS::IAM::Role").items()
+             if v["Properties"].get("RoleName") == "ben-test-agentcore-runtime"}
+    assert len(roles) == 1, "IaC runtime execution role missing"
+    role = next(iter(roles.values()))["Properties"]
+    trust = json.dumps(role["AssumeRolePolicyDocument"])
+    assert "bedrock-agentcore.amazonaws.com" in trust and "aws:SourceAccount" in trust and "aws:SourceArn" in trust
+    pols = json.dumps([v for v in t.find_resources("AWS::IAM::Policy").values()
+                       if "RuntimeExecutionRole" in json.dumps(v["Properties"].get("Roles"))])
+    for needle in ("ecr:BatchGetImage", "ecr:GetAuthorizationToken", "/aws/bedrock-agentcore/runtimes/",
+                   "bedrock-agentcore:GetWorkloadAccessTokenForJWT", "workload-identity/benefits_runtime_agent-*",
+                   "xray:PutTraceSegments", "bedrock-agentcore", "Aegis/Budget", "ssm:GetParameter",
+                   "-eligibility/*", "dynamodb:UpdateItem", "bedrock:ApplyGuardrail",
+                   "bedrock:InvokeModelWithResponseStream", "bedrock:GuardrailIdentifier"):
+        assert needle in pols, f"runtime execution role policy is missing {needle}"
+    assert '"bedrock-agentcore:*"' not in pols and '"Action": "*"' not in pols
+    t.has_output("RuntimeExecutionRoleArn", {})
+
+
+def test_runtime_execution_role_without_guardrail_has_no_guardrail_condition():
+    """Sandbox without a guardrail: the runtime role must still exist (IaC, never CLI) but not carry a
+    condition the runtime could not satisfy."""
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "dr", prefix="ben-rtest", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "cr", prefix="ben-rtest", asset_dir=asset, data=data)
+    t = Template.from_stack(compute)
+    pols = json.dumps([v for v in t.find_resources("AWS::IAM::Policy").values()
+                       if "RuntimeExecutionRole" in json.dumps(v["Properties"].get("Roles"))])
+    assert "bedrock:InvokeModel" in pols and "bedrock:GuardrailIdentifier" not in pols

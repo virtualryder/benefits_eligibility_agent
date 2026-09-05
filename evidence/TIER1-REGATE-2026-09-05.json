@@ -1,0 +1,75 @@
+{
+ "gate": "tier1-regate",
+ "env": "t1",
+ "region": "us-east-1",
+ "pass": false,
+ "fatal": "RuntimeError: deploy failed",
+ "checks": {
+  "deploy": {
+   "ok": false,
+   "detail": "rc=1 in 593.3s"
+  },
+  "teardown_zero_residue": {
+   "ok": false,
+   "detail": "destroy_rc=1 cleanup_rc=2 model_logging_as_before=True"
+  }
+ },
+ "steps": {
+  "pre_model_logging_cfg": {
+   "cloudWatchConfig": {
+    "logGroupName": "/aegis/bedrock/model-invocations",
+    "roleArn": "arn:aws:iam::111122223333:role/aegis-bedrock-invocation-logging"
+   },
+   "textDataDeliveryEnabled": true,
+   "imageDataDeliveryEnabled": false,
+   "embeddingDataDeliveryEnabled": false,
+   "videoDataDeliveryEnabled": true
+  },
+  "deploy": {
+   "cmd": "npx --yes aws-cdk@2 deploy --all --require-approval never --outputs-file outputs-t1.json -c env=t1 -c retention_profile=sandbox-demo -c kms=customer-managed -c network_mode=private -c perimeter=1 -c model_logging=1 -c model_log_lock_days=0 -c capture_all=1 -c capture_lock_mode=GOVERNANCE -c capture_retention_days=1 -c tenant=ben-t1-agency",
+   "rc": 1,
+   "secs": 593.3,
+   "out": "arn:aws:cloudformation:us-east-1:111122223333:stack/ben-t1-data/ab1a9280-a971-11f1-9d58-0edd9a39b38d\narn:aws:cloudformation:us-east-1:111122223333:stack/ben-t1-network/cb6f3ea0-a971-11f1-a9bc-0affc4b2c861\narn:aws:cloudformation:us-east-1:111122223333:stack/ben-t1-identity/049eadf0-a972-11f1-9d7d-0afff8ef0f95\narn:aws:cloudformation:us-east-1:111122223333:stack/ben-t1-lineage/1c0ac5f0-a972-11f1-b411-0e347d8f8399\narn:aws:cloudformation:us-east-1:111122223333:stack/ben-t1-compute/3c38fe50-a972-11f1-886a-12b873129909\n",
+   "err": "_IN_PROGRESS      | AWS::IAM::Role                   | Controller/Role (ControllerRoleB0761B18) Resource creation Initiated\nben-t1-workflow | 0/6 | 5:44:26 PM | CREATE_IN_PROGRESS      | AWS::CDK::Metadata               | CDKMetadata/Default (CDKMetadata) Resource creation Initiated\nben-t1-workflow | 0/6 | 5:44:26 PM | CREATE_IN_PROGRESS      | AWS::Logs::LogGroup              | ControllerLogs (ControllerLogsA1749C6A) Resource creation Initiated\nben-t1-workflow | 1/6 | 5:44:26 PM | CREATE_COMPLETE         | AWS::CDK::Metadata               | CDKMetadata/Default (CDKMetadata) \nben-t1-workflow | 1/6 | 5:44:28 PM | CREATE_FAILED           | AWS::Logs::LogGroup              | ControllerLogs (ControllerLogsA1749C6A) Resource handler returned message: \"The specified KMS key does not exist or is not allowed to be used with Arn 'arn:aws:logs:us-east-1:111122223333:log-group:/aws/states/ben-t1-determination-workflow' (Service: CloudWatchLogs, Status Code: 400, Request ID: ec7c9af7-7048-4f50-bf21-b201761f956a) (SDK Attempt Count: 1)\" (RequestToken: b7cfa115-7343-03a8-df96-28cced745a79, HandlerErrorCode: AccessDenied)\nben-t1-workflow | 1/6 | 5:44:28 PM | CREATE_FAILED           | AWS::IAM::Role                   | Controller/Role (ControllerRoleB0761B18) Resource creation cancelled\nben-t1-workflow | 1/6 | 5:44:28 PM | ROLLBACK_IN_PROGRESS    | AWS::CloudFormation::Stack       | ben-t1-workflow The following resource(s) failed to create: [ControllerLogsA1749C6A, ControllerRoleB0761B18]. Rollback requested by user.\nben-t1-workflow | 1/6 | 5:44:30 PM | DELETE_IN_PROGRESS      | AWS::IAM::Role                   | Controller/Role (ControllerRoleB0761B18) \nben-t1-workflow | 1/6 | 5:44:30 PM | DELETE_IN_PROGRESS      | AWS::CDK::Metadata               | CDKMetadata/Default (CDKMetadata) \nben-t1-workflow | 1/6 | 5:44:30 PM | DELETE_IN_PROGRESS      | AWS::Logs::LogGroup              | ControllerLogs (ControllerLogsA1749C6A) \nben-t1-workflow | 0/6 | 5:44:31 PM | DELETE_COMPLETE         | AWS::CDK::Metadata               | CDKMetadata/Default (CDKMetadata) \nben-t1-workflow | 1/6 | 5:44:31 PM | DELETE_COMPLETE         | AWS::Logs::LogGroup              | ControllerLogs (ControllerLogsA1749C6A) \nben-t1-workflow | 2/6 | 5:44:41 PM | DELETE_COMPLETE         | AWS::IAM::Role                   | Controller/Role (ControllerRoleB0761B18) \nben-t1-workflow | 3/6 | 5:44:42 PM | ROLLBACK_COMPLETE       | AWS::CloudFormation::Stack       | ben-t1-workflow \n\nFailed resources:\nben-t1-workflow | 5:44:28 PM | CREATE_FAILED           | AWS::Logs::LogGroup              | ControllerLogs (ControllerLogsA1749C6A) Resource handler returned message: \"The specified KMS key does not exist or is not allowed to be used with Arn 'arn:aws:logs:us-east-1:111122223333:log-group:/aws/states/ben-t1-determination-workflow' (Service: CloudWatchLogs, Status Code: 400, Request ID: ec7c9af7-7048-4f50-bf21-b201761f956a) (SDK Attempt Count: 1)\" (RequestToken: b7cfa115-7343-03a8-df96-28cced745a79, HandlerErrorCode: AccessDenied)\n\u274c  ben-t1-workflow failed to deploy\n\u2023 DeploymentError: Resource updates failed:\nben-t1-workflow/ControllerLogs/Resource  (AWS::Logs::LogGroup ControllerLogsA1749C6A)\n  Resource handler returned message: \"The specified KMS key does not exist or is not allowed to be used with Arn\n  'arn:aws:logs:us-east-1:111122223333:log-group:/aws/states/ben-t1-determination-workflow' (Service: CloudWatchLogs,\n  Status Code: 400, Request ID: ec7c9af7-7048-4f50-bf21-b201761f956a) (SDK Attempt Count: 1)\" (RequestToken:\n  b7cfa115-7343-03a8-df96-28cced745a79, HandlerErrorCode: AccessDenied)\nSource Location: ...aws-cdk-lib, jsii runtime, node internals...\n                 (no user code in 10 frames, use --stack-trace-limit to capture more)\n\n   (only the most recent 500 CloudTrail events in the window were checked)\n   CloudTrail delivery can lag up to 15 minutes behind the failure; re-run `cdk diagnose` in a few minutes to check for additional control-plane errors (e.g. AccessDenied).\n"
+  },
+  "destroy": {
+   "cmd": "npx --yes aws-cdk@2 destroy --all --force -c env=t1 -c retention_profile=sandbox-demo -c kms=customer-managed -c network_mode=private -c perimeter=1 -c model_logging=1 -c model_log_lock_days=0 -c capture_all=1 -c capture_lock_mode=GOVERNANCE -c capture_retention_days=1 -c tenant=ben-t1-agency",
+   "rc": 1,
+   "secs": 40.1,
+   "out": "",
+   "err": "ault (CDKMetadata) \nben-t1-lineage |   2 | 5:45:09 PM | DELETE_COMPLETE         | AWS::CloudTrail::Trail     | CaptureAll (CaptureAll8C880304) \nben-t1-lineage |   2 | 5:45:10 PM | DELETE_IN_PROGRESS      | AWS::IAM::Policy           | CaptureAll/LogsRole/DefaultPolicy (CaptureAllLogsRoleDefaultPolicyB563E521) \nben-t1-lineage |   2 | 5:45:10 PM | DELETE_IN_PROGRESS      | AWS::S3::BucketPolicy      | CaptureWorm/Policy (CaptureWormPolicy496DF25F) \nben-t1-lineage |   3 | 5:45:10 PM | DELETE_COMPLETE         | AWS::IAM::Policy           | CaptureAll/LogsRole/DefaultPolicy (CaptureAllLogsRoleDefaultPolicyB563E521) \nben-t1-lineage |   3 | 5:45:11 PM | DELETE_IN_PROGRESS      | AWS::IAM::Role             | CaptureAll/LogsRole (CaptureAllLogsRoleAE7CEF9B) \nben-t1-lineage |   3 | 5:45:11 PM | DELETE_IN_PROGRESS      | AWS::Logs::LogGroup        | CaptureLogGroup (CaptureLogGroup9F4F5F63) \nben-t1-lineage |   4 | 5:45:11 PM | DELETE_COMPLETE         | AWS::S3::BucketPolicy      | CaptureWorm/Policy (CaptureWormPolicy496DF25F) \nben-t1-lineage |   4 | 5:45:11 PM | DELETE_IN_PROGRESS      | AWS::S3::Bucket            | CaptureWorm (CaptureWorm10EF9F52) \nben-t1-lineage |   5 | 5:45:12 PM | DELETE_COMPLETE         | AWS::Logs::LogGroup        | CaptureLogGroup (CaptureLogGroup9F4F5F63) \nben-t1-lineage |   5 | 5:45:12 PM | DELETE_FAILED           | AWS::S3::Bucket            | CaptureWorm (CaptureWorm10EF9F52) Resource handler returned message: \"The bucket you tried to delete is not empty. You must delete all versions in the bucket. (Service: S3, Status Code: 409, Request ID: 7BCZCZGHQ34PH1KJ, Extended Request ID: YWIB4zIoLOibxuA1xdbZWcbxCNrqbe1f782DLQXII0IGMKcIcQMW7LjF3jGqDbZRTcKbR4j33LIfHk7wWqsGoAewsYpos8ma) (SDK Attempt Count: 1)\" (RequestToken: 5fe03d3c-92cb-fb73-936b-98197a532049, HandlerErrorCode: GeneralServiceException)\nben-t1-lineage |   6 | 5:45:22 PM | DELETE_COMPLETE         | AWS::IAM::Role             | CaptureAll/LogsRole (CaptureAllLogsRoleAE7CEF9B) \nben-t1-lineage |   6 | 5:45:22 PM | DELETE_FAILED           | AWS::CloudFormation::Stack | ben-t1-lineage The following resource(s) failed to delete: [CaptureWorm10EF9F52]. \n\nFailed resources:\nben-t1-lineage | 5:45:12 PM | DELETE_FAILED           | AWS::S3::Bucket            | CaptureWorm (CaptureWorm10EF9F52) Resource handler returned message: \"The bucket you tried to delete is not empty. You must delete all versions in the bucket. (Service: S3, Status Code: 409, Request ID: 7BCZCZGHQ34PH1KJ, Extended Request ID: YWIB4zIoLOibxuA1xdbZWcbxCNrqbe1f782DLQXII0IGMKcIcQMW7LjF3jGqDbZRTcKbR4j33LIfHk7wWqsGoAewsYpos8ma) (SDK Attempt Count: 1)\" (RequestToken: 5fe03d3c-92cb-fb73-936b-98197a532049, HandlerErrorCode: GeneralServiceException)\n\u274c  ben-t1-lineage: destroy failed DeploymentError: The stack named ben-t1-lineage is in a failed state. You may need to delete it from the AWS console : DELETE_FAILED (The following resource(s) failed to delete: [CaptureWorm10EF9F52]. ): Resource handler returned message: \"The bucket you tried to delete is not empty. You must delete all versions in the bucket. (Service: S3, Status Code: 409, Request ID: 7BCZCZGHQ34PH1KJ, Extended Request ID: YWIB4zIoLOibxuA1xdbZWcbxCNrqbe1f782DLQXII0IGMKcIcQMW7LjF3jGqDbZRTcKbR4j33LIfHk7wWqsGoAewsYpos8ma) (SDK Attempt Count: 1)\" (RequestToken: 5fe03d3c-92cb-fb73-936b-98197a532049, HandlerErrorCode: GeneralServiceException)\nThe stack named ben-t1-lineage is in a failed state. You may need to delete it from the AWS console : DELETE_FAILED (The following resource(s) failed to delete: [CaptureWorm10EF9F52]. ): Resource handler returned message: \"The bucket you tried to delete is not empty. You must delete all versions in the bucket. (Service: S3, Status Code: 409, Request ID: 7BCZCZGHQ34PH1KJ, Extended Request ID: YWIB4zIoLOibxuA1xdbZWcbxCNrqbe1f782DLQXII0IGMKcIcQMW7LjF3jGqDbZRTcKbR4j33LIfHk7wWqsGoAewsYpos8ma) (SDK Attempt Count: 1)\" (RequestToken: 5fe03d3c-92cb-fb73-936b-98197a532049, HandlerErrorCode: GeneralServiceException)\n"
+  },
+  "cleanup": {
+   "cmd": "C:\\Users\\daryd\\AppData\\Local\\Programs\\Python\\Python312\\python.exe C:\\Users\\daryd\\Projects-DR\\benefits_eligibility_agent\\scripts\\cleanup_retained.py --prefix ben-t1 --region us-east-1 --i-know-this-deletes-evidence",
+   "rc": 2,
+   "secs": 11.3,
+   "out": "deleted table ben-t1-audit-ledger\ndeleted table ben-t1-authz-context\ndeleted table ben-t1-budgets\ndeleted table ben-t1-case-store\ndeleted table ben-t1-pending-approvals\ndeleted table ben-t1-sanitized-artifacts\ndeleted bucket ben-t1-capture-worm-111122223333\ndeleted bucket ben-t1-data-wormvault2878b4f9-jgj0xolya8qd\ndeleted log group /aws/lambda/ben-t1-approve-signoff\ndeleted log group /aws/lambda/ben-t1-assess-eligibility\ndeleted log group /aws/lambda/ben-t1-core-tools\ndeleted log group /aws/lambda/ben-t1-finalize\ndeleted log group /aws/lambda/ben-t1-ingest-application\ndeleted log group /aws/lambda/ben-t1-intake-application\ndeleted log group /aws/lambda/ben-t1-kill-switch-disengage\ndeleted log group /aws/lambda/ben-t1-kill-switch-engage\ndeleted log group /aws/lambda/ben-t1-mask-pii\ndeleted log group /aws/lambda/ben-t1-overpayment\ndeleted log group /aws/lambda/ben-t1-redetermine\ndeleted log group /aws/lambda/ben-t1-request-signoff\ndeleted log group /aws/lambda/ben-t1-signoff-register\ndeleted log group /aws/lambda/ben-t1-tenant-interceptor\ndeleted log group /aws/lambda/ben-t1-workflow-guards\ndeleted log group /aws/lambda/ben-t1-write-audit\ndeleted pool us-east-1_q5PdQvhm4\npurged secret ben-t1/provenance-signing\nCMK scheduled for deletion (7d) 4d162999-6319-4fed-8e31-7157b5cef1af\n{\n  \"prefix\": \"ben-t1\",\n  \"clean\": false,\n  \"residue\": {\n    \"tables\": [],\n    \"lambdas\": [\n      \"ben-t1-core-tools\",\n      \"ben-t1-request-signoff\",\n      \"ben-t1-overpayment\",\n      \"ben-t1-write-audit\",\n      \"ben-t1-redetermine\",\n      \"ben-t1-workflow-guards\",\n      \"ben-t1-signoff-register\",\n      \"ben-t1-kill-switch-disengage\",\n      \"ben-t1-kill-switch-engage\",\n      \"ben-t1-ingest-application\",\n      \"ben-t1-finalize\",\n      \"ben-t1-tenant-interceptor\",\n      \"ben-t1-approve-signoff\",\n      \"ben-t1-mask-pii\",\n      \"ben-t1-assess-eligibility\",\n      \"ben-t1-intake-application\"\n    ],\n    \"stacks\": [\n      \"ben-t1-compute\",\n      \"ben-t1-lineage\",\n      \"ben-t1-identity\",\n      \"ben-t1-network\",\n      \"ben-t1-data\"\n    ],\n    \"pools\": [],\n    \"buckets\": [],\n    \"log_groups\": []\n  }\n}\n",
+   "err": ""
+  }
+ },
+ "context": [
+  "-c",
+  "env=t1",
+  "-c",
+  "retention_profile=sandbox-demo",
+  "-c",
+  "kms=customer-managed",
+  "-c",
+  "network_mode=private",
+  "-c",
+  "perimeter=1",
+  "-c",
+  "model_logging=1",
+  "-c",
+  "model_log_lock_days=0",
+  "-c",
+  "capture_all=1",
+  "-c",
+  "capture_lock_mode=GOVERNANCE",
+  "-c",
+  "capture_retention_days=1",
+  "-c",
+  "tenant=ben-t1-agency"
+ ],
+ "finished_at": 1788644741
+}

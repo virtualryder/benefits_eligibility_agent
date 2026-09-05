@@ -201,6 +201,18 @@ def main():
     finally:
         # ── 10. teardown to zero residue ──────────────────────────────────────────────────────
         if not a.skip_teardown:
+            # The capture WORM bucket holds CloudTrail deliveries under a GOVERNANCE lock; CloudFormation
+            # cannot delete a non-empty bucket and CDK's auto-delete cannot bypass a lock, so the lineage
+            # stack would end DELETE_FAILED. Empty it (bypass, sandbox retention only) BEFORE destroy.
+            try:
+                s3 = s.client("s3")
+                wb = "%s-capture-worm-%s" % (prefix, acct)
+                for page in s3.get_paginator("list_object_versions").paginate(Bucket=wb):
+                    for o in page.get("Versions", []) + page.get("DeleteMarkers", []):
+                        s3.delete_object(Bucket=wb, Key=o["Key"], VersionId=o["VersionId"], BypassGovernanceRetention=True)
+                steps["capture_bucket_emptied"] = True
+            except Exception as exc:
+                steps["capture_bucket_emptied"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
             steps["destroy"] = sh(cdk_cmd("destroy", "--all", "--force", *ctx(env)), cwd=CDK, timeout=3600)
             steps["cleanup"] = sh([sys.executable, os.path.join(HERE, "cleanup_retained.py"), "--prefix", prefix,
                                    "--region", region, "--i-know-this-deletes-evidence"], cwd=REPO, timeout=1200)
