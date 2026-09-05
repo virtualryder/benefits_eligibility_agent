@@ -1,0 +1,102 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyBedrockInferenceOutsideGovernedPath",
+      "Effect": "Deny",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "bedrock:InvokeModelWithBidirectionalStream",
+        "bedrock:InvokeAgent",
+        "bedrock:InvokeInlineAgent",
+        "bedrock:InvokeFlow",
+        "bedrock:Retrieve",
+        "bedrock:RetrieveAndGenerate",
+        "bedrock:StartAsyncInvoke",
+        "bedrock:CreateModelInvocationJob",
+        "bedrock:ApplyGuardrail"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111122223333:role/ben-prod-compute-coretoolsServiceRole-EXAMPLE",
+            "arn:aws:iam::111122223333:role/AmazonBedrockAgentCoreSDKRuntime-EXAMPLE"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ProtectGovernedBedrockIdentities",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::111122223333:role/ben-prod-compute-coretoolsServiceRole-EXAMPLE",
+        "arn:aws:iam::111122223333:role/AmazonBedrockAgentCoreSDKRuntime-EXAMPLE"
+      ],
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111122223333:role/aegis-platform-deployer-EXAMPLE"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ProtectPerimeterTelemetry",
+      "Effect": "Deny",
+      "Action": [
+        "bedrock:DeleteModelInvocationLoggingConfiguration",
+        "bedrock:PutModelInvocationLoggingConfiguration",
+        "cloudtrail:StopLogging",
+        "cloudtrail:DeleteTrail",
+        "cloudtrail:UpdateTrail",
+        "cloudtrail:PutEventSelectors"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111122223333:role/aegis-platform-deployer-EXAMPLE"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyBedrockControlPlaneChangesOutsideDeployer",
+      "Effect": "Deny",
+      "Action": [
+        "bedrock:CreateGuardrail",
+        "bedrock:UpdateGuardrail",
+        "bedrock:DeleteGuardrail",
+        "bedrock:CreateGuardrailVersion",
+        "bedrock:CreateModelCustomizationJob",
+        "bedrock:CreateModelImportJob",
+        "bedrock:CreateProvisionedModelThroughput",
+        "bedrock:PutModelInvocationLoggingConfiguration"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111122223333:role/aegis-platform-deployer-EXAMPLE"
+          ]
+        }
+      }
+    }
+  ]
+}

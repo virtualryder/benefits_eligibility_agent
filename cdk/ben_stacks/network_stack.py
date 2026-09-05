@@ -17,7 +17,7 @@ Contrast with the housing/EDU/PV agents, which DO reach one sanctioned external 
 Scorecard / openFDA) and therefore ship a Network Firewall egress allowlist. Benefits needs none.
 """
 import aws_cdk as cdk
-from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_ec2 as ec2, aws_iam as iam
 from constructs import Construct
 
 # Benefits reaches NO external domain — the allowlist is empty by design (docs/DATA-SOURCE-POLICY.md).
@@ -25,7 +25,7 @@ ALLOWED_DOMAINS = []
 
 
 class NetworkStack(cdk.Stack):
-    def __init__(self, scope: Construct, cid: str, *, prefix: str, **kw):
+    def __init__(self, scope: Construct, cid: str, *, prefix: str, bedrock_principals=(), **kw):
         super().__init__(scope, cid, **kw)
 
         # Isolated-only VPC: no public subnets, no NAT, no IGW. The app subnets have no default route
@@ -37,6 +37,7 @@ class NetworkStack(cdk.Stack):
                 ec2.SubnetConfiguration(name="app", subnet_type=ec2.SubnetType.PRIVATE_ISOLATED, cidr_mask=24),
             ])
         app_sel = ec2.SubnetSelection(subnet_group_name="app")
+        self.endpoints = {}
 
         # ── AWS traffic stays on the AWS network (the ONLY reachable destinations) ────
         self.vpc.add_gateway_endpoint("S3Ep", service=ec2.GatewayVpcEndpointAwsService.S3, subnets=[app_sel])
@@ -55,7 +56,26 @@ class NetworkStack(cdk.Stack):
                           # fails on a cold start and identity verification breaks. private_dns_enabled
                           # makes the public cognito-idp hostname resolve to the endpoint inside the VPC.
                           ("CognitoIdpEp", ec2.InterfaceVpcEndpointAwsService("cognito-idp"))):
-            self.vpc.add_interface_endpoint(name, service=svc, subnets=app_sel, private_dns_enabled=True)
+            self.endpoints[name] = self.vpc.add_interface_endpoint(
+                name, service=svc, subnets=app_sel, private_dns_enabled=True)
+
+        # ── Bedrock runtime endpoint POLICY (enforcement-perimeter review, 2026-09-05) ─────────
+        # Network-layer half of the perimeter INSIDE the pack's own VPC: the bedrock-runtime interface
+        # endpoint accepts inference calls ONLY from the governed drafter role (the compute stack's
+        # core-tools Lambda, whose IAM allow additionally requires a guardrail on every call) and any
+        # -c approved_bedrock_principals. Anything else in these subnets that obtains Bedrock
+        # credentials is refused at the endpoint - the in-VPC counterpart of the org SCP under org/.
+        # aws:PrincipalArn resolves to the ROLE arn for a role session, so a caller-chosen session name
+        # cannot satisfy it. Converse / ConverseStream authorize as InvokeModel / ...WithResponseStream.
+        drafter_role_pattern = f"arn:aws:iam::{self.account}:role/{prefix}-compute-coretoolsServiceRole*"
+        self.bedrock_endpoint_principals = [drafter_role_pattern] + [p for p in bedrock_principals if p]
+        self.endpoints["BedrockEp"].add_to_policy(iam.PolicyStatement(
+            sid="GovernedDrafterOnly", effect=iam.Effect.ALLOW,
+            principals=[iam.AnyPrincipal()],
+            actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:ApplyGuardrail"],
+            resources=["*"],
+            conditions={"ArnLike": {"aws:PrincipalArn": self.bedrock_endpoint_principals},
+                        "StringEquals": {"aws:PrincipalAccount": self.account}}))
 
         # ── the governed Lambdas' security group: egress 443 only ────────────────────
         # allow_all_outbound=False keeps the intent explicit. Egress is TLS-443 to any IPv4 — but this

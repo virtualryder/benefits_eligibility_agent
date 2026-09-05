@@ -44,9 +44,10 @@ from constructs import Construct
 class ObservabilityStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, compute, workflow,
                  data=None, gateway=None, model_logging: bool = False, tenants=("default",),
-                 budget_usd: float = 0.0, runtime_role_name: str = "", **kw):
+                 budget_usd: float = 0.0, runtime_role_name: str = "", lineage=None,
+                 transparency_lock_days: int = 0, approved_bedrock_principals=(), **kw):
         super().__init__(scope, cid, **kw)
-        self._transparency(prefix, gateway, model_logging)
+        self._transparency(prefix, gateway, model_logging, data=data, lock_days=int(transparency_lock_days or 0))
         # Gate-B: ops alarms may carry case ids — under customer-managed KMS the topic is CMK-encrypted.
         # Imported key reference (see compute_stack): cloudwatch.amazonaws.com is pre-authorized in
         # the DataStack key policy so alarms can publish to the encrypted topic.
@@ -54,6 +55,8 @@ class ObservabilityStack(cdk.Stack):
         if data is not None and getattr(data, "cmk", None) is not None:
             cmk = kms.Key.from_key_arn(self, "DataCmk", data.cmk.key_arn)
         topic = sns.Topic(self, "Alarms", topic_name=f"{prefix}-ops-alarms", master_key=cmk)
+        self._perimeter_bypass_alarm(prefix, lineage, compute, runtime_role_name,
+                                     tuple(approved_bedrock_principals or ()), topic)
 
         def alarm(name, metric, threshold=0, eval_periods=1, desc=""):
             a = cw.Alarm(self, name, metric=metric, threshold=threshold,
@@ -229,23 +232,103 @@ class ObservabilityStack(cdk.Stack):
         cdk.CfnOutput(self, "DashboardName", value=f"{prefix}-operations")
 
     # ── Phase 110: full transparency — every model invocation + every gateway request ────────────
-    def _transparency(self, prefix, gateway, model_logging):
+    # Bedrock operations that invoke a model / agent / guardrail as CloudTrail names them (management
+    # events for the InvokeModel / Converse family; data events for the rest - see LineageStack).
+    BEDROCK_INVOKE_EVENTS = ("InvokeModel", "InvokeModelWithResponseStream", "Converse", "ConverseStream",
+                             "InvokeModelWithBidirectionalStream", "ApplyGuardrail", "InvokeAgent",
+                             "InvokeInlineAgent", "InvokeFlow", "Retrieve", "RetrieveAndGenerate",
+                             "StartAsyncInvoke", "CreateModelInvocationJob")
+
+    def _perimeter_bypass_alarm(self, prefix, lineage, compute, runtime_role_name, extra_principals, topic):
+        """DETECTIVE half of the Bedrock enforcement perimeter (2026-09-05 review): from the account-wide
+        capture trail (LineageStack, -c capture_all=1) raise `<prefix>-bedrock-perimeter-bypass` when ANY
+        principal outside the approved allowlist invokes Bedrock. The allowlist is the governed drafter
+        role, the AgentCore runtime role (-c runtime_role=<name>) and -c approved_bedrock_principals=<arn,
+        ...>. Two metric filters feed one metric: (a) assumed-role sessions whose ISSUING ROLE ARN (not the
+        caller-chosen session name) is outside the allowlist, and (b) any IAM-user or root caller - both
+        are bypasses by definition. PREVENTION is the org SCP + VPC-endpoint policy under org/."""
+        self.bypass_alarm = None
+        if lineage is None or getattr(lineage, "capture_log_group", None) is None:
+            return
+        approved = [compute.core.role.role_arn]
+        if runtime_role_name:
+            approved.append(f"arn:aws:iam::{self.account}:role/{runtime_role_name}")
+        approved += [a for a in extra_principals if a]
+        self.approved_bedrock_principals = approved
+        src = logs.FilterPattern.string_value("$.eventSource", "=", "bedrock.amazonaws.com")
+        invoke = logs.FilterPattern.any(*[logs.FilterPattern.string_value("$.eventName", "=", e)
+                                          for e in self.BEDROCK_INVOKE_EVENTS])
+        role_outside = logs.FilterPattern.all(
+            src, invoke, logs.FilterPattern.string_value("$.userIdentity.type", "=", "AssumedRole"),
+            *[logs.FilterPattern.string_value("$.userIdentity.sessionContext.sessionIssuer.arn", "!=", a)
+              for a in approved])
+        human_caller = logs.FilterPattern.all(
+            src, invoke, logs.FilterPattern.any(logs.FilterPattern.string_value("$.userIdentity.type", "=", "IAMUser"),
+                                                logs.FilterPattern.string_value("$.userIdentity.type", "=", "Root")))
+        for name, pat in (("RoleOutsideAllowlist", role_outside), ("HumanCaller", human_caller)):
+            logs.MetricFilter(self, f"BedrockBypass{name}", log_group=lineage.capture_log_group,
+                              filter_pattern=pat, metric_namespace=f"Aegis/Perimeter/{prefix}",
+                              metric_name="BedrockBypassInvocations", metric_value="1")
+        m = cw.Metric(namespace=f"Aegis/Perimeter/{prefix}", metric_name="BedrockBypassInvocations",
+                      statistic="Sum", period=cdk.Duration.minutes(5))
+        a = cw.Alarm(self, "BedrockPerimeterBypass", metric=m, threshold=1, evaluation_periods=1,
+                     comparison_operator=cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                     treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
+                     alarm_name=f"{prefix}-bedrock-perimeter-bypass",
+                     alarm_description="A principal OUTSIDE the approved allowlist (governed drafter role, AgentCore "
+                                       "runtime role, -c approved_bedrock_principals) invoked Bedrock directly - a "
+                                       "governance-perimeter bypass. Source: account capture trail (management + "
+                                       "Bedrock data events). Prevention: org SCP + VPC-endpoint policy (org/).")
+        a.add_alarm_action(cwa.SnsAction(topic))
+        self.bypass_alarm = a
+        cdk.CfnOutput(self, "BedrockPerimeterBypassAlarm", value=a.alarm_name)
+
+    def _transparency(self, prefix, gateway, model_logging, data=None, lock_days=0):
         """Bedrock MODEL INVOCATION LOGGING (the exact Converse request/response bodies, tagged by the
         runtime's requestMetadata: tenant / session_id / case_id) + the AgentCore GATEWAY's vended
         request logs (CloudWatch Logs delivery, log type APPLICATION_LOGS). The runtime's spans and
         logs are AgentCore-managed (/aws/bedrock-agentcore/runtimes/<agent>-<endpoint>, aws/spans).
-        Sources: Bedrock model-invocation logging + AgentCore observability configuration docs."""
+        Sources: Bedrock model-invocation logging + AgentCore observability configuration docs.
+
+        STORE PROTECTION (enforcement-perimeter review, 2026-09-05). Invocation logging is an ACCOUNT
+        setting: it records every caller's prompts/completions, not only the governed drafter's (whose
+        input is proven de-identified by the P0-1 sanitized_ref gate before it ever reaches Bedrock). So
+        the store is treated as a regulated-data store, not a debug log: under customer-managed KMS the
+        log group and the large-payload bucket are encrypted with the deployment CMK (the bedrock service
+        principal is granted GenerateDataKey/Decrypt on it, SourceAccount-scoped, so delivery still
+        works), and with lock_days > 0 (the production profile) the bucket is Object-Locked in COMPLIANCE
+        mode with that retention, versioned, RETAINED on stack delete and never auto-emptied. The
+        sandbox default (lock_days=0, AWS-managed keys) keeps the destroy/auto-delete teardown shape."""
         self.model_log_group = None
         if model_logging:
+            cmk = getattr(data, "cmk", None) if data is not None else None
+            locked = int(lock_days or 0) > 0
             lg = logs.LogGroup(self, "ModelInvocationLogs", log_group_name=f"/aws/bedrock/modelinvocations/{prefix}",
-                               retention=logs.RetentionDays.ONE_YEAR, removal_policy=cdk.RemovalPolicy.DESTROY)
-            big = s3.Bucket(self, "ModelInvocationLargeData", block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-                            encryption=s3.BucketEncryption.S3_MANAGED, enforce_ssl=True,
-                            removal_policy=cdk.RemovalPolicy.DESTROY, auto_delete_objects=True)
+                               retention=logs.RetentionDays.ONE_YEAR, encryption_key=cmk,
+                               removal_policy=(cdk.RemovalPolicy.RETAIN if locked else cdk.RemovalPolicy.DESTROY))
+            bucket_kw = dict(block_public_access=s3.BlockPublicAccess.BLOCK_ALL, enforce_ssl=True,
+                             encryption=(s3.BucketEncryption.KMS if cmk is not None else s3.BucketEncryption.S3_MANAGED),
+                             encryption_key=cmk)
+            if locked:
+                bucket_kw.update(versioned=True, object_lock_enabled=True,
+                                 object_lock_default_retention=s3.ObjectLockRetention.compliance(
+                                     duration=cdk.Duration.days(int(lock_days))),
+                                 removal_policy=cdk.RemovalPolicy.RETAIN)
+            else:
+                bucket_kw.update(removal_policy=cdk.RemovalPolicy.DESTROY, auto_delete_objects=True)
+            big = s3.Bucket(self, "ModelInvocationLargeData", **bucket_kw)
             big.add_to_resource_policy(iam.PolicyStatement(
                 actions=["s3:PutObject"], resources=[f"{big.bucket_arn}/*"],
                 principals=[iam.ServicePrincipal("bedrock.amazonaws.com")],
                 conditions={"StringEquals": {"aws:SourceAccount": self.account}}))
+            if cmk is not None:
+                # SSE-KMS delivery: the Bedrock service principal must be able to use the CMK.
+                cmk.add_to_resource_policy(iam.PolicyStatement(
+                    sid="BedrockInvocationLogDelivery",
+                    actions=["kms:GenerateDataKey*", "kms:Decrypt", "kms:DescribeKey"], resources=["*"],
+                    principals=[iam.ServicePrincipal("bedrock.amazonaws.com")],
+                    conditions={"StringEquals": {"aws:SourceAccount": self.account}}))
+            self.model_invocation_store_locked = locked
             role = iam.Role(self, "ModelInvocationLogRole", assumed_by=iam.ServicePrincipal(
                 "bedrock.amazonaws.com", conditions={"StringEquals": {"aws:SourceAccount": self.account}}))
             role.add_to_policy(iam.PolicyStatement(actions=["logs:CreateLogStream", "logs:PutLogEvents"],

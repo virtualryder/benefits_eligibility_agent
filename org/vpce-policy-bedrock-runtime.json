@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GovernedDrafterOnly",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "bedrock:ApplyGuardrail"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::111122223333:role/ben-prod-compute-coretoolsServiceRole-EXAMPLE"
+          ]
+        },
+        "StringEquals": {
+          "aws:PrincipalAccount": "111122223333"
+        }
+      }
+    }
+  ]
+}

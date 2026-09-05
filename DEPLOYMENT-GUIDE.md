@@ -52,6 +52,15 @@ Guidelines compiled in as configuration, so there is no runtime external depende
 | `tenants=<a>,<b>,…` | **Hybrid multi-tenant**: one shared control plane (identity, compute, workflow, gateway + Cedar engine) and ONE physically separate data stack per tenant (`ben-<env>-<tenant>-data`: tenant-scoped tables + the tenant's own Object-Lock vault `<prefix>-<tenant>-worm-<account>`). Creates a `tenant_<id>` Cognito group per tenant, deploys the gateway REQUEST interceptor (`tenant-interceptor`), attaches `require_tenant` (Cedar), sets `MULTITENANT=1` + `WORM_BUCKET_TEMPLATE` on the governed Lambdas, threads the signed tenant pair through the workflow, and mirrors least-privilege grants onto `<prefix>-*-<logical>`. Mutually exclusive in spirit with `tenant=` (silo). |
 | `model_logging=1` | **Bedrock model-invocation logging** for the account+region (an account-level singleton — it REPLACES any existing configuration, hence opt-in): CloudWatch group `/aws/bedrock/modelinvocations/<prefix>` + S3 large-data bucket + the `bedrock.amazonaws.com` role; removed on teardown. Also delivers the AgentCore gateway's vended request logs to `/aws/vendedlogs/bedrock-agentcore/gateway/<prefix>`. |
 
+### 1c. Enforcement-perimeter switches (2026-09-05)
+
+| Switch | Effect |
+|---|---|
+| `model_log_lock_days=N` | Treats the model-invocation store as **regulated data**: the log group and the large-payload bucket are encrypted with the deployment CMK (under `kms=customer-managed`; the Bedrock service is granted the key), the bucket is Object-Locked **COMPLIANCE** for N days, versioned, **retained** on stack delete and never auto-emptied. **The production profile gate refuses to synth without N > 0** (an account-level invocation log records every caller's prompts, not only the governed drafter's de-identified ones). Sandbox default `0` keeps the destroy/auto-delete shape. |
+| `approved_bedrock_principals=<arn>,<arn>` | Extra principals (break-glass, a VPC-attached runtime) admitted by the `bedrock-runtime` VPC-endpoint policy and excluded from the bypass alarm. The governed drafter role and `runtime_role` are always in the allowlist. |
+| *(with `capture_all=1`)* | The capture trail now uses **advanced selectors**: management ALL + data events for S3, Lambda, every Bedrock data-plane resource type and `AWS::BedrockAgentCore::Gateway`; the observability stack raises **`<prefix>-bedrock-perimeter-bypass`** (ops topic) when any principal outside the allowlist invokes Bedrock. |
+| *(org boundary)* | Prevention of direct calls lives outside the pack: render and attach the SCP + endpoint policy under [`org/`](org/README.md) (`python scripts/render_org_perimeter.py --lint` to lint; sandbox OU first). |
+
 Multi-tenant contracts: the tenant is **derived, never requested** (verified identity → interceptor →
 HMAC-signed `__aegis_tenant`/`__aegis_tenant_sig` → every Lambda verifies before routing); `ingest`
 (direct IAM invocation) derives it from a verified caseworker access token (`access_token` in the
@@ -274,6 +283,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 243 pass locally (+1 CI-only gate = 255 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
-python -m pytest tests/test_cdk_stacks.py -q  # 27 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
+python -m pytest tests/ -q                    # 243 pass locally (+1 CI-only gate = 263 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
+python -m pytest tests/test_cdk_stacks.py -q  # 31 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```

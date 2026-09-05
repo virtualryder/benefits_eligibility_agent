@@ -156,6 +156,7 @@ def _require_production_controls(app, env_name, profile):
         "capture_all=1": truthy("capture_all"),
         "capture_lock_mode=COMPLIANCE": str(ctx("capture_lock_mode") or "GOVERNANCE").upper() == "COMPLIANCE",
         "manifest signed & verified (deep-dive #202)": _manifest_verifies(),
+        "model_log_lock_days>0 (invocation-log store Object-Locked, CMK, retained)": int(ctx("model_log_lock_days") or 0) > 0,
     }
     missing = [k for k, ok in required.items() if not ok]
     if missing:
@@ -182,7 +183,10 @@ tenant_data = {t: DataStack(app, f"{prefix}-{t}-data", prefix=prefix, retention_
                for t in tenants}
 network = None
 if (app.node.try_get_context("network_mode") or "public") == "private":
-    network = NetworkStack(app, f"{prefix}-network", prefix=prefix)
+    network = NetworkStack(app, f"{prefix}-network", prefix=prefix,
+                           bedrock_principals=tuple(
+                               a.strip() for a in str(app.node.try_get_context("approved_bedrock_principals") or "").split(",")
+                               if a.strip()))
 identity = IdentityStack(
     app, f"{prefix}-identity", prefix=prefix,
     identity_mode=app.node.try_get_context("identity_mode") or "sandbox",
@@ -229,6 +233,20 @@ gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute,
 # Phase 110 (full transparency): -c model_logging=1 turns on Bedrock MODEL INVOCATION LOGGING for the
 # account+region (it is an account-level singleton - it replaces any existing configuration, so it is
 # opt-in) and delivers the gateway's vended request logs; the runtime's spans/logs are AgentCore-managed.
+# #168 (capture EVERY API call in the account): -c capture_all=1 provisions ONE account trail
+# (management ALL - which is where CloudTrail records InvokeModel / Converse - plus S3, Lambda, every
+# Bedrock data-plane resource type and the AgentCore Gateway as DATA events; multi-region;
+# file-validation on) delivered to CloudWatch Logs AND a WORM Object-Lock bucket, so
+# scripts/lineage_proof.py can prove every governed API call is captured and joinable into one lineage,
+# and the ObservabilityStack can raise the bedrock-perimeter-bypass alarm for any direct caller outside
+# the allowlist. Account-level + cost -> opt-in; torn down after the gate. Created BEFORE observability
+# so the alarm can read its capture log group.
+lineage = None
+if str(app.node.try_get_context("capture_all") or "").lower() in ("1", "true", "yes"):
+    lineage = LineageStack(app, f"{prefix}-lineage", prefix=prefix,
+                           retention_days=int(app.node.try_get_context("capture_retention_days") or 1),
+                           lock_mode=app.node.try_get_context("capture_lock_mode") or "GOVERNANCE")
+
 observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix,
                                    compute=compute, workflow=workflow, data=data, gateway=gateway,
                                    model_logging=bool(app.node.try_get_context("model_logging")),
@@ -236,17 +254,16 @@ observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix
                                    # backstop (-c budget_usd) with an IAM deny action + kill-switch engage
                                    tenants=tuple(tenants) or ("default",),
                                    budget_usd=float(app.node.try_get_context("budget_usd") or 0),
-                                   runtime_role_name=app.node.try_get_context("runtime_role") or "")
-
-# #168 (capture EVERY API call): -c capture_all=1 provisions ONE account trail (management ALL +
-# S3/Lambda data events, multi-region, file-validation on) delivered to CloudWatch Logs AND a WORM
-# Object-Lock bucket, so scripts/lineage_proof.py can prove every governed API call is captured and
-# joinable into one lineage. Account-level + cost -> opt-in; torn down after the gate.
-lineage = None
-if str(app.node.try_get_context("capture_all") or "").lower() in ("1", "true", "yes"):
-    lineage = LineageStack(app, f"{prefix}-lineage", prefix=prefix,
-                           retention_days=int(app.node.try_get_context("capture_retention_days") or 1),
-                           lock_mode=app.node.try_get_context("capture_lock_mode") or "GOVERNANCE")
+                                   runtime_role_name=app.node.try_get_context("runtime_role") or "",
+                                   # enforcement-perimeter review (2026-09-05): detective bypass alarm from
+                                   # the capture trail + a regulated-data invocation-log store
+                                   # (-c model_log_lock_days=N -> Object-Lock COMPLIANCE + RETAIN; the
+                                   # production gate requires N > 0; CMK under -c kms=customer-managed)
+                                   lineage=lineage,
+                                   transparency_lock_days=int(app.node.try_get_context("model_log_lock_days") or 0),
+                                   approved_bedrock_principals=tuple(
+                                       a.strip() for a in str(app.node.try_get_context("approved_bedrock_principals") or "").split(",")
+                                       if a.strip()))
 
 for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
         + tuple(tenant_data.values()) + ((lineage,) if lineage else ()):

@@ -522,3 +522,125 @@ def test_agentcore_attachment_provider_is_least_privilege():
     assert '"bedrock-agentcore:*"' not in g, "the attachment provider still holds bedrock-agentcore:* (over-privileged)"
     assert '"bedrock-agentcore:UpdateGateway"' in g and '"bedrock-agentcore:CreatePolicy"' in g, \
         "the provider is missing the enumerated control-plane actions it needs"
+
+
+# ── Enforcement-perimeter review (2026-09-05): account-boundary capture + detection + hardening ──
+
+def test_capture_trail_selects_bedrock_and_agentcore_data_events():
+    """The account capture trail (#168) must use ADVANCED selectors that record management events (where
+    CloudTrail logs InvokeModel / Converse) PLUS every documented Bedrock data-plane resource type and the
+    AgentCore Gateway, so a bypass through ApplyGuardrail / InvokeAgent / RetrieveAndGenerate / async or
+    bidirectional invokes / the gateway is captured in WORM custody too. Basic EventSelectors must be gone
+    (a trail cannot carry both)."""
+    from ben_stacks.lineage_stack import LineageStack
+    app = aws_cdk.App()
+    t = Template.from_stack(LineageStack(app, "lp", prefix="ben-ptest"))
+    trails = t.find_resources("AWS::CloudTrail::Trail")
+    assert len(trails) == 1
+    props = next(iter(trails.values()))["Properties"]
+    assert "EventSelectors" not in props, "basic EventSelectors must be removed when advanced selectors are used"
+    sel = props["AdvancedEventSelectors"]
+    types = set()
+    mgmt = False
+    for s in sel:
+        fields = {f["Field"]: f["Equals"] for f in s["FieldSelectors"]}
+        if fields.get("eventCategory") == ["Management"]:
+            mgmt = True
+        for rt in fields.get("resources.type", []):
+            types.add(rt)
+        assert len(fields.get("resources.type", [])) <= 1, "one resources.type per advanced selector"
+    assert mgmt, "management events (InvokeModel / Converse live here) must be selected"
+    for rt in ("AWS::S3::Object", "AWS::Lambda::Function", "AWS::Bedrock::Model", "AWS::Bedrock::AsyncInvoke",
+               "AWS::Bedrock::Guardrail", "AWS::Bedrock::KnowledgeBase", "AWS::Bedrock::AgentAlias",
+               "AWS::Bedrock::InlineAgent", "AWS::Bedrock::FlowAlias", "AWS::Bedrock::Prompt",
+               "AWS::BedrockAgentCore::Gateway"):
+        assert rt in types, f"capture trail no longer selects data events for {rt}"
+    assert props.get("IsMultiRegionTrail") is True and props.get("EnableLogFileValidation") is True
+
+
+def _perimeter_stacks(kms="aws-managed", lock_days=0, capture=True):
+    from ben_stacks.observability_stack import ObservabilityStack
+    from ben_stacks.lineage_stack import LineageStack
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "dq", prefix="ben-qtest", retention_profile="sandbox-demo", kms_mode=kms)
+    compute = ComputeStack(app, "cq", prefix="ben-qtest", asset_dir=asset, data=data)
+    workflow = WorkflowStack(app, "wq", prefix="ben-qtest", compute=compute, data=data)
+    lineage = LineageStack(app, "lq", prefix="ben-qtest") if capture else None
+    obs = ObservabilityStack(app, "oq", prefix="ben-qtest", compute=compute, workflow=workflow, data=data,
+                             model_logging=True, lineage=lineage, transparency_lock_days=lock_days,
+                             runtime_role_name="AmazonBedrockAgentCoreSDKRuntime-x",
+                             approved_bedrock_principals=("arn:aws:iam::111122223333:role/break-glass",))
+    return data, compute, obs
+
+
+def test_bedrock_perimeter_bypass_alarm_from_capture_trail():
+    """DETECTIVE perimeter: with the capture trail present, two metric filters on its log group feed
+    Aegis/Perimeter BedrockBypassInvocations - (a) assumed-role sessions whose ISSUING ROLE (not the
+    caller-chosen session name) is outside the allowlist, (b) any IAM-user / root caller - and a >=1
+    alarm goes to the ops topic. Without the trail there is nothing to read, so no alarm is claimed."""
+    _, compute, obs = _perimeter_stacks()
+    to = Template.from_stack(obs)
+    filters = to.find_resources("AWS::Logs::MetricFilter")
+    pats = [json.dumps(v["Properties"]["FilterPattern"]) for v in filters.values()]
+    assert len(filters) == 2, f"expected two bypass metric filters, got {len(filters)}"
+    joined = " ".join(pats)
+    assert "bedrock.amazonaws.com" in joined and "InvokeModel" in joined and "RetrieveAndGenerate" in joined
+    assert "sessionIssuer.arn" in joined, "the role filter must key on the issuing ROLE arn, not the session name"
+    # the session name lives in userIdentity.arn / principalId - never key on those
+    assert "userIdentity.arn" not in joined and "principalId" not in joined, "never key on a caller-chosen session name"
+    assert "IAMUser" in joined and "Root" in joined
+    assert "break-glass" in joined and "AmazonBedrockAgentCoreSDKRuntime-x" in joined
+    to.has_resource_properties("AWS::CloudWatch::Alarm", Match.object_like({
+        "AlarmName": "ben-qtest-bedrock-perimeter-bypass", "Namespace": "Aegis/Perimeter/ben-qtest",
+        "MetricName": "BedrockBypassInvocations", "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold"}))
+    _, _, obs2 = _perimeter_stacks(capture=False)
+    assert Template.from_stack(obs2).find_resources("AWS::Logs::MetricFilter") == {}
+
+
+def test_invocation_log_store_is_regulated_data_under_production_settings():
+    """The model-invocation store records EVERY caller's prompts (account setting), so under
+    customer-managed KMS + model_log_lock_days>0 it must be CMK-encrypted (log group AND large-payload
+    bucket, with the bedrock service granted use of the key), Object-Locked in COMPLIANCE mode, versioned,
+    RETAINED and never auto-emptied. The sandbox default keeps the destroy/auto-delete shape."""
+    data, _, obs = _perimeter_stacks(kms="customer-managed", lock_days=400)
+    to, td = Template.from_stack(obs), Template.from_stack(data)
+    to.has_resource_properties("AWS::S3::Bucket", Match.object_like({
+        "ObjectLockEnabled": True,
+        "ObjectLockConfiguration": Match.object_like({"Rule": {"DefaultRetention": {"Mode": "COMPLIANCE", "Days": 400}}}),
+        "VersioningConfiguration": {"Status": "Enabled"},
+        "BucketEncryption": Match.object_like({"ServerSideEncryptionConfiguration": [
+            Match.object_like({"ServerSideEncryptionByDefault": Match.object_like({"SSEAlgorithm": "aws:kms"})})]})}))
+    bucket = [v for v in to.find_resources("AWS::S3::Bucket").values() if v.get("Properties", {}).get("ObjectLockEnabled")][0]
+    assert bucket.get("DeletionPolicy") == "Retain"
+    assert to.find_resources("Custom::S3AutoDeleteObjects") == {}, "a locked regulated-data store must never be auto-emptied"
+    lg = [v for v in to.find_resources("AWS::Logs::LogGroup").values()
+          if "modelinvocations" in json.dumps(v.get("Properties", {}).get("LogGroupName"))][0]
+    assert "KmsKeyId" in lg["Properties"] and lg.get("DeletionPolicy") == "Retain"
+    assert "BedrockInvocationLogDelivery" in json.dumps(td.to_json()), "bedrock service must be granted the CMK for delivery"
+    # sandbox default: unlocked, destroyable
+    _, _, obs0 = _perimeter_stacks()
+    t0 = Template.from_stack(obs0)
+    assert t0.find_resources("Custom::S3AutoDeleteObjects") != {}
+    assert not any(v.get("Properties", {}).get("ObjectLockEnabled") for v in t0.find_resources("AWS::S3::Bucket").values())
+
+
+def test_bedrock_runtime_endpoint_policy_admits_only_the_governed_drafter():
+    """NETWORK half of the perimeter inside the pack VPC: the bedrock-runtime interface endpoint carries
+    a policy that allows inference ONLY from the governed drafter role pattern (+ approved principals),
+    keyed on aws:PrincipalArn (the ROLE arn for sessions) and aws:PrincipalAccount."""
+    app = aws_cdk.App()
+    net = NetworkStack(app, "np", prefix="ben-ptest", bedrock_principals=("arn:aws:iam::111122223333:role/break-glass",))
+    t = Template.from_stack(net)
+    eps = t.find_resources("AWS::EC2::VPCEndpoint")
+    bedrock = [v for v in eps.values() if "bedrock-runtime" in json.dumps(v["Properties"]["ServiceName"])]
+    assert len(bedrock) == 1
+    pol = json.dumps(bedrock[0]["Properties"]["PolicyDocument"])
+    assert "GovernedDrafterOnly" in pol and "coretoolsServiceRole" in pol and "break-glass" in pol
+    assert "aws:PrincipalArn" in pol and "aws:PrincipalAccount" in pol
+    assert '"bedrock:InvokeModel"' in pol and '"bedrock:InvokeModelWithResponseStream"' in pol
+    assert "userId" not in pol
+    # every other endpoint keeps the default (no restrictive policy needed there)
+    others = [v for v in eps.values() if "bedrock-runtime" not in json.dumps(v["Properties"]["ServiceName"])]
+    assert all("PolicyDocument" not in v["Properties"] for v in others)

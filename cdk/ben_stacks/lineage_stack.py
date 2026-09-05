@@ -31,9 +31,24 @@ production uses COMPLIANCE + a real retention window, where not even root can de
 The bucket is NOT auto-delete (auto-delete cannot bypass a lock); teardown empties it with the bypass
 permission and then removes it.
 
-DynamoDB and Bedrock data-plane calls are ALREADY captured by dedicated, stronger sources - the
-hash-chained WORM audit ledger and the Bedrock model-invocation log - which the lineage proof joins
-alongside this trail; this trail's job is the account-wide management + S3/Lambda data plane.
+DynamoDB data-plane calls are captured by a dedicated, stronger source - the hash-chained WORM audit
+ledger - which the lineage proof joins alongside this trail.
+
+BEDROCK COVERAGE (enforcement-perimeter review, 2026-09-05). Bedrock's core inference calls -
+InvokeModel, InvokeModelWithResponseStream, Converse, ConverseStream - are recorded by CloudTrail as
+MANAGEMENT events (AWS: "Monitor Amazon Bedrock API calls using CloudTrail"), so this trail ALREADY
+captures every direct model invocation in the account by ANY principal, in WORM custody with file
+validation. That is the account-boundary net the model-invocation log alone cannot be: invocation
+logging is a mutable account setting (anyone with bedrock:DeleteModelInvocationLoggingConfiguration
+turns it off), is per-region, and is not WORM. The remaining Bedrock data-plane operations are DATA
+events that CloudTrail does not log by default, so this trail selects every documented Bedrock data
+resource type - ApplyGuardrail (Guardrail), InvokeAgent (AgentAlias), InvokeInlineAgent (InlineAgent),
+InvokeFlow (FlowAlias), Retrieve / RetrieveAndGenerate (KnowledgeBase), StartAsyncInvoke /
+InvokeModelWithBidirectionalStream (Model + AsyncInvoke), RenderPrompt (Prompt) - plus the AgentCore
+Gateway data plane (AWS::BedrockAgentCore::Gateway), so a bypass through ANY of those surfaces is
+captured too. The ObservabilityStack raises the `bedrock-perimeter-bypass` alarm from this capture
+whenever a principal outside the approved allowlist invokes Bedrock (detective); PREVENTION at the
+account boundary is the org SCP + VPC-endpoint policy shipped under org/ (see org/README.md).
 """
 import aws_cdk as cdk
 from aws_cdk import (aws_cloudtrail as cloudtrail, aws_logs as logs, aws_s3 as s3)
@@ -41,6 +56,33 @@ from constructs import Construct
 
 
 class LineageStack(cdk.Stack):
+    # Every Bedrock DATA-event resource type documented in "Monitor Amazon Bedrock API calls using
+    # CloudTrail" (the core InvokeModel / Converse family are MANAGEMENT events, captured by the
+    # management selector), plus the AgentCore Gateway data plane.
+    DATA_RESOURCE_TYPES = (
+        "AWS::S3::Object",
+        "AWS::Lambda::Function",
+        "AWS::Bedrock::Model",
+        "AWS::Bedrock::AsyncInvoke",
+        "AWS::Bedrock::Guardrail",
+        "AWS::Bedrock::KnowledgeBase",
+        "AWS::Bedrock::AgentAlias",
+        "AWS::Bedrock::InlineAgent",
+        "AWS::Bedrock::FlowAlias",
+        "AWS::Bedrock::Prompt",
+        "AWS::BedrockAgentCore::Gateway",
+    )
+
+    @classmethod
+    def advanced_event_selectors(cls):
+        sel = [{"Name": "Management events (all, read + write)",
+                "FieldSelectors": [{"Field": "eventCategory", "Equals": ["Management"]}]}]
+        for rt in cls.DATA_RESOURCE_TYPES:
+            sel.append({"Name": "Data events: %s" % rt,
+                        "FieldSelectors": [{"Field": "eventCategory", "Equals": ["Data"]},
+                                           {"Field": "resources.type", "Equals": [rt]}]})
+        return sel
+
     def __init__(self, scope: Construct, cid: str, *, prefix: str,
                  retention_days: int = 1, lock_mode: str = "GOVERNANCE", **kw):
         super().__init__(scope, cid, **kw)
@@ -89,14 +131,14 @@ class LineageStack(cdk.Stack):
             send_to_cloud_watch_logs=True,
             cloud_watch_log_group=ct_log_group)
 
-        # DATA events: every S3 object write (evidence vault + all buckets) and every Lambda invoke
-        # (every governed tool call as AWS recorded it, for the invoked-vs-audited coverage check).
-        trail.add_event_selector(
-            cloudtrail.DataResourceType.S3_OBJECT, ["arn:aws:s3:::"],
-            read_write_type=cloudtrail.ReadWriteType.ALL, include_management_events=True)
-        trail.add_event_selector(
-            cloudtrail.DataResourceType.LAMBDA_FUNCTION, ["arn:aws:lambda"],
-            read_write_type=cloudtrail.ReadWriteType.ALL, include_management_events=False)
+        # ADVANCED event selectors (a trail uses basic OR advanced selectors, never both): management
+        # ALL, plus DATA events for every S3 object write (evidence vault + all buckets), every Lambda
+        # invoke (every governed tool call as AWS recorded it, for the invoked-vs-audited coverage
+        # check), every documented Bedrock data-plane resource type, and the AgentCore Gateway data
+        # plane. One selector per resource type (CloudTrail allows a single resources.type per selector).
+        cfn_trail = trail.node.default_child
+        cfn_trail.add_property_deletion_override("EventSelectors")
+        cfn_trail.add_property_override("AdvancedEventSelectors", self.advanced_event_selectors())
 
         self.trail = trail
         self.capture_log_group = ct_log_group

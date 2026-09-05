@@ -1,0 +1,200 @@
+[
+  {
+    "Name": "Management events (all, read + write)",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Management"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::S3::Object",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::S3::Object"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Lambda::Function",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Lambda::Function"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::Model",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::Model"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::AsyncInvoke",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::AsyncInvoke"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::Guardrail",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::Guardrail"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::KnowledgeBase",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::KnowledgeBase"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::AgentAlias",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::AgentAlias"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::InlineAgent",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::InlineAgent"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::FlowAlias",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::FlowAlias"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::Bedrock::Prompt",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::Bedrock::Prompt"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::BedrockAgentCore::Gateway",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::BedrockAgentCore::Gateway"
+        ]
+      }
+    ]
+  }
+]

@@ -66,7 +66,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **255 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **263 offline tests**;
 > tag `v0.5.1-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -135,8 +135,8 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 255 tests**
-> (control-plane + 27 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 263 tests**
+> (control-plane + 31 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
 
@@ -261,6 +261,26 @@ consequential commit now requires the hash-chained ledger write **AND** the S3 O
 un-strandable (durable evidence before any side effect), and the interceptor makes the Cedar context
 fields authoritative (above). On 1.10.0 before it: capture-every-API-call lineage (#168), token chargeback
 vs Cost Explorer (#169), audit-before-finalize (#159), args-hash-bound approvals (#162).
+
+**Enforcement perimeter (2026-09-05, second external review — "an opt-in proxy without SCPs").** Stated
+precisely: Aegis governs every call **on the governed path** preventively, and the `capture_all` trail
+**captures** every Bedrock invocation in the account by *any* principal (CloudTrail records
+`InvokeModel`/`Converse` as management events; the trail now also selects every Bedrock **data**-event
+type — guardrails, agents, flows, knowledge bases, async/bidirectional — and the AgentCore Gateway).
+**Prevention** of a direct call by a principal with its own Bedrock grant is an organization-boundary
+control, now shipped under [`org/`](org/README.md): a corrected SCP (real inference actions only;
+allowlist by `aws:PrincipalArn` — the *role* ARN, never a caller-chosen session name; allowlisted roles
+and the telemetry protected), a VPC-endpoint policy (also applied by the pack's own private network), the
+CloudTrail selector set, a renderer + lint, and a regression fixture proving the review's proposed SCP
+would have denied nothing. Detection: `<prefix>-bedrock-perimeter-bypass` alarms on any caller outside
+the allowlist. The model-invocation store is regulated data under the production profile
+(`-c model_log_lock_days=N` → CMK + Object-Lock COMPLIANCE + retained; the profile gate refuses without
+it) — the drafter's own input is already de-identified before Bedrock (P0-1), so the exposure is
+*bypass callers'* prompts, which is what the alarm catches. Streaming/TTFT: not applicable — there is no
+inline token proxy; the drafter is a synchronous `converse()` inside the workflow. Status, honestly:
+pack-level halves are IaC-asserted (4 new CDK tests) with live validation staged into the next
+private-mode / `capture_all` / `model_logging` gates; the SCP is statically validated until an
+Organization is available (#172). Plan: PERIM-1..8 in the platform gap register.
 
 Evidence: `evidence/AGENTCORE-CEDAR-PERIMETER-2026-09-05.md`, `evidence/AGENTCORE-GUARDRAIL-2026-09-05.md`,
 `evidence/AGENTCORE-GROUNDING-2026-09-05.md` + `evidence/AGENTCORE-GROUNDING-DRAFTER-190-2026-09-05.md`,
