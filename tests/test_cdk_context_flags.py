@@ -58,7 +58,8 @@ def test_production_profile_gate_present_and_complete():
         "the production-profile synth gate is missing from cdk/app.py"
     for control in ("kms=customer-managed", "retention_profile=production-reference", "network_mode=private",
                     "identity_mode!=sandbox", "oidc_issuer_url", "waf=1", "perimeter=1", "model_logging=1",
-                    "capture_all=1", "capture_lock_mode=COMPLIANCE"):
+                    "capture_all=1", "capture_lock_mode=COMPLIANCE",
+                    "manifest signed & verified"):
         assert control in src, f"the production gate no longer enforces: {control}"
     # the only sanctioned bypass is the explicit, audited override
     assert "allow_insecure_prod" in src, "the audited-exception override must remain explicit"

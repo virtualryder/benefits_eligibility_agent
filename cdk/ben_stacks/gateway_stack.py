@@ -132,8 +132,26 @@ class GatewayStack(cdk.Stack):
             code=lambda_.Code.from_asset(str(pathlib.Path(__file__).resolve().parents[1] / "gateway_provider")),
             handler="handler.handler")
         ssm_param = f"/{prefix}-eligibility/gateway-url"
+        # LEAST-PRIVILEGE (external review): the attachment provider previously held bedrock-agentcore:* —
+        # far broader than it needs, and a standing ability to run ANY AgentCore control-plane action.
+        # Scoped to the EXACT CRUD the handler performs (cdk/gateway_provider/handler.py). UpdateGateway
+        # is retained because the provider must attach the policy engine + set ENFORCE during deploy; the
+        # deployed ENFORCE mode is asserted by scripts/*_proof.py on every gate, so a drift to LOG_ONLY is
+        # caught. (Resource-scoping these to this account/region is a further tightening; kept "*" here
+        # because several AgentCore List/Create actions are account-level and reject a resource condition.)
         provider_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["bedrock-agentcore:*"],   # control-plane CRUD for engine/gateway/target/policy
+            sid="AgentCoreControlPlaneCrud",
+            actions=[
+                "bedrock-agentcore:ListPolicyEngines", "bedrock-agentcore:CreatePolicyEngine",
+                "bedrock-agentcore:GetPolicyEngine", "bedrock-agentcore:DeletePolicyEngine",
+                "bedrock-agentcore:ListGateways", "bedrock-agentcore:CreateGateway",
+                "bedrock-agentcore:GetGateway", "bedrock-agentcore:UpdateGateway",
+                "bedrock-agentcore:DeleteGateway",
+                "bedrock-agentcore:ListGatewayTargets", "bedrock-agentcore:CreateGatewayTarget",
+                "bedrock-agentcore:GetGatewayTarget", "bedrock-agentcore:DeleteGatewayTarget",
+                "bedrock-agentcore:CreatePolicy", "bedrock-agentcore:GetPolicy",
+                "bedrock-agentcore:ListPolicies", "bedrock-agentcore:DeletePolicy",
+            ],
             resources=["*"]))
         provider_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["ssm:PutParameter", "ssm:DeleteParameter"],

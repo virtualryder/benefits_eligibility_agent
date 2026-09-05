@@ -493,3 +493,32 @@ def test_governed_lambdas_are_vpc_isolated_when_private():
                                         "SecurityGroupIds": Match.any_value()})}))
     # the VPC is isolated: no NAT gateway exists
     Template.from_stack(net).resource_count_is("AWS::EC2::NatGateway", 0)
+
+
+# ── External-review IAM hardening (Tier 1) ─────────────────────────────────────
+
+def test_drafter_bedrock_invocation_requires_a_guardrail():
+    """MANDATORY-GUARDRAIL IAM CONDITION: when a guardrail is configured, the drafter's
+    bedrock:InvokeModel is DENIED unless the request carries a guardrail (Null present-check on
+    bedrock:GuardrailIdentifier) — so a compromised/mis-coded drafter cannot make an UNGOVERNED model
+    call that bypasses the guardrail."""
+    t = json.dumps(_compute_with_guardrail().to_json())
+    assert '"bedrock:GuardrailIdentifier"' in t, "the mandatory-guardrail IAM condition is missing from the drafter role"
+    assert '"bedrock:InvokeModel"' in t
+
+
+def test_agentcore_attachment_provider_is_least_privilege():
+    """The AgentCore attachment provider must NOT hold bedrock-agentcore:* — only the enumerated
+    control-plane CRUD it performs. Guards against a standing 'any AgentCore action' grant (a broad
+    grant could, e.g., UpdateGateway to flip ENFORCE->LOG_ONLY outside the deploy path)."""
+    from ben_stacks.gateway_stack import GatewayStack
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "dp", prefix="ben-ptest", retention_profile="sandbox-demo")
+    compute = ComputeStack(app, "cp", prefix="ben-ptest", asset_dir=asset, data=data)
+    identity = IdentityStack(app, "ip", prefix="ben-ptest")
+    gateway = GatewayStack(app, "gp", prefix="ben-ptest", compute=compute, identity=identity)
+    g = json.dumps(Template.from_stack(gateway).to_json())
+    assert '"bedrock-agentcore:*"' not in g, "the attachment provider still holds bedrock-agentcore:* (over-privileged)"
+    assert '"bedrock-agentcore:UpdateGateway"' in g and '"bedrock-agentcore:CreatePolicy"' in g, \
+        "the provider is missing the enumerated control-plane actions it needs"

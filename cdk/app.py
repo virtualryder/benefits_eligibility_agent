@@ -107,6 +107,25 @@ env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
 
 
+def _manifest_verifies():
+    """Deep-dive #202: the agent manifest must ship SIGNED and the signature must VERIFY, or production
+    synth is refused. Verification is offline (embedded Ed25519 public key over the canonical manifest
+    bytes); an unsigned (`signing.signature: null`) or edited manifest fails closed."""
+    try:
+        import sys as _sys
+        _lc = os.path.join(REPO, "lib", "controls")
+        if _lc not in _sys.path:
+            _sys.path.insert(0, _lc)
+        import verify_manifest as _vm
+        ok, reason = _vm.verify_file(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"))
+        if not ok:
+            print("manifest verification: FAILED — %s" % reason)
+        return ok
+    except Exception as exc:  # fail closed on any error
+        print("manifest verification: ERROR — %s" % type(exc).__name__)
+        return False
+
+
 def _require_production_controls(app, env_name, profile):
     """PRODUCTION PROFILE GATE (deep-dive #6). `env=prod*` (or `-c profile=production`) REFUSES to
     synthesize unless EVERY production control is explicitly enabled, so "production" fails closed on an
@@ -136,6 +155,7 @@ def _require_production_controls(app, env_name, profile):
         "model_logging=1": truthy("model_logging"),
         "capture_all=1": truthy("capture_all"),
         "capture_lock_mode=COMPLIANCE": str(ctx("capture_lock_mode") or "GOVERNANCE").upper() == "COMPLIANCE",
+        "manifest signed & verified (deep-dive #202)": _manifest_verifies(),
     }
     missing = [k for k, ok in required.items() if not ok]
     if missing:

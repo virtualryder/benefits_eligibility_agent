@@ -252,5 +252,5 @@ pack: SLG                        # bar 9 — pack compatibility declaration
 
 signing:                         # bar 8 — signed by a known publisher
   publisher: virtualryder
-  algorithm: rsassa-pss-sha256
-  signature: null                # UNSIGNED — delivery gate blocks until signed
+  algorithm: Ed25519
+  signature: manifest.sig

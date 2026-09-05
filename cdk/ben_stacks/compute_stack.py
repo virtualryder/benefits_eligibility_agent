@@ -386,9 +386,16 @@ class ComputeStack(cdk.Stack):
         # sanitized-store readers (content channel: the drafter loads masked text; guards/assess verify)
         for f in (self.core, self.guards, self.assess):
             data.sanitized_table.grant(f, "dynamodb:GetItem")
-        # drafter: Bedrock only
+        # drafter: Bedrock only. MANDATORY-GUARDRAIL IAM CONDITION (external review): when a guardrail is
+        # configured, the drafter's model invocations are DENIED unless the request carries a guardrail
+        # (`bedrock:GuardrailIdentifier` must be present) - so a compromised or mis-coded drafter cannot
+        # make an UNGOVERNED Bedrock call that bypasses the guardrail. This is the AWS-documented pattern
+        # for enforcing a mandatory guardrail at the IAM layer (Null present-check on the condition key).
+        _has_guardrail = bool(guardrail_id) or bool(self.guardrail)
         self.core.add_to_role_policy(iam.PolicyStatement(
-            actions=["bedrock:InvokeModel"], resources=["*"]))
+            sid="DrafterBedrockGuardrailRequired" if _has_guardrail else "DrafterBedrock",
+            actions=["bedrock:InvokeModel"], resources=["*"],
+            conditions=({"Null": {"bedrock:GuardrailIdentifier": "false"}} if _has_guardrail else None)))
         if guardrail_id:
             # Converse with guardrailConfig requires ApplyGuardrail on the specific guardrail.
             self.core.add_to_role_policy(iam.PolicyStatement(
