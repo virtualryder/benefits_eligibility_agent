@@ -32,6 +32,7 @@ from ben_stacks.workflow_stack import WorkflowStack
 from ben_stacks.identity_stack import IdentityStack
 from ben_stacks.observability_stack import ObservabilityStack
 from ben_stacks.gateway_stack import GatewayStack
+from ben_stacks.lineage_stack import LineageStack
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -153,8 +154,18 @@ observability = ObservabilityStack(app, f"{prefix}-observability", prefix=prefix
                                    budget_usd=float(app.node.try_get_context("budget_usd") or 0),
                                    runtime_role_name=app.node.try_get_context("runtime_role") or "")
 
+# #168 (capture EVERY API call): -c capture_all=1 provisions ONE account trail (management ALL +
+# S3/Lambda data events, multi-region, file-validation on) delivered to CloudWatch Logs AND a WORM
+# Object-Lock bucket, so scripts/lineage_proof.py can prove every governed API call is captured and
+# joinable into one lineage. Account-level + cost -> opt-in; torn down after the gate.
+lineage = None
+if str(app.node.try_get_context("capture_all") or "").lower() in ("1", "true", "yes"):
+    lineage = LineageStack(app, f"{prefix}-lineage", prefix=prefix,
+                           retention_days=int(app.node.try_get_context("capture_retention_days") or 1),
+                           lock_mode=app.node.try_get_context("capture_lock_mode") or "GOVERNANCE")
+
 for s in (data, compute, workflow, identity, observability, gateway) + ((network,) if network else ()) \
-        + tuple(tenant_data.values()):
+        + tuple(tenant_data.values()) + ((lineage,) if lineage else ()):
     cdk.Tags.of(s).add("app", "benefits-eligibility-agent")
     cdk.Tags.of(s).add("env", env_name)
     cdk.Tags.of(s).add("cost-center", "governed-agents")
