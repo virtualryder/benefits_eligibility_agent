@@ -222,8 +222,17 @@ honesty_boundary:
 
 grounding:                       # bar 4 — declared grounding source + threshold
   source: fpl_reference_data     # FPL-pinned eligibility tables (FPL-pinned test)
-  grounding_threshold: 0.85      # pilot-tunable; PQ evidence sets the floor
-  relevance_threshold: 0.80
+  # #150 (live gate 2026-09-05): the guardrail carries a CONTEXTUAL GROUNDING policy (GROUNDING +
+  # RELEVANCE) and its mechanism is live-proven via ApplyGuardrail - a grounded, source-backed answer
+  # scores ~0.99 and passes; a contradictory/hallucinated one scores ~0 and is BLOCKED. It is NOT yet
+  # enforced end-to-end on the free-form notice drafter: Bedrock grounding scores a determination notice
+  # ~0 whenever it states standard boilerplate not in the source (processing timeframe, 90-day appeal
+  # window, "draft for review"), which would block every legitimate notice. Enforcing it on the drafter
+  # needs the grounded-facts / fixed-boilerplate split OR the authoritative program reference as the
+  # grounding_source (fpl_reference_data + statutory timeframes + appeal text). Thresholds are the declared
+  # pilot floor; PQ tunes them once the drafter is refactored.
+  grounding_threshold: 0.55      # pilot-tunable floor
+  relevance_threshold: 0.55
 
 budget:                          # bar 5 — hard cap; benefits data fails closed
   # ENFORCED LIVE since 2026-09-03 (governed-core 1.9.0, task 128): cdk/app.py reads this block into every

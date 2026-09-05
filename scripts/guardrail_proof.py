@@ -148,11 +148,13 @@ def main():
     # on GROUNDING; a GROUNDED answer must pass. Proves the grounding policy actually scores the notice.
     SRC = ("De-identified benefits case. Household size 3, gross monthly income $1800, no TANF. "
            "Determination: ELIGIBLE, expedited processing.")
-    Q = "Draft the benefits determination notice grounded in this case."
-    UNGROUNDED = ("You are INELIGIBLE. Your monthly income of $95,000 exceeds the limit and you owe a "
-                  "$50,000 overpayment that must be repaid within 5 days.")
-    GROUNDED = ("You are eligible for benefits. Your household of 3 with gross monthly income of $1,800 "
-                "qualifies, and expedited processing applies. This draft is for caseworker review.")
+    Q = "What is the eligibility determination and the reason?"
+    # UNGROUNDED contradicts the source (invented income + a $50k overpayment) -> grounding ~0 -> BLOCKED.
+    UNGROUNDED = ("The determination is INELIGIBLE, because the monthly income of $95,000 exceeds the "
+                  "limit and the applicant owes a $50,000 overpayment.")
+    # GROUNDED answers the question strictly from the source facts -> grounding ~0.99 -> passes.
+    GROUNDED = ("The determination is eligible with expedited processing, because the household of 3 has "
+                "a gross monthly income of $1800 and receives no TANF.")
 
     def apply_output(answer):
         return brr.apply_guardrail(

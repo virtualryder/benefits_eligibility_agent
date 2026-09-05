@@ -69,8 +69,16 @@ class ComputeStack(cdk.Stack):
                     bedrock.CfnGuardrail.ContextualGroundingPolicyConfigProperty(
                         filters_config=grounding_filters) if grounding_filters else None),
             )
+            # A guardrail VERSION is an immutable snapshot; CfnGuardrailVersion does NOT auto-republish
+            # when the guardrail's policies change (found live 2026-09-05: a tuned grounding threshold
+            # updated DRAFT but the pinned v1 the drafter enforces stayed stale). Embed a config signature
+            # in the description so a policy change replaces the version -> a fresh published version whose
+            # attr_version flows into the drafter's GUARDRAIL_VERSION env.
+            _cfg_sig = "pa=%s;pii=%d;gnd=%s;rel=%s" % (
+                pa, len(pii), gnd.get("grounding_threshold"), gnd.get("relevance_threshold"))
             ver = bedrock.CfnGuardrailVersion(self, "GuardrailVersion",
-                                              guardrail_identifier=self.guardrail.attr_guardrail_id)
+                                              guardrail_identifier=self.guardrail.attr_guardrail_id,
+                                              description="aegis-guardrail cfg " + _cfg_sig)
             guardrail_id = self.guardrail.attr_guardrail_id
             guardrail_version = ver.attr_version
             self.guardrail_arn = self.guardrail.attr_guardrail_arn

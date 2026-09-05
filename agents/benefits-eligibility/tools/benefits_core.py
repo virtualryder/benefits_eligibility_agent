@@ -68,19 +68,17 @@ def _draft(e):
     if case is None:
         return {"error": "refused: case content does not match the signed sanitized artifact",
                 "drafted_by": None, "sanitized_ref_verified": True, "content_bound": False}
-    # #150 contextual grounding: when a guardrail is applied, tag the content with guardContent qualifiers
-    # so the guardrail's CONTEXTUAL GROUNDING policy actually runs - the de-identified case is the
-    # grounding_source the notice must be supported by, and the query is the ask. Without these qualifiers
-    # the grounding filters are inert. (Plain text when no guardrail is wired.)
-    if GUARDRAIL_ID:
-        content = [
-            {"guardContent": {"text": {"text": case, "qualifiers": ["grounding_source"]}}},
-            {"guardContent": {"text": {"text": "Draft the benefits determination notice grounded in this "
-                                               "de-identified case and its determination.",
-                                       "qualifiers": ["query"]}}},
-        ]
-    else:
-        content = [{"text": "De-identified case + determination:\n" + case}]
+    # #150 contextual grounding: the guardrail carries a CONTEXTUAL GROUNDING policy and its mechanism is
+    # live-proven (blocks ungrounded/contradictory output, passes a grounded answer). It is NOT wired onto
+    # this free-form notice via guardContent qualifiers, because Bedrock contextual grounding scores a
+    # determination notice ~0 on GROUNDING whenever it states standard boilerplate not present in the
+    # grounding source (processing timeframe, the 90-day appeal window, "draft for review") - even though
+    # RELEVANCE is 1.0 - which would block EVERY legitimate notice. Enforcing grounding end-to-end here
+    # requires either (a) generating only source-backed facts under grounding + appending the fixed
+    # notice boilerplate deterministically, or (b) passing the authoritative program reference
+    # (fpl_reference_data + statutory timeframes + appeal-rights text) as the grounding_source. Tracked as
+    # a follow-up; PROMPT_ATTACK + PII masking still apply to every draft. (See #150 evidence.)
+    content = [{"text": "De-identified case + determination:\n" + case}]
     kwargs = dict(
         modelId=DRAFT_MODEL_ID,
         system=[{"text": _SYSTEM}],
