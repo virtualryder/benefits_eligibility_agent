@@ -43,11 +43,13 @@ qualifiers, on the pinned version the drafter enforces):
 
 - **Contextual grounding: integrated as IaC and live-proven at the mechanism level** (blocks ungrounded,
   passes grounded). This closes the "declared but not wired" gap for bar-4 grounding.
-- **End-to-end enforcement on the notice drafter is deferred** to one of: (a) generate only source-backed
-  facts under grounding and append the fixed notice boilerplate deterministically (outside the guardrail
-  scope), or (b) pass the authoritative program reference (`fpl_reference_data` + statutory timeframes +
-  appeal-rights text) as the `grounding_source` so a faithful notice is grounded in it. Both tie to the
-  authoritative-inputs work (#147/#163). Tracked as a follow-up.
+- **End-to-end enforcement on the notice drafter — DONE (#190).** Option (a) is implemented and
+  live-proven: the drafter generates only the grounded factual core (grounding-scored) and appends the
+  fixed notice boilerplate deterministically outside the guardrail scope. A faithful notice passes; a
+  hallucinated determination is grounding-blocked fail-closed. See
+  `evidence/AGENTCORE-GROUNDING-DRAFTER-190-2026-09-05.md` (10/10 PASS). Option (b) — grounding a full
+  notice on the authoritative program reference (`fpl_reference_data` + statutory timeframes + appeal
+  text) — remains a future enhancement tied to the authoritative-inputs work (#147/#163).
 
 ## Teardown
 

@@ -64,3 +64,65 @@ def test_draft_converse_is_tagged_with_correlation_request_metadata(monkeypatch)
     assert meta["trace_id"] == "6a99b48df6fc6e20d82d074efa877cbd" and meta["execution_arn"].endswith(":execution:wf:x-1")
     assert "case_id" not in meta and "CASE-SECRET-1" not in json.dumps(meta), "no case id / content in requestMetadata"
     assert len(meta) <= 16 and all(len(k) <= 256 and len(v) <= 256 and core._META_OK.search(v) is None for k, v in meta.items())
+
+
+# --- #190: contextual grounding enforced end-to-end on the drafter -----------------------------------
+
+def test_draft_grounds_core_and_appends_boilerplate_when_guardrail_bound(monkeypatch):
+    """#190: with a guardrail bound, the model is asked for ONLY the grounded factual core (case tagged
+    grounding_source + a query, via guardContent, so the CONTEXTUAL GROUNDING filter scores the model's
+    factual claims); the fixed notice boilerplate is appended DETERMINISTICALLY after the call, so a
+    legitimate notice is never blocked by boilerplate the grounding source doesn't contain."""
+    core = load("benefits_core")
+    seen, stored = {}, {}
+
+    class _Spy(_FakeBedrock):
+        def converse(self, **kw):
+            seen.update(kw)
+            return super().converse(**kw)
+    monkeypatch.setattr(core.boto3, "client", lambda *a, **k: _Spy())
+    monkeypatch.setattr(core, "GUARDRAIL_ID", "gr-abc123")   # module constant, set at import
+    monkeypatch.setattr(core, "GUARDRAIL_VERSION", "1")
+    monkeypatch.setenv("CASE_TABLE", "ben-test-case-store")
+    import case_store
+    monkeypatch.setattr(case_store, "put_case",
+                        lambda text, kind="application", case_id="": (stored.update(text=text), "case-notice-190")[1])
+    r = core.handler({"sanitized_ref": make_sanitized_ref(CASE), "case": CASE, "deidentified": True}, None)
+
+    # the guardrail is bound on the Converse call, on the PINNED enforced version
+    assert seen.get("guardrailConfig") == {"guardrailIdentifier": "gr-abc123", "guardrailVersion": "1"}
+    # grounded-core system prompt, not the full-notice system prompt
+    assert seen["system"] == [{"text": core._SYSTEM_GROUNDED_CORE}]
+    # the case is the grounding_source and a query is present -> grounding scores the model's claims
+    quals = [q for block in seen["messages"][0]["content"] for q in block.get("guardContent", {}).get("text", {}).get("qualifiers", [])]
+    assert "grounding_source" in quals and "query" in quals
+    assert CASE in json.dumps(seen["messages"][0]["content"]), "the de-identified case must be the grounding source"
+    # the boilerplate was appended deterministically (outside the model / grounding scope)
+    assert stored["text"].endswith(core._NOTICE_BOILERPLATE)
+    assert stored["text"].startswith(NOTICE), "the grounded core precedes the fixed boilerplate"
+    assert r.get("notice_ref") == "case-notice-190" and r.get("guardrail_applied") is True
+
+
+def test_draft_fail_closed_on_guardrail_intervention(monkeypatch):
+    """#190/#166: ANY guardrail intervention on the draft is fail-closed - no notice_ref is minted, even
+    when the guardrail substitutes a non-empty blocked message. A hallucinated/ungrounded determination
+    is blocked here."""
+    core = load("benefits_core")
+
+    class _Blocked(_FakeBedrock):
+        def converse(self, **kw):
+            return {"output": {"message": {"content": [{"text": "Sorry, the model cannot assist."}]}},
+                    "stopReason": "guardrail_intervened"}
+    monkeypatch.setattr(core.boto3, "client", lambda *a, **k: _Blocked())
+    monkeypatch.setattr(core, "GUARDRAIL_ID", "gr-abc123")
+    monkeypatch.setattr(core, "GUARDRAIL_VERSION", "1")
+    monkeypatch.setenv("CASE_TABLE", "ben-test-case-store")
+    import case_store
+    minted = {"called": False}
+    monkeypatch.setattr(case_store, "put_case",
+                        lambda *a, **k: minted.__setitem__("called", True) or "case-should-not-happen")
+    r = core.handler({"sanitized_ref": make_sanitized_ref(CASE), "case": CASE, "deidentified": True}, None)
+
+    assert r.get("guardrail") == "BLOCKED" and r.get("drafted_by") is None
+    assert "notice_ref" not in r and "notice" not in r
+    assert minted["called"] is False, "a blocked draft must never mint a notice_ref"

@@ -22,6 +22,29 @@ _SYSTEM = (
     "rights. (5) This is a DRAFT for human review, not a final decision. Output the notice text only."
 )
 
+# #190: to enforce CONTEXTUAL GROUNDING end-to-end, the model generates ONLY the grounded factual core
+# (determination + plain reason, strictly from the case facts) - which the grounding filter can score
+# ~1.0 - and the standard notice boilerplate (timeframe/appeal-rights/draft framing), which is NOT in the
+# grounding source and would otherwise sink the grounding score, is appended DETERMINISTICALLY afterward
+# (fixed template, never model-invented specifics). So grounding gates the model's factual claims (a
+# hallucinated determination is blocked) without blocking a legitimate notice.
+_SYSTEM_GROUNDED_CORE = (
+    "You write ONLY the factual core of a benefits eligibility determination, for caseworker review. You "
+    "are given an ALREADY DE-IDENTIFIED case plus its determination. Output 2-4 plain-language sentences "
+    "stating (a) the determination (eligible / ineligible / needs review) and (b) the reason, using ONLY "
+    "facts present in the provided case. Preserve every [REDACTED:...] placeholder verbatim; never guess "
+    "redacted values. Do NOT add processing timeframes, appeal/fair-hearing rights, dollar amounts, dates, "
+    "or any detail not in the case - those are appended separately. Output the factual core text only."
+)
+# Fixed, deterministic boilerplate appended to the grounded core. No invented specifics: program-specific
+# values (timeframe, appeal deadline) are left as caseworker placeholders so nothing ungrounded is asserted.
+_NOTICE_BOILERPLATE = (
+    "\n\nProcessing timeframe: per program policy [caseworker to insert].\n"
+    "Appeal / fair-hearing rights: you may request a fair hearing per program policy "
+    "[caseworker to insert deadline].\n"
+    "This is a DRAFT for caseworker review, not a final decision."
+)
+
 
 def _coerce(event):
     e = event or {}
@@ -68,20 +91,26 @@ def _draft(e):
     if case is None:
         return {"error": "refused: case content does not match the signed sanitized artifact",
                 "drafted_by": None, "sanitized_ref_verified": True, "content_bound": False}
-    # #150 contextual grounding: the guardrail carries a CONTEXTUAL GROUNDING policy and its mechanism is
-    # live-proven (blocks ungrounded/contradictory output, passes a grounded answer). It is NOT wired onto
-    # this free-form notice via guardContent qualifiers, because Bedrock contextual grounding scores a
-    # determination notice ~0 on GROUNDING whenever it states standard boilerplate not present in the
-    # grounding source (processing timeframe, the 90-day appeal window, "draft for review") - even though
-    # RELEVANCE is 1.0 - which would block EVERY legitimate notice. Enforcing grounding end-to-end here
-    # requires either (a) generating only source-backed facts under grounding + appending the fixed
-    # notice boilerplate deterministically, or (b) passing the authoritative program reference
-    # (fpl_reference_data + statutory timeframes + appeal-rights text) as the grounding_source. Tracked as
-    # a follow-up; PROMPT_ATTACK + PII masking still apply to every draft. (See #150 evidence.)
-    content = [{"text": "De-identified case + determination:\n" + case}]
+    # #190 contextual grounding, enforced end-to-end. When a guardrail is applied, the model generates ONLY
+    # the GROUNDED FACTUAL CORE (determination + reason, strictly from the case) tagged with guardContent
+    # grounding_source + query qualifiers, so the guardrail's CONTEXTUAL GROUNDING filter scores the model's
+    # factual claims: a faithful core passes (~1.0), a hallucinated/contradictory one is BLOCKED fail-closed.
+    # The standard notice boilerplate (timeframe / appeal rights / draft framing) - which is not in the
+    # grounding source and would sink the grounding score - is appended DETERMINISTICALLY after the model
+    # call (fixed template, no invented specifics), so a legitimate notice is never blocked by boilerplate.
+    if GUARDRAIL_ID:
+        system = [{"text": _SYSTEM_GROUNDED_CORE}]
+        content = [
+            {"guardContent": {"text": {"text": case, "qualifiers": ["grounding_source"]}}},
+            {"guardContent": {"text": {"text": "What is the eligibility determination and the reason, "
+                                               "based only on these case facts?", "qualifiers": ["query"]}}},
+        ]
+    else:
+        system = [{"text": _SYSTEM}]
+        content = [{"text": "De-identified case + determination:\n" + case}]
     kwargs = dict(
         modelId=DRAFT_MODEL_ID,
-        system=[{"text": _SYSTEM}],
+        system=system,
         messages=[{"role": "user", "content": content}],
         inferenceConfig={"maxTokens": 700, "temperature": 0.2},
     )
@@ -118,6 +147,10 @@ def _draft(e):
             # blocked draft; the case surfaces to the caseworker as draft-blocked instead.
             return {"error": "guardrail blocked the draft (fail-closed)", "drafted_by": None,
                     "guardrail": "BLOCKED", "guardrail_version": GUARDRAIL_VERSION}
+        # #190: the model output is the GROUNDING-passed factual core; append the fixed notice boilerplate
+        # deterministically (not model-generated, not grounding-scored) to form the full notice.
+        if GUARDRAIL_ID:
+            notice = notice + _NOTICE_BOILERPLATE
         out = {"drafted_by": DRAFT_MODEL_ID, "chars": len(notice),
                "guardrail_applied": bool(GUARDRAIL_ID), "deidentified_input": True,
                "budget": {k: metered.get(k) for k in ("metered", "tokens", "usd_micro", "used_tokens", "pct_tokens", "price_version")}}

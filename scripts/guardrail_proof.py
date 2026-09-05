@@ -91,9 +91,12 @@ def main():
     time.sleep(4)
     tok = access_token(pool, client, a.region, "cw-gr", pw)
 
-    # mint a signed sanitized_ref via mask_pii
+    # mint a signed sanitized_ref via mask_pii. #190: a real draft_notice input is the de-identified case
+    # PLUS its determination - the grounded-core drafter grounds the notice on that, so include the
+    # determination in the masked source (otherwise a stated determination is legitimately ungrounded).
     m = Mcp(url, tok); m.init()
-    mask = m.tool(MASK, {"case": SYNTHETIC_CASE + " " + str(uuid.uuid4())})
+    mask = m.tool(MASK, {"case": SYNTHETIC_CASE + " Determination: ELIGIBLE, expedited processing. "
+                         + str(uuid.uuid4())})
     sr = tool_result(mask).get("sanitized_ref")
     ev["steps"].append({"step": "sanitized_ref", "have_ref": bool(sr)})
 
