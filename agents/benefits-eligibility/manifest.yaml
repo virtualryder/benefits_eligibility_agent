@@ -193,7 +193,7 @@ policies:
   - { name: require_entitlement,      kind: forbid, require_entitlement: true }
   # TEMPORAL: no governed action outside the deployment's service window (within_service_window is set by the
   # gateway interceptor from the real request time; caller values are overwritten).
-  - { name: require_service_window,   kind: forbid, require_service_window: true, scope: temporal }
+  - { name: require_service_window,   kind: forbid, require_service_window: true, scope: temporal, actions: [assess_eligibility, redetermine, detect_overpayment, draft_notice] }
   # CONSENT + PURPOSE on the eligibility decision. Coarse gateway gates on the authoritative server-side controls.
   - { name: consent_purpose_before_assess, kind: forbid, action: assess_eligibility, require_consent: true, allowed_purposes: [eligibility, redetermination] }
   # BUDGET on the model-spending drafter (budget_ok is interceptor-injected from the live per-tenant meter).

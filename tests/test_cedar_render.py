@@ -58,11 +58,11 @@ def policies():
 NINE_CONDITIONS = [
     ("ben_require_entitlement",            'principal.getTag("custom:tools") != ""'),        # 1 entitlement
     ("ben_mask_before_assess",             "context.input.deidentified == true"),            # 2 data-class
-    ("ben_consent_purpose_before_assess",  "context.input.consent == true"),                 # 3 consent
+    ("ben_consent_purpose_before_assess",  "context.input has consent && context.input.consent == true"),  # 3 consent
     ("ben_consent_purpose_before_assess",  'context.input.purpose == "eligibility"'),        # 4 purpose
-    ("ben_budget_before_draft",            "context.input.budget_ok == true"),               # 5 budget
-    ("ben_require_service_window",         "context.input.within_service_window == true"),   # 6 temporal
-    ("ben_amount_cap_overpayment",         "context.input.prior_monthly_benefit <= 5000"),   # 7 quantitative
+    ("ben_budget_before_draft",            "context.input has budget_ok && context.input.budget_ok == true"),  # 5 budget
+    ("ben_require_service_window",         "context.input has within_service_window && context.input.within_service_window == true"),  # 6 temporal
+    ("ben_amount_cap_overpayment",         'context.input.prior_monthly_benefit.lessThanOrEqual(decimal("5000.0"))'),  # 7 quantitative
     ("ben_require_tenant",                 'principal.hasTag("custom:tenant")'),             # 8 tenant
     ("ben_no_self_commit",                 'AgentCore::Action::"ben-core___finalize_determination"'),  # 9 SoD
 ]
@@ -111,3 +111,76 @@ def test_every_statement_parses_under_cedar():
     res = cedarpy.is_authorized(req, policy_set, [])
     # Deny-by-default with an empty context and no matching permit condition.
     assert "Deny" in str(res.decision)
+
+
+# ---------------------------------------------------------------------------
+# The policies/*.cedar files are the SOURCE OF TRUTH for the CDK deploy
+# (gateway_stack globs them). These checks lint them against the rules the GA
+# AgentCore Policy engine actually enforces at create-policy time - rules that
+# schema-less cedarpy does NOT catch, and that a live gate surfaced (2026-09-05):
+#   1. an UNSCOPED forbid (action, resource is Gateway) must NOT read context.input
+#      - built-in actions (InvokeAgent/InvokeLLM/Mcp/...) carry no `input`.
+#   2. every optional context.input.<field> access must be presence-guarded
+#      (`context.input has <field>`); `deidentified` is a required tool field (exempt).
+#   3. a `number` tool field (here prior_monthly_benefit) is a Cedar DECIMAL: compare
+#      with the decimal extension, never the Long `<=`/`>=` operators.
+# ---------------------------------------------------------------------------
+import glob
+import re
+
+POLICIES_DIR = os.path.join(ROOT, "policies")
+REQUIRED_INPUT_FIELDS = {"deidentified"}   # required in the tool schema -> no `has` guard needed
+
+
+def _cedar_files():
+    return sorted(glob.glob(os.path.join(POLICIES_DIR, "*.cedar")))
+
+
+def test_cedar_files_exist():
+    names = {os.path.basename(p) for p in _cedar_files()}
+    for expected in ("require_entitlement.cedar", "require_service_window.cedar",
+                     "consent_purpose_before_assess.cedar", "budget_before_draft.cedar",
+                     "amount_cap_overpayment.cedar"):
+        assert expected in names, "missing %s" % expected
+
+
+@pytest.mark.parametrize("path", _cedar_files())
+def test_cedar_file_parses(path):
+    cedarpy = pytest.importorskip("cedarpy")
+    body = open(path, encoding="utf-8").read()
+    stmt = re.sub(r'AgentCore::Gateway::"arn:[^"]+"',
+                  'AgentCore::Gateway::"%s"' % GW_ARN, body)
+    req = {"principal": 'AgentCore::User::"u"',
+           "action": 'AgentCore::Action::"assess-eligibility___assess_eligibility"',
+           "resource": 'AgentCore::Gateway::"%s"' % GW_ARN, "context": {}}
+    cedarpy.is_authorized(req, stmt, [])   # raises on a syntax error
+
+
+@pytest.mark.parametrize("path", _cedar_files())
+def test_cedar_ga_schema_rules(path):
+    body = open(path, encoding="utf-8").read()
+    # strip // comments so the lint sees only the statement
+    code = "\n".join(re.sub(r"//.*$", "", ln) for ln in body.splitlines())
+
+    reads_input = "context.input" in code
+    # Rule 1: an unscoped forbid must not read context.input.
+    unscoped = re.search(r"forbid\s*\(\s*principal\s*,\s*action\s*,", code) is not None
+    if reads_input:
+        assert not unscoped, (
+            "%s: an UNSCOPED forbid reads context.input - the GA engine rejects this "
+            "(built-in actions have no input). Scope it to specific tool actions." % os.path.basename(path))
+
+    # Rule 2: every optional context.input.<field> access is presence-guarded.
+    accessed = set(re.findall(r"context\.input\.([A-Za-z_][A-Za-z0-9_]*)", code))
+    guarded = set(re.findall(r"context\.input has ([A-Za-z_][A-Za-z0-9_]*)", code))
+    for field in accessed:
+        if field in REQUIRED_INPUT_FIELDS:
+            continue
+        assert field in guarded, (
+            "%s: optional context.input.%s is accessed without a `context.input has %s` guard "
+            "(the GA engine rejects unguarded optional-attribute access)." % (os.path.basename(path), field, field))
+
+    # Rule 3: no bare Long comparison on a decimal amount field; use the decimal extension.
+    assert not re.search(r"context\.input\.prior_monthly_benefit\s*(<=|>=|<|>)\s*\d", code), (
+        "%s: prior_monthly_benefit is a Cedar decimal - use .lessThanOrEqual(decimal(\"..\")), "
+        "not a Long comparison." % os.path.basename(path))
