@@ -9,7 +9,7 @@
 |---|---|
 | Tag | `v0.4.0-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-03 after the kill-switch and budget gates passed on it. |
 | Commit SHA | `git rev-list -n1 v0.4.0-pilot-rc1` |
-| Test count at the tag | **187** offline tests (186 local + 1 CI-only); 18 CDK assertions |
+| Test count at the tag | **200** offline tests (199 local + 1 CI-only); 18 CDK assertions |
 | Governance core | `governed-core` **1.9.0**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`); `lib/core.lock` locked at 1.9.0 |
 | What this tag adds over `v0.3.0-pilot-rc1` | **Kill Switch on the AgentCore path** — `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md` (env `mt5`, 2 tenants, real Runtime, **29/29**, 13.9 s to effect). **Per-tenant token + USD budget** — `evidence/AGENTCORE-BUDGET-2026-09-03.md` (env `mt6`, **24/24**: meter == model-invocation log to the token, cap refusals at gateway / drafter / runtime incl. mid-session, 60/85 % alarms, AWS Budgets ceiling → kill switch) + `-regression.json` (0 unexpected). Two drafter fixes found by that gate: the append-only ledger grant so its workflow-hop DENIED record lands, and `requestMetadata` tagging on its server-side `Converse`. |
 | Carried unchanged from `v0.3.0-pilot-rc1` | AgentCore ENFORCE from-zero, hybrid multi-tenant (2 tenants), per-tenant audit routing 12/12, full transparency 13/13 per tenant, consolidated 111 gate + strict PII canary + 0-unexpected sweep (`ben-mt4`, 2026-09-02) — the control code those runs exercised is unchanged; the deltas are the two controls above and the drafter fixes, each proven on their own from-zero deployments (`mt5`, `mt6`). |
@@ -36,7 +36,7 @@
 | Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. |
 | Commit SHA | the commit carrying tag `v0.1.2-pilot-rc1` (`git rev-list -n1 v0.1.2-pilot-rc1`) |
 | Test count at the tag | **101** offline tests at the moment `v0.1.2-pilot-rc1` was cut — a record of that tag, not a claim about the current tree <!-- count-gate:historical --> |
-| Test count on current main | **187 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
+| Test count on current main | **200 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |

@@ -161,14 +161,41 @@ def main():
                     'unless { principal.hasTag("custom:tenant") || (principal.hasTag("cognito:groups") '
                     '&& principal.getTag("cognito:groups") like "*tenant_*") };')
             mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
+        elif kind == "forbid" and p.get("require_entitlement"):
+            # ENTITLEMENT (zero-default tools): a principal with no NON-EMPTY custom:tools entitlement
+            # claim may call NOTHING - being in the role group is not enough. Defense in depth for the
+            # gateway interceptor, which already drops the whole tool list when the claim is missing.
+            stmt = ('forbid(principal, action, resource is AgentCore::Gateway) '
+                    'unless { principal.hasTag("custom:tools") && principal.getTag("custom:tools") != "" };')
+            mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
+        elif kind == "forbid" and p.get("require_service_window"):
+            # TEMPORAL: no governed action outside the deployment's service window. `within_service_window`
+            # is set by the gateway interceptor from the real request time (authoritative; caller values
+            # overwritten), so this is not a caller-asserted flag.
+            stmt = ('forbid(principal, action, resource is AgentCore::Gateway) '
+                    'unless { context.input.within_service_window == true };')
+            mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
         elif kind == "forbid":
             aid = action_id(p["action"])
             base = ('forbid(principal, action == AgentCore::Action::"%s", '
                     'resource == AgentCore::Gateway::"__GW_ARN__")' % aid)
+            # Build the `unless` clause from every declared condition (all must hold to permit the call).
+            # These are COARSE gateway gates layered on the authoritative server-side controls (the signed
+            # sanitized_ref, the live budget meter, the recorded consent) - the same defense-in-depth role
+            # the `deidentified` boolean plays; no single one is accepted downstream as proof.
+            conds = []
             if p.get("unless_deidentified"):
-                stmt = base + " unless { context.input.deidentified == true };"
-            else:
-                stmt = base + ";"
+                conds.append("context.input.deidentified == true")          # data-classification
+            if p.get("require_consent"):
+                conds.append("context.input.consent == true")               # consent
+            if p.get("allowed_purposes"):
+                conds.append("(" + " || ".join('context.input.purpose == "%s"' % x
+                                                for x in p["allowed_purposes"]) + ")")  # purpose
+            if p.get("require_budget_ok"):
+                conds.append("context.input.budget_ok == true")             # budget (interceptor-injected)
+            if p.get("amount_limit") is not None:
+                conds.append("context.input.%s <= %d" % (p.get("amount_field", "amount"), int(p["amount_limit"])))  # quantitative
+            stmt = base + (" unless { " + " && ".join(conds) + " };" if conds else ";")
             mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
         else:
             raise SystemExit("unknown policy kind '%s'" % kind)

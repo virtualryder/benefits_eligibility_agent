@@ -66,7 +66,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **187 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **200 offline tests**;
 > tag `v0.4.0-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -135,7 +135,7 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 187 tests**
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 200 tests**
 > (control-plane + 18 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.

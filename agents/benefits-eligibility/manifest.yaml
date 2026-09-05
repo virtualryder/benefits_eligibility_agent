@@ -187,6 +187,19 @@ policies:
   # phase 108 (hybrid multi-tenant): un-tenanted identities are refused at the gateway. Attached ONLY in
   # multi-tenant deployments (scope: multitenant) - silo principals carry no custom:tenant tag.
   - { name: require_tenant,           kind: forbid, require_tenant: true, scope: multitenant }
+  # --- Full 9-condition Cedar model (#160 entitlement + #161 consent/purpose/budget/temporal/quantitative) ---
+  # ENTITLEMENT (#160): zero-default tools - no NON-EMPTY custom:tools claim => no tool at all, even for a
+  # role-group member. Defense in depth for the interceptor, which already drops the tool list on a missing claim.
+  - { name: require_entitlement,      kind: forbid, require_entitlement: true }
+  # TEMPORAL: no governed action outside the deployment's service window (within_service_window is set by the
+  # gateway interceptor from the real request time; caller values are overwritten).
+  - { name: require_service_window,   kind: forbid, require_service_window: true, scope: temporal }
+  # CONSENT + PURPOSE on the eligibility decision. Coarse gateway gates on the authoritative server-side controls.
+  - { name: consent_purpose_before_assess, kind: forbid, action: assess_eligibility, require_consent: true, allowed_purposes: [eligibility, redetermination] }
+  # BUDGET on the model-spending drafter (budget_ok is interceptor-injected from the live per-tenant meter).
+  - { name: budget_before_draft,      kind: forbid, action: draft_notice, require_budget_ok: true }
+  # QUANTITATIVE: an overpayment computation above the caseworker amount cap is refused (elevated auth only).
+  - { name: amount_cap_overpayment,   kind: forbid, action: detect_overpayment, amount_limit: 5000, amount_field: prior_monthly_benefit }
 
 workflow:
   entrypoint: agent.py
