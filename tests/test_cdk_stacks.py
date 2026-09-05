@@ -552,10 +552,12 @@ def test_capture_trail_selects_bedrock_and_agentcore_data_events():
     assert mgmt, "management events (InvokeModel / Converse live here) must be selected"
     for rt in ("AWS::S3::Object", "AWS::Lambda::Function", "AWS::Bedrock::Model", "AWS::Bedrock::AsyncInvoke",
                "AWS::Bedrock::Guardrail", "AWS::Bedrock::KnowledgeBase", "AWS::Bedrock::AgentAlias",
-               "AWS::Bedrock::InlineAgent", "AWS::Bedrock::FlowAlias", "AWS::Bedrock::Prompt",
-               "AWS::BedrockAgentCore::Gateway"):
+               "AWS::Bedrock::InlineAgent", "AWS::Bedrock::FlowAlias",
+               "AWS::BedrockAgentCore::Gateway", "AWS::BedrockAgentCore::Runtime", "AWS::BedrockAgentCore::RuntimeEndpoint"):
         assert rt in types, f"capture trail no longer selects data events for {rt}"
     assert props.get("IsMultiRegionTrail") is True and props.get("EnableLogFileValidation") is True
+    # live-rejected by CloudTrail (2026-09-05): never let it back in
+    assert "AWS::Bedrock::Prompt" not in types
 
 
 def _perimeter_stacks(kms="aws-managed", lock_days=0, capture=True):

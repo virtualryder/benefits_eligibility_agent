@@ -83,6 +83,7 @@ def main():
         checks[name] = {"ok": bool(ok), "detail": detail}
         print(("PASS " if ok else "FAIL ") + name + (" - " + str(detail)[:200] if detail else ""), flush=True)
 
+    fatal = None
     try:
         # ── 1. deploy from zero ───────────────────────────────────────────────────────────────
         if not a.skip_deploy:
@@ -90,7 +91,7 @@ def main():
                                          "--outputs-file", "outputs-%s.json" % env, *ctx(env)), cwd=CDK, timeout=3600)
             check("deploy", steps["deploy"]["rc"] == 0, "rc=%s in %ss" % (steps["deploy"]["rc"], steps["deploy"]["secs"]))
             if steps["deploy"]["rc"] != 0:
-                raise SystemExit("deploy failed")
+                raise RuntimeError("deploy failed")
         outputs = {}
         try:
             outputs = json.load(open(os.path.join(CDK, "outputs-%s.json" % env), encoding="utf-8"))
@@ -194,6 +195,9 @@ def main():
             check("D2_operator_console_live", "Containment" in html or "kill" in html.lower(), "bytes=%d" % len(html))
         except Exception as exc:
             check("D2_operator_console_live", False, "%s: %s" % (type(exc).__name__, str(exc)[:150]))
+    except Exception as exc:  # noqa: BLE001 - record, tear down, still write evidence
+        fatal = "%s: %s" % (type(exc).__name__, str(exc)[:300])
+        print("FATAL " + fatal, flush=True)
     finally:
         # ── 10. teardown to zero residue ──────────────────────────────────────────────────────
         if not a.skip_teardown:
@@ -215,8 +219,8 @@ def main():
             check("teardown_zero_residue", steps["destroy"]["rc"] == 0 and steps["cleanup"]["rc"] == 0 and restored,
                   "destroy_rc=%s cleanup_rc=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], steps["cleanup"]["rc"], restored))
 
-    ok = all(c["ok"] for c in checks.values())
-    result = {"gate": "tier1-regate", "env": env, "region": region, "pass": ok, "checks": checks, "steps": steps,
+    ok = all(c["ok"] for c in checks.values()) and not fatal
+    result = {"gate": "tier1-regate", "env": env, "region": region, "pass": ok, "fatal": fatal, "checks": checks, "steps": steps,
               "context": ctx(env), "finished_at": int(time.time())}
     raw = json.dumps(result, indent=1, default=str)
     raw = raw.replace(acct, REDACT)

@@ -44,9 +44,9 @@ turns it off), is per-region, and is not WORM. The remaining Bedrock data-plane 
 events that CloudTrail does not log by default, so this trail selects every documented Bedrock data
 resource type - ApplyGuardrail (Guardrail), InvokeAgent (AgentAlias), InvokeInlineAgent (InlineAgent),
 InvokeFlow (FlowAlias), Retrieve / RetrieveAndGenerate (KnowledgeBase), StartAsyncInvoke /
-InvokeModelWithBidirectionalStream (Model + AsyncInvoke), RenderPrompt (Prompt) - plus the AgentCore
-Gateway data plane (AWS::BedrockAgentCore::Gateway), so a bypass through ANY of those surfaces is
-captured too. The ObservabilityStack raises the `bedrock-perimeter-bypass` alarm from this capture
+InvokeModelWithBidirectionalStream (Model + AsyncInvoke) - plus the AgentCore Gateway and Runtime data
+planes (AWS::BedrockAgentCore::Gateway / Runtime / RuntimeEndpoint), so a bypass through ANY of those
+surfaces - and every invocation of the governed agent runtime itself - is captured too. The ObservabilityStack raises the `bedrock-perimeter-bypass` alarm from this capture
 whenever a principal outside the approved allowlist invokes Bedrock (detective); PREVENTION at the
 account boundary is the org SCP + VPC-endpoint policy shipped under org/ (see org/README.md).
 """
@@ -69,9 +69,14 @@ class LineageStack(cdk.Stack):
         "AWS::Bedrock::AgentAlias",
         "AWS::Bedrock::InlineAgent",
         "AWS::Bedrock::FlowAlias",
-        "AWS::Bedrock::Prompt",
         "AWS::BedrockAgentCore::Gateway",
+        "AWS::BedrockAgentCore::Runtime",
+        "AWS::BedrockAgentCore::RuntimeEndpoint",
     )
+    # Every value above was PROVED accepted by CloudTrail PutEventSelectors on 2026-09-05 (a throwaway
+    # trail, one type at a time). AWS::Bedrock::Prompt - which a docs summary listed for RenderPrompt -
+    # is REJECTED ("resources.type field value is not valid") and broke the first live deploy of this
+    # selector set; it is deliberately absent. Re-probe before adding a type.
 
     @classmethod
     def advanced_event_selectors(cls):

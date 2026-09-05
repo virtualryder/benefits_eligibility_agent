@@ -164,23 +164,6 @@
     ]
   },
   {
-    "Name": "Data events: AWS::Bedrock::Prompt",
-    "FieldSelectors": [
-      {
-        "Field": "eventCategory",
-        "Equals": [
-          "Data"
-        ]
-      },
-      {
-        "Field": "resources.type",
-        "Equals": [
-          "AWS::Bedrock::Prompt"
-        ]
-      }
-    ]
-  },
-  {
     "Name": "Data events: AWS::BedrockAgentCore::Gateway",
     "FieldSelectors": [
       {
@@ -193,6 +176,40 @@
         "Field": "resources.type",
         "Equals": [
           "AWS::BedrockAgentCore::Gateway"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::BedrockAgentCore::Runtime",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::BedrockAgentCore::Runtime"
+        ]
+      }
+    ]
+  },
+  {
+    "Name": "Data events: AWS::BedrockAgentCore::RuntimeEndpoint",
+    "FieldSelectors": [
+      {
+        "Field": "eventCategory",
+        "Equals": [
+          "Data"
+        ]
+      },
+      {
+        "Field": "resources.type",
+        "Equals": [
+          "AWS::BedrockAgentCore::RuntimeEndpoint"
         ]
       }
     ]
