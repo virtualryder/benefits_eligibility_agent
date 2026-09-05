@@ -1,0 +1,228 @@
+{
+ "env": "nw",
+ "prefix": "ben-nw",
+ "user_pool": "us-east-1_UrP50DAeY",
+ "web_acl_arn": "arn:aws:wafv2:us-east-1:111122223333:regional/webacl/ben-nw-auth-waf/89058e9e-aeba-4de9-a496-6f41f2ba2a90",
+ "steps": [
+  {
+   "step": "apply_association",
+   "applied": false,
+   "attempts": 12,
+   "last_error": "WAFUnavailableEntityException: An error occurred (WAFUnavailableEntityException) when calling the AssociateWebACL operation: AWS WAF couldn\u2019t retrieve the resource that you requested. Retry y"
+  },
+  {
+   "step": "waf_on_pool",
+   "resource": "arn:aws:cognito-idp:us-east-1:111122223333:userpool/us-east-1_UrP50DAeY",
+   "detail": {
+    "web_acl_name": null,
+    "rules": [],
+    "statement_types": [],
+    "default_action": []
+   }
+  },
+  {
+   "step": "lambdas_vpc",
+   "count": 16,
+   "all_in_vpc": true,
+   "distinct_subnets": [
+    "subnet-086381946948f9423",
+    "subnet-0d39950c8e762c5b1"
+   ],
+   "distinct_sgs": [
+    "sg-044a1de4ba17db063"
+   ],
+   "functions": [
+    {
+     "fn": "ben-nw-core-tools",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-redetermine",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-ingest-application",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-tenant-interceptor",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-intake-application",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-kill-switch-disengage",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-approve-signoff",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-write-audit",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-mask-pii",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-assess-eligibility",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-signoff-register",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-overpayment",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-finalize",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-kill-switch-engage",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-request-signoff",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    },
+    {
+     "fn": "ben-nw-workflow-guards",
+     "in_vpc": true,
+     "subnets": [
+      "subnet-0d39950c8e762c5b1",
+      "subnet-086381946948f9423"
+     ],
+     "sgs": [
+      "sg-044a1de4ba17db063"
+     ]
+    }
+   ]
+  },
+  {
+   "step": "zero_public_egress",
+   "vpc_id": "vpc-02ba3a4f5f06b4da6",
+   "nat_gateways": 0,
+   "internet_gateways": 0
+  }
+ ],
+ "verdict": {
+  "waf_associated_with_pool": false,
+  "waf_has_common_ruleset": false,
+  "waf_has_rate_limit": false,
+  "governed_lambdas_in_vpc": true,
+  "zero_public_egress": true,
+  "PASS": false
+ }
+}
