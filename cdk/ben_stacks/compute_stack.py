@@ -155,6 +155,12 @@ class ComputeStack(cdk.Stack):
             # never a caller-asserted boolean. Per-tenant routed via AUTHZ_TABLE_TEMPLATE in MT mode.
             "AUTHZ_TABLE": data.authz_table.table_name,
             "AUTHZ_TABLE_TEMPLATE": f"{prefix}-{{tenant}}-authz-context",
+            # deep-dive #3: the interceptor derives within_service_window from the SERVER CLOCK vs this
+            # window (UTC), authoritatively (the caller can no longer assert it). Default 00:00-24:00 =
+            # ALWAYS in-window (temporal enforcement OFF by default, matching prior behavior); a
+            # deployment enables real temporal limits by narrowing SERVICE_WINDOW_START/END (and DAYS).
+            "SERVICE_WINDOW_START": str(self.node.try_get_context("service_window_start") or "0"),
+            "SERVICE_WINDOW_END": str(self.node.try_get_context("service_window_end") or "24"),
         }
         # Gate-B B5: the deployment's pinned tenant (one agency per isolated deployment). Tenant identity
         # is DERIVED from this env, never from a request body (lib/controls/tenancy.py).

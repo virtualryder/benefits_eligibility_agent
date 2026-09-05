@@ -9,7 +9,7 @@ customer deployments.*
 ## 0. Supported path
 
 ```bash
-git checkout v0.5.0-pilot-rc1                 # release tag (offline-green; live clean-account re-gate pending), never main
+git checkout v0.5.1-pilot-rc1                 # release tag (offline-green; live clean-account re-gate pending), never main
 cd cdk && pip install -r requirements.txt     # PINNED: aws-cdk-lib==2.262.1, constructs==10.7.1
 npx --yes aws-cdk@2 bootstrap aws://<account>/us-east-1     # once per account
 ```

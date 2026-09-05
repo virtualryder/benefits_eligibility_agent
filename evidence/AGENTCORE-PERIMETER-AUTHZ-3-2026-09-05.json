@@ -1,0 +1,190 @@
+{
+ "env": "perim",
+ "prefix": "ben-perim",
+ "gateway_url": "https://ben-perim-ben-gw-prneggebyg.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+ "enforcement": "ENFORCE",
+ "policy_engine": "ben_perim_ben_authz-ukgj3mrgl9",
+ "steps": [
+  {
+   "step": "entitlement_infra",
+   "custom_attr": "exists_or_InvalidParameterException",
+   "mapper_fn": "arn:aws:lambda:us-east-1:111122223333:function:ben-perim-entitlement-mapper",
+   "mapper": "attached PreTokenGeneration V2_0",
+   "group": "tools_granted"
+  },
+  {
+   "step": "identities",
+   "users": {
+    "cw-ent": [
+     "benefits_caseworker",
+     "tools_granted"
+    ],
+    "cw-noent": [
+     "benefits_caseworker"
+    ],
+    "cw-claim": [
+     "benefits_caseworker"
+    ]
+   },
+   "token_claims": {
+    "cw-ent": {
+     "cognito:groups": [
+      "benefits_caseworker",
+      "tools_granted"
+     ],
+     "custom:tools": "intake_application,mask_pii,assess_eligibility,redetermine,detect_overpayment,draft_notice,write_audit,request_signoff"
+    },
+    "cw-noent": {
+     "cognito:groups": [
+      "benefits_caseworker"
+     ],
+     "custom:tools": ""
+    },
+    "cw-claim": {
+     "cognito:groups": [
+      "benefits_caseworker"
+     ],
+     "custom:tools": "intake_application,mask_pii,assess_eligibility,redetermine,detect_overpayment,draft_notice,write_audit,request_signoff"
+    }
+   }
+  },
+  {
+   "step": "entitlement",
+   "calls": {
+    "cw-noent": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to require_entitlement-6gvdzaqqcp]"
+      }
+     }
+    },
+    "cw-ent": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"6ba2d22868254dc983672ce3c02b1871\",\"sanitized_sha256\":\"52cb318505c9c04261532caa3adcf6cc83254b3047f2bccbf1a78b9395969d3d\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788633903,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"79bb7018198b0ec714c24b4de28204e5af4a8601c6dea67b42017da9dd1e08e8\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:AWS_SECRET_KEY]\"}"
+        }
+       ]
+      }
+     }
+    },
+    "cw-claim": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"8cedbd3a9812473abbf3747ecd1ddbba\",\"sanitized_sha256\":\"91d08f750ed689f1036cdaf021e28fd5ce75274dd1c79c7d0b8b72c3f79a0d15\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788633905,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"ad92f854ef1b99d566b26b92693f4170487f11982102d7c2a54a4b3b35e319bd\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:IP_ADDRESS]\"}"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "step": "sanitized_ref_minted",
+   "have_ref": true,
+   "masked_by": "comprehend:DetectPiiEntities+regex-backstop",
+   "deidentified": true
+  },
+  {
+   "step": "authz_seed",
+   "table": "ben-perim-authz-context",
+   "authorized_case": "CASE-AUTH-dd27f03c",
+   "unauthorized_case": "CASE-NOAUTH-d61a04de"
+  },
+  {
+   "step": "conditions",
+   "calls": {
+    "authz_present": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"assessed\":true,\"determination\":\"ELIGIBLE\",\"eligible\":true,\"processing_clock\":\"STANDARD\",\"processing_days\":30,\"income_pct_fpl\":79.1,\"household_size\":3,\"deidentified_input\":true,\"assessed_by\":\"rules:FPL/SNAP-gross(2026 authoritative)\",\"fpl_source\":\"HHS 2026 Poverty Guidelines (Federal Register 2026-00755); SNAP gross limit 130% FPL (7 CFR 273.9)\",\"fpl_year\":2026,\"reason\":\"gross monthly income 1800 is within the 130% FPL limit (2960)\",\"notes\":[\"FPL uses the authoritative 2026 HHS guidelines; AK/HI and program/state variations are configurable\",\"gross-income test only; net-income test and verification remain for caseworker review\"]}"
+        }
+       ]
+      }
+     }
+    },
+    "forged_no_record": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to consent_purpose_before_assess-my_tw6wsd9]"
+      }
+     }
+    },
+    "amount_over": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to amount_cap_overpayment-t8r59g97ry]"
+      }
+     }
+    },
+    "amount_ok": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 6,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"computed\":true,\"classification\":\"OVERPAYMENT\",\"overpayment_amount\":16800.0,\"monthly_difference\":2800.0,\"months\":6,\"deidentified_input\":true,\"computed_by\":\"rules:overpayment(prior-corrected)*months\",\"note\":\"overpayment identified; recovery must follow adequate notice and the household's appeal rights, and any suspected-fraud referral is a HUMAN-only decision (the agent cannot refer).\"}"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "step": "teardown_mapper",
+   "result": {
+    "detached_trigger": true,
+    "deleted_fn": true,
+    "deleted_role": true
+   }
+  }
+ ],
+ "diagnostic_custom_tools_claim": {
+  "custom_tools_in_token": true,
+  "custom_tools_claim_enforced_in_cedar": true,
+  "cw-claim_result": "allowed"
+ },
+ "verdict": {
+  "entitlement_zero_default": true,
+  "consent_purpose_authoritative": true,
+  "amount_cap": true,
+  "PASS": true
+ }
+}

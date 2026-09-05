@@ -5,9 +5,9 @@
 [![CI](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/virtualryder/benefits_eligibility_agent/actions/workflows/ci.yml)
 
 > **SUPPORTED DEPLOYMENT PATH — read this first.** The ONE supported path is **AWS CDK at the validated
-> release tag [`v0.5.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.0-pilot-rc1)**
+> release tag [`v0.5.1-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.1-pilot-rc1)**
 > (`cdk/ben_stacks`, 7 stacks + one data stack per tenant in multi-tenant mode, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
-> per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md). `v0.5.0-pilot-rc1`
+> per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md). `v0.5.1-pilot-rc1`
 > (2026-09-03) is the tree the kill-switch (29/29) and per-tenant budget (24/24) gates validated live on top of the
 > `v0.3.0-pilot-rc1` tree (2026-09-02: AgentCore from-zero, hybrid multi-tenant, per-tenant audit routing, full transparency,
 > 111 gate); the older `v0.1.2-pilot-rc1` is the EP1 Gate-B tag (2026-07-27 — `evidence/EP1-VALIDATION.md`).
@@ -67,7 +67,7 @@ from a reusable, manifest-driven template.
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
 > Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **244 offline tests**;
-> tag `v0.5.0-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
+> tag `v0.5.1-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
 > Fresh from-zero ENFORCE re-proof (`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`); **hybrid multi-tenant**
@@ -229,11 +229,16 @@ Details: `DEPLOYMENT-GUIDE.md` §1d; evidence `evidence/AGENTCORE-BUDGET-2026-09
 Four control surfaces added and proven live on the GA AgentCore Cedar engine + a Bedrock guardrail, each
 from a from-zero deploy torn down to zero residue:
 
-- **Zero-default entitlement + action-scoped Cedar (#160/#161).** A caseworker with no `custom:tools`
-  claim and not in a `tools_granted` group is denied *every* tool; the remaining perimeter conditions
-  (service-window, consent+purpose-before-assess, budget-before-draft, a decimal amount cap on
-  overpayment) ship as `scope: perimeter` `.cedar` policies globbed into the gateway by IaC and validated
-  ACTIVE on the GA engine. `scripts/cedar_perimeter_proof.py` — 6/6.
+- **Zero-default entitlement + action-scoped Cedar (#160/#161), with AUTHORITATIVE context (#3).** A
+  caseworker with no `custom:tools` claim and not in a `tools_granted` group is denied *every* tool; the
+  remaining perimeter conditions (service-window, consent+purpose-before-assess, budget-before-draft, a
+  decimal amount cap) ship as `scope: perimeter` `.cedar` policies. **The Cedar context fields are
+  server-authoritative, not caller-asserted** (external-review #3): the gateway interceptor strips any
+  caller-supplied `consent`/`purpose`/`budget_ok`/`within_service_window` and injects only trusted values
+  — the server clock, the live meter, and `lib/controls/authoritative_context.py` (consent/purpose read
+  from a server-side authz record by `case_id`; no record ⇒ Cedar denies). Live-proven: a caller that
+  FORGES `consent=true` on a case with no authz record is DENIED; an authorized case passes.
+  `scripts/cedar_perimeter_proof.py` — PASS (`evidence/AGENTCORE-PERIMETER-AUTHZ-3-2026-09-05.md`).
 - **Bedrock output guardrail as IaC (#166).** The compute stack builds the guardrail from the manifest
   (PROMPT_ATTACK + PII ANONYMIZE + a published immutable version pinned by a config-signature so a policy
   change republishes) and wires it into the drafter (`ApplyGuardrail`, fail-closed). `scripts/guardrail_proof.py` — 7/7.
@@ -244,13 +249,18 @@ from a from-zero deploy torn down to zero residue:
   so a legitimate notice is never false-blocked. 10/10 live.
 - **Private-VPC posture + WAF (#170).** The tool + drafter Lambdas run in private subnets with VPC
   endpoints; a live sweep measured 0 NAT gateways / 0 internet gateways. A REGIONAL WAFv2 Web ACL is built
-  as IaC on the Cognito front door. The WAF↔Cognito *association* (#189) and Organizations SCP/RCP (#172)
-  are blocked at the AWS **account** level in this sandbox and require a non-sandbox/Organizations account
-  — code and IaC are in place and tested to the account boundary.
+  as IaC on the Cognito front door. **#189 correction:** the WAF↔Cognito association is AWS-**supported**;
+  the `WAFUnavailableEntityException` we hit is a documented *propagation delay* (seconds–minutes), not an
+  account block — the harness now retries across ~6 min (live re-run pending). AgentCore Gateway is also
+  directly WAF-associable (`GatewayAssociateWebACL`). Organizations SCP/RCP (#172) genuinely needs an AWS
+  Organizations account.
 
-Also on this pin: governed-core **1.10.0** — capture-every-API-call lineage (account CloudTrail → WORM,
-joined into one record per case, zero orphan governed calls — #168), token chargeback reconciled against
-Cost Explorer (#169), audit-before-finalize fail-closed (#159), and args-hash-bound approvals (#162).
+Also on this pin: governed-core **1.10.1** — the **fault-semantics batch** (external review): a
+consequential commit now requires the hash-chained ledger write **AND** the S3 Object-Lock WORM copy
+(`evidence.is_durable`; WORM repaired on replay), `request_signoff`/`approve_signoff` are fail-closed +
+un-strandable (durable evidence before any side effect), and the interceptor makes the Cedar context
+fields authoritative (above). On 1.10.0 before it: capture-every-API-call lineage (#168), token chargeback
+vs Cost Explorer (#169), audit-before-finalize (#159), args-hash-bound approvals (#162).
 
 Evidence: `evidence/AGENTCORE-CEDAR-PERIMETER-2026-09-05.md`, `evidence/AGENTCORE-GUARDRAIL-2026-09-05.md`,
 `evidence/AGENTCORE-GROUNDING-2026-09-05.md` + `evidence/AGENTCORE-GROUNDING-DRAFTER-190-2026-09-05.md`,

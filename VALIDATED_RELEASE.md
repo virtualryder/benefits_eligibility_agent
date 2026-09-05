@@ -3,12 +3,12 @@
 *Single source of truth for the current release tag is the repo-root `RELEASE` file, enforced by
 `tests/test_release_consistency.py`. Authoritative counts + limitations: `RELEASE-MANIFEST.md`.*
 
-## Current release — `v0.5.0-pilot-rc1` (2026-09-03)
+## Current release — `v0.5.1-pilot-rc1` (2026-09-03)
 
 | Field | Value |
 |---|---|
-| Tag | `v0.5.0-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-03 after the kill-switch and budget gates passed on it. |
-| Commit SHA | `git rev-list -n1 v0.5.0-pilot-rc1` |
+| Tag | `v0.5.1-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-03 after the kill-switch and budget gates passed on it. |
+| Commit SHA | `git rev-list -n1 v0.5.1-pilot-rc1` |
 | Test count at the tag | **244** offline tests (243 local + 1 CI-only); 25 CDK assertions |
 | Governance core | `governed-core` **1.9.0**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`); `lib/core.lock` locked at 1.9.0 |
 | What this tag adds over `v0.3.0-pilot-rc1` | **Kill Switch on the AgentCore path** — `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md` (env `mt5`, 2 tenants, real Runtime, **29/29**, 13.9 s to effect). **Per-tenant token + USD budget** — `evidence/AGENTCORE-BUDGET-2026-09-03.md` (env `mt6`, **24/24**: meter == model-invocation log to the token, cap refusals at gateway / drafter / runtime incl. mid-session, 60/85 % alarms, AWS Budgets ceiling → kill switch) + `-regression.json` (0 unexpected). Two drafter fixes found by that gate: the append-only ledger grant so its workflow-hop DENIED record lands, and `requestMetadata` tagging on its server-side `Converse`. |
@@ -25,8 +25,8 @@
 | Governance core | `governed-core` **1.7.1**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`) |
 | Validated live on this tree (each deployed from zero, exercised, torn down) | AgentCore ENFORCE from-zero re-proof (`ben-e2e`) — `evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md` · hybrid multi-tenant, 2 tenants, cross-tenant deny + per-tenant routing (`ben-mt`, 5/5) — `evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md` · per-tenant audit ledger / WORM vault / approvals routing on the gateway AND workflow hops, fail-closed (`ben-mt2`, 12/12) — `evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md` · full per-case transparency through the real AgentCore Runtime (`ben-mt3`, 13/13 per tenant) — `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md` |
 | Consolidated 111 gate on this tag | **PASS (2026-09-02, env `mt4`)** — ONE from-zero deployment of this tag: isolation + per-tenant audit routing 12/12, full transparency through the real AgentCore Runtime 13/13 per tenant, strict PII canary clean, and an end-to-end regression sweep with **0 unexpected errors** across 20 log groups, all executions, alarms, DLQs and Lambda error metrics — [`evidence/AGENTCORE-111-GATE-2026-09-02.md`](evidence/AGENTCORE-111-GATE-2026-09-02.md). Two launch-tooling defects found by the sweep (Git-Bash path mangling of the SSM parameter name; SSM grant on the wrong path) fixed in `lib/runtime/*.sh` after the tag — harness only, no product code |
-| Kill Switch on the AgentCore path (after this tag, on main) | **PASS (2026-09-03, env `mt5`, 29/29)** — governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`. Not part of `v0.3.0-pilot-rc1`; carried by `v0.5.0-pilot-rc1`. |
-| Per-tenant token + USD budget (after this tag, on main) | **PASS (2026-09-03, env `mt6`, 24/24)** — governed-core 1.9.0; `evidence/AGENTCORE-BUDGET-2026-09-03.md`. Not part of `v0.3.0-pilot-rc1`; carried by `v0.5.0-pilot-rc1`. |
+| Kill Switch on the AgentCore path (after this tag, on main) | **PASS (2026-09-03, env `mt5`, 29/29)** — governed-core 1.8.0; `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`. Not part of `v0.3.0-pilot-rc1`; carried by `v0.5.1-pilot-rc1`. |
+| Per-tenant token + USD budget (after this tag, on main) | **PASS (2026-09-03, env `mt6`, 24/24)** — governed-core 1.9.0; `evidence/AGENTCORE-BUDGET-2026-09-03.md`. Not part of `v0.3.0-pilot-rc1`; carried by `v0.5.1-pilot-rc1`. |
 | Not re-run on this tree | the EP1 Gate-B posture walk (zero-egress private networking, CMK, MFA identity) — last captured 2026-07-27/28 on `v0.1.2-pilot-rc1`; the switches are unchanged and synth-tested, but the live re-walk is owed |
 
 ## EP1 record — `v0.1.2-pilot-rc1` (2026-07-27)
