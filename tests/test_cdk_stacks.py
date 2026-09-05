@@ -461,11 +461,12 @@ def test_waf_web_acl_associated_with_user_pool():
             Match.object_like({"Action": {"Block": {}},
                                "Statement": {"RateBasedStatement": Match.object_like({"AggregateKeyType": "IP"})}}),
         ])}))
-    t.resource_count_is("AWS::WAFv2::WebACLAssociation", 1)
-    # ResourceArn is a CloudFormation intrinsic (the pool ARN built from the pool-id token), so assert
-    # the association carries both a ResourceArn and a WebACLArn rather than regex-matching an object.
-    t.has_resource_properties("AWS::WAFv2::WebACLAssociation", Match.object_like({
-        "ResourceArn": Match.any_value(), "WebACLArn": Match.any_value()}))
+    # Association is an AwsCustomResource calling AssociateWebACL (the native WebACLAssociation hangs for
+    # Cognito targets); it synths as one Custom::AWS resource carrying a Create and a Delete SDK call
+    # (their bodies are CFN intrinsics binding the web-acl ARN + pool ARN, so assert presence, not text).
+    t.resource_count_is("Custom::AWS", 1)
+    t.has_resource_properties("Custom::AWS", Match.object_like({
+        "Create": Match.any_value(), "Delete": Match.any_value()}))
 
 
 def test_governed_lambdas_are_vpc_isolated_when_private():
