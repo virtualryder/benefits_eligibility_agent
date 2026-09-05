@@ -47,7 +47,14 @@ class NetworkStack(cdk.Stack):
                           ("BedrockEp", ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME),
                           ("LogsEp", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS),
                           ("KmsEp", ec2.InterfaceVpcEndpointAwsService.KMS),
-                          ("StsEp", ec2.InterfaceVpcEndpointAwsService.STS)):
+                          ("StsEp", ec2.InterfaceVpcEndpointAwsService.STS),
+                          # deep-dive #5: the approval/requester verifier fetches the Cognito JWKS
+                          # (https://cognito-idp.<region>.amazonaws.com/<pool>/.well-known/jwks.json) at
+                          # cold start to verify RS256 access tokens. In a zero-egress VPC there is no
+                          # internet route, so WITHOUT this cognito-idp interface endpoint the JWKS fetch
+                          # fails on a cold start and identity verification breaks. private_dns_enabled
+                          # makes the public cognito-idp hostname resolve to the endpoint inside the VPC.
+                          ("CognitoIdpEp", ec2.InterfaceVpcEndpointAwsService("cognito-idp"))):
             self.vpc.add_interface_endpoint(name, service=svc, subnets=app_sel, private_dns_enabled=True)
 
         # ── the governed Lambdas' security group: egress 443 only ────────────────────

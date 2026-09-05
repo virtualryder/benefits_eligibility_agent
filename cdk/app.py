@@ -105,6 +105,47 @@ def guardrail_from_manifest():
 app = cdk.App()
 env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
+
+
+def _require_production_controls(app, env_name, profile):
+    """PRODUCTION PROFILE GATE (deep-dive #6). `env=prod*` (or `-c profile=production`) REFUSES to
+    synthesize unless EVERY production control is explicitly enabled, so "production" fails closed on an
+    insecure default instead of quietly synthesizing with dev defaults (public network, AWS-managed KMS,
+    sandbox identity, WAF / perimeter / model-logging / account-capture off). A deliberate, audited
+    exception is possible only with `-c allow_insecure_prod=1`, which is echoed in the synth output."""
+    def ctx(k):
+        return app.node.try_get_context(k)
+
+    def truthy(k):
+        return str(ctx(k) or "").lower() in ("1", "true", "yes")
+
+    is_prod = str(env_name).lower().startswith("prod") or str(ctx("profile") or "").lower() in ("production", "prod")
+    if not is_prod:
+        return
+    if truthy("allow_insecure_prod"):
+        print("WARNING: allow_insecure_prod=1 — production controls NOT enforced for this synth (audited exception).")
+        return
+    required = {
+        "kms=customer-managed": ctx("kms") == "customer-managed",
+        "retention_profile=production-reference|compliance*": str(profile).lower().startswith(("production", "compliance")),
+        "network_mode=private": ctx("network_mode") == "private",
+        "identity_mode!=sandbox (pilot/federated)": str(ctx("identity_mode") or "sandbox").lower() != "sandbox",
+        "oidc_issuer_url set (enterprise IdP federation)": bool(ctx("oidc_issuer_url")),
+        "waf=1": truthy("waf"),
+        "perimeter=1": truthy("perimeter"),
+        "model_logging=1": truthy("model_logging"),
+        "capture_all=1": truthy("capture_all"),
+        "capture_lock_mode=COMPLIANCE": str(ctx("capture_lock_mode") or "GOVERNANCE").upper() == "COMPLIANCE",
+    }
+    missing = [k for k, ok in required.items() if not ok]
+    if missing:
+        raise SystemExit(
+            "PRODUCTION PROFILE REFUSED (deep-dive #6): env=%s requires every production control to be "
+            "explicitly enabled; missing:\n  - %s\n\nEnable each, or pass -c allow_insecure_prod=1 for a "
+            "deliberate, audited exception." % (env_name, "\n  - ".join(missing)))
+
+
+_require_production_controls(app, env_name, profile)
 prefix = f"ben-{env_name}"
 asset_dir = stage_lambda_bundle()
 

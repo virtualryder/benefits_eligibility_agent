@@ -1,4 +1,4 @@
-# #170 — VPC + WAF on the runtime path (2026-09-05) — VPC **PASS** · WAF ACL built, association **BLOCKED live**
+# #170 — VPC + WAF on the runtime path (2026-09-05) — VPC **PASS** · WAF Web ACL built as IaC; association **PENDING live re-run** (propagation-delay, retry extended — see corrected #189 addendum)
 
 **What this is.** A from-zero deploy (`ben-nw`, `-c network_mode=private -c waf=1`) exercising the
 network/edge perimeter of the runtime path, with `scripts/network_waf_proof.py`. Account ids redacted
@@ -17,13 +17,16 @@ This is the substantive perimeter control for the compute path and it is enforce
 (`-c network_mode=private`, `NetworkStack`: S3/DynamoDB gateway endpoints + Comprehend/Bedrock/Secrets/
 StepFunctions/Logs/KMS/STS interface endpoints; SG egress 443 to AWS endpoints only).
 
-## WAF on the auth front door — Web ACL built as IaC; association blocked live
+## WAF on the auth front door — Web ACL built as IaC; association pending live re-run (propagation-delay)
 
 The `-c waf=1` deploy creates a **REGIONAL WAFv2 Web ACL** (`ben-nw-auth-waf`) with the AWS managed
 **Common Rule Set** + a **per-IP rate-based** block rule (verified created). The Web ACL is the correct,
-attachable control for the runtime/auth path, because the AgentCore Gateway and Runtime are **managed
-endpoints and are not WAF-associable resource types** (WAFv2 associates only with ALB / API Gateway /
-CloudFront / AppSync / **Cognito user pool** / App Runner); the user pool is the associable surface.
+attachable control for the auth path. **Correction (2026-09-05):** AgentCore Gateway is now **directly
+WAF-associable** via `GatewayAssociateWebACL`
+(<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-waf.html>), so the MCP runtime
+front door can ALSO be WAF-fronted directly — an earlier "AgentCore Gateway is not WAF-associable" claim
+is retracted. WAFv2 additionally associates with ALB / API Gateway / CloudFront / AppSync / **Cognito
+user pool** / App Runner; the Cognito user pool is the associable surface for the auth front door here.
 
 **The association could not be completed live.** Three distinct AWS-side obstacles were hit and are
 recorded here so the finding is not lost:
@@ -64,23 +67,33 @@ Raw redacted record: `evidence/AGENTCORE-NETWORK-WAF-2026-09-05.json` (verdict s
 and the WAF association error verbatim).
 
 
-## Addendum (#189) — isolated repro confirms an ACCOUNT-LEVEL block, not a config/timing bug
+## Addendum (#189) — CORRECTED 2026-09-05: this was a PROPAGATION-DELAY / too-short-retry issue, NOT an account block
 
-To finish the WAF↔Cognito association (#189), the failure was reproduced in a **clean, fully isolated
-setup** — a fresh throwaway user pool + a **Managed Login v2** domain confirmed **ACTIVE** + a minimal
-REGIONAL Web ACL aged several minutes + multiple `AssociateWebACL` retries. Every attempt returned the
-same **`WAFUnavailableEntityException`: "AWS WAF couldn't retrieve the resource that you requested."**,
-and `get-web-acl-for-resource` stayed `null`. The throwaway resources were then deleted (zero residue).
+**Correction (after external review + reading the AWS docs).** An earlier version of this addendum
+concluded the `WAFUnavailableEntityException` was an **account/SCP-level block**. That conclusion was
+**wrong**, and it is retracted. AWS **explicitly documents** WAF↔Cognito association as **fully
+supported**, and documents this exact exception as a **propagation delay**:
 
-Because the error persists with a correct, ACTIVE Managed Login v2 configuration and is identical across
-two independent pools, it is **not** the native-CFN-hang, not a propagation race, not a feature-plan
-issue, and not Managed Login v1 vs v2. The signature — WAF unable to *retrieve* the Cognito resource on
-an otherwise valid association — points to an **account/region-level constraint** (an SCP or permission
-boundary preventing WAF from reaching Cognito, or a service-side enablement gap) on this sandbox account
-`111122223333`. That is the same class of limitation already flagged for #172 (Organizations perimeter),
-which needs access beyond this single sandbox account.
+> "When you create a web ACL, a small amount of time passes before the web ACL has fully propagated and
+> is available to Amazon Cognito. The propagation time can be from a few seconds to a number of minutes.
+> AWS WAF returns a `WAFUnavailableEntityException` when you attempt to associate a web ACL before it has
+> fully propagated."
+> — <https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html>
 
-**Resolution path (outside this session's reach):** run the same `-c waf=1` deploy + the retrying
-association in an account without the sandbox restriction, or open AWS Support to confirm whether an SCP
-/ permission boundary is denying WAF↔Cognito association. The IaC (Web ACL) and the retrying-association
-harness are in place and correct; only the account-level permission to bind them is missing.
+The isolated repro that "confirmed a block" retried only for ~60 s (12 × 5 s). That is **inside** the
+documented propagation window, so the persistent exception is consistent with *not having waited long
+enough*, **not** with an SCP/permission boundary. There is no evidence of an account-level denial.
+
+**What changed:** `scripts/network_waf_proof.py` now retries `AssociateWebACL` with backoff across **up
+to ~6 minutes** to cover the documented propagation window. The association is expected to succeed once
+the freshly-created REGIONAL Web ACL has propagated.
+
+**Also corrected:** AgentCore Gateway itself is now **directly WAF-associable** via `GatewayAssociateWebACL`
+(<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-waf.html>) — an earlier claim
+that "AgentCore Gateway is not WAF-associable" is outdated and is retracted. The runtime path's MCP
+front door can be WAF-fronted directly, in addition to the Cognito auth front door.
+
+**Status:** the IaC (REGIONAL Web ACL) and the corrected retrying-association harness are in place;
+a **live re-run with the ~6-minute window is PENDING** and is the remaining step to turn this from
+"supported + corrected" into "live-proven associated". (This is unrelated to #172 Organizations SCP/RCP,
+which genuinely does need an AWS Organizations account.)
