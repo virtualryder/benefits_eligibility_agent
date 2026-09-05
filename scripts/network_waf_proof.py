@@ -38,7 +38,27 @@ def main():
     ident = outputs(cf, f"{prefix}-identity")
     pool_id = ident["UserPoolId"]
     pool_arn = f"arn:aws:cognito-idp:{a.region}:{acct}:userpool/{pool_id}"
-    ev = {"env": a.env, "prefix": prefix, "user_pool": pool_id, "steps": []}
+    web_acl_arn = ident.get("WebAclArn", "")
+    ev = {"env": a.env, "prefix": prefix, "user_pool": pool_id, "web_acl_arn": web_acl_arn, "steps": []}
+
+    # 0. APPLY the association WITH RETRY. WAF<->Cognito association is eventually consistent: a call
+    # fired right after pool creation fails "AWS WAF couldn't retrieve the resource", and the native CFN
+    # association resource hangs for Cognito targets - so the association is applied here with retry.
+    assoc_applied, assoc_attempts, assoc_err = False, 0, ""
+    if web_acl_arn:
+        for assoc_attempts in range(1, 13):
+            try:
+                waf.associate_web_acl(WebACLArn=web_acl_arn, ResourceArn=pool_arn)
+                assoc_applied = True
+                break
+            except Exception as exc:
+                assoc_err = type(exc).__name__ + ": " + str(exc)[:160]
+                import time as _t
+                _t.sleep(5)
+    ev["steps"].append({"step": "apply_association", "applied": assoc_applied,
+                        "attempts": assoc_attempts, "last_error": "" if assoc_applied else assoc_err})
+    import time as _t
+    _t.sleep(8)   # let the association propagate before the read-back
 
     # 1. WAF associated with the pool
     waf_info = {}

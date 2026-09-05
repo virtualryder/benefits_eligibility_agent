@@ -401,9 +401,10 @@ def _compute_with_guardrail():
     app = aws_cdk.App()
     asset = stage_lambda_bundle()
     data = DataStack(app, "d", prefix="ben-test", retention_profile="sandbox-demo", kms_mode="aws-managed")
-    gcfg = dict((yaml.safe_load(
+    _m = yaml.safe_load(
         (ROOT / "agents" / "benefits-eligibility" / "manifest.yaml").read_text(encoding="utf-8")) or {}
-    ).get("guardrail") or {})
+    gcfg = dict(_m.get("guardrail") or {})
+    gcfg["grounding"] = dict(_m.get("grounding") or {})   # #150: fold in grounding thresholds (as app.py does)
     compute = ComputeStack(app, "c", prefix="ben-test", asset_dir=asset, data=data,
                            tenant="ben-test-agency", guardrail_config=gcfg)
     return Template.from_stack(compute)
@@ -427,6 +428,17 @@ def test_guardrail_version_pinned():
     t.resource_count_is("AWS::Bedrock::GuardrailVersion", 1)
 
 
+def test_guardrail_has_contextual_grounding():
+    """#150: the guardrail carries a CONTEXTUAL GROUNDING policy with GROUNDING + RELEVANCE filters
+    from the manifest thresholds (so an ungrounded/irrelevant drafted notice is blocked fail-closed)."""
+    t = _compute_with_guardrail()
+    t.has_resource_properties("AWS::Bedrock::Guardrail", Match.object_like({
+        "ContextualGroundingPolicyConfig": {"FiltersConfig": Match.array_with([
+            Match.object_like({"Type": "GROUNDING", "Threshold": Match.any_value()}),
+            Match.object_like({"Type": "RELEVANCE", "Threshold": Match.any_value()}),
+        ])}}))
+
+
 def test_drafter_gets_guardrail_env_and_applyguardrail_perm():
     """The drafter Lambda receives GUARDRAIL_ID/VERSION and an ApplyGuardrail grant."""
     t = _compute_with_guardrail()
@@ -447,8 +459,11 @@ def test_waf_off_by_default():
     t.resource_count_is("AWS::WAFv2::WebACL", 0)
 
 
-def test_waf_web_acl_associated_with_user_pool():
-    """`-c waf=1` creates a REGIONAL Web ACL (common rules + per-IP rate limit) associated to the pool."""
+def test_waf_web_acl_created_for_pool():
+    """`-c waf=1` creates a REGIONAL Web ACL (managed common rules + per-IP rate limit) for the auth
+    surface. (Association to the pool is applied post-deploy with retry — see network_waf_proof.py — and
+    proven live, because WAF<->Cognito association is eventually consistent and the native CFN
+    association resource hangs for Cognito targets.)"""
     app = aws_cdk.App()
     t = Template.from_stack(IdentityStack(app, "iw", prefix="ben-test", waf=True))
     t.resource_count_is("AWS::WAFv2::WebACL", 1)
@@ -461,12 +476,6 @@ def test_waf_web_acl_associated_with_user_pool():
             Match.object_like({"Action": {"Block": {}},
                                "Statement": {"RateBasedStatement": Match.object_like({"AggregateKeyType": "IP"})}}),
         ])}))
-    # Association is an AwsCustomResource calling AssociateWebACL (the native WebACLAssociation hangs for
-    # Cognito targets); it synths as one Custom::AWS resource carrying a Create and a Delete SDK call
-    # (their bodies are CFN intrinsics binding the web-acl ARN + pool ARN, so assert presence, not text).
-    t.resource_count_is("Custom::AWS", 1)
-    t.has_resource_properties("Custom::AWS", Match.object_like({
-        "Create": Match.any_value(), "Delete": Match.any_value()}))
 
 
 def test_governed_lambdas_are_vpc_isolated_when_private():

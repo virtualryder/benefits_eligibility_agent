@@ -4,7 +4,7 @@
 (never an adjudicator; never denies, reduces, terminates, refers fraud, or writes to a system of record).
 **Repo:** `github.com/virtualryder/benefits_eligibility_agent`. **Tag:** `v0.1.2-pilot-rc1` (cut after the
 live EP1 run, 2026-07-27). **Build state:** control plane hardened + full CDK/Gate-B IaC, **live
-EP1-validated**; **233 offline tests** on current main (control-plane + 24 CDK synthesis). **Owner:** David Ryder (AWS SA).
+EP1-validated**; **234 offline tests** on current main (control-plane + 25 CDK synthesis). **Owner:** David Ryder (AWS SA).
 
 ---
 
@@ -35,7 +35,7 @@ EP1-validated**; **233 offline tests** on current main (control-plane + 24 CDK s
 
 ## 2. Gates
 
-**Gate A — code + synth (done).** 233/233 offline (CI); CDK synthesizes to valid CloudFormation.
+**Gate A — code + synth (done).** 234/234 offline (CI); CDK synthesizes to valid CloudFormation.
 
 **Gate B — live EP1 validation (done, 2026-07-27, env `ben-val1`, us-east-1).** All Gate-B switches on a
 clean account: `validate_deployment.py` PASS; the controller ran every guard to the human sign-off gate;

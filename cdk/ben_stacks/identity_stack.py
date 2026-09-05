@@ -11,8 +11,7 @@ ENFORCED, and an enterprise OIDC IdP can be attached AS IaC (issuer/client id vi
 secret via a Secrets Manager dynamic reference — never plaintext in the template). Federated users
 land in the SAME pool and hit the SAME deny-by-default Cedar policies as native operators."""
 import aws_cdk as cdk
-from aws_cdk import (aws_cognito as cognito, aws_iam as iam, aws_wafv2 as wafv2,
-                     custom_resources as cr)
+from aws_cdk import aws_cognito as cognito, aws_wafv2 as wafv2
 from constructs import Construct
 
 
@@ -134,29 +133,15 @@ class IdentityStack(cdk.Stack):
                 ])
             self.web_acl_arn = self.web_acl.attr_arn
             pool_arn = f"arn:aws:cognito-idp:{self.region}:{self.account}:userpool/{self.pool.user_pool_id}"
-            # Associate via an AwsCustomResource (AssociateWebACL / DisassociateWebACL) rather than the
-            # native AWS::WAFv2::WebACLAssociation: for a COGNITO target that resource's CloudFormation
-            # stabilization waiter hangs (found live 2026-09-05 — CREATE_IN_PROGRESS with no progress and
-            # get-web-acl-for-resource still null). The API call returns immediately; propagation then
-            # completes async. on_delete disassociates so the association follows the stack lifecycle.
-            assoc = cr.AwsCustomResource(
-                self, "AuthWebAclAssoc",
-                on_create=cr.AwsSdkCall(
-                    service="WAFV2", action="associateWebACL",
-                    parameters={"WebACLArn": self.web_acl.attr_arn, "ResourceArn": pool_arn},
-                    physical_resource_id=cr.PhysicalResourceId.of(f"{prefix}-auth-waf-assoc")),
-                on_delete=cr.AwsSdkCall(
-                    service="WAFV2", action="disassociateWebACL",
-                    parameters={"ResourceArn": pool_arn}),
-                policy=cr.AwsCustomResourcePolicy.from_statements([
-                    iam.PolicyStatement(actions=["wafv2:AssociateWebACL", "wafv2:DisassociateWebACL",
-                                                 "wafv2:GetWebACLForResource"], resources=["*"]),
-                    iam.PolicyStatement(actions=["cognito-idp:AssociateWebACL",
-                                                 "cognito-idp:DisassociateWebACL",
-                                                 "cognito-idp:GetWebACLForResource"], resources=["*"])]))
-            assoc.node.add_dependency(self.web_acl)
+            # ASSOCIATION is applied post-deploy WITH RETRY (scripts/network_waf_proof.py), not as a CFN
+            # resource. Two live findings (2026-09-05) drove this: (a) the native
+            # AWS::WAFv2::WebACLAssociation hangs indefinitely for a COGNITO target (its stabilization
+            # waiter misbehaves), and (b) a naive AwsCustomResource AssociateWebACL fired right after pool
+            # creation fails "AWS WAF couldn't retrieve the resource" - WAF<->Cognito association is
+            # eventually consistent and must be retried. The Web ACL itself is IaC here; production folds
+            # the association into a RETRYING Lambda-backed custom resource (tracked follow-up).
             cdk.CfnOutput(self, "WebAclArn", value=self.web_acl.attr_arn)
-            cdk.CfnOutput(self, "WafAssociatedResource", value=pool_arn)
+            cdk.CfnOutput(self, "WafAssociateTarget", value=pool_arn)
 
         cdk.CfnOutput(self, "UserPoolId", value=self.pool.user_pool_id)
         cdk.CfnOutput(self, "ClientId", value=self.client.user_pool_client_id)

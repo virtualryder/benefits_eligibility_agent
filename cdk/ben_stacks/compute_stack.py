@@ -39,6 +39,19 @@ class ComputeStack(cdk.Stack):
         if not guardrail_id and gcfg.get("name"):
             pa = (gcfg.get("prompt_attack") or "HIGH").upper()
             pii = [{"type": t, "action": "ANONYMIZE"} for t in gcfg.get("pii_anonymize", [])]
+            # #150: contextual grounding policy from the manifest `grounding:` thresholds. GROUNDING scores
+            # how well the drafted notice is supported by the case facts (grounding_source); RELEVANCE how
+            # well it answers the ask (query). The drafter tags its Converse content with those qualifiers,
+            # and benefits_core fails closed on guardrail_intervened, so an ungrounded/irrelevant notice is
+            # blocked. Thresholds are pilot-tunable in the manifest.
+            gnd = gcfg.get("grounding") or {}
+            grounding_filters = []
+            if gnd.get("grounding_threshold") is not None:
+                grounding_filters.append(bedrock.CfnGuardrail.ContextualGroundingFilterConfigProperty(
+                    type="GROUNDING", threshold=float(gnd["grounding_threshold"])))
+            if gnd.get("relevance_threshold") is not None:
+                grounding_filters.append(bedrock.CfnGuardrail.ContextualGroundingFilterConfigProperty(
+                    type="RELEVANCE", threshold=float(gnd["relevance_threshold"])))
             self.guardrail = bedrock.CfnGuardrail(
                 self, "Guardrail",
                 name=f"{prefix}-{gcfg['name']}",
@@ -52,6 +65,9 @@ class ComputeStack(cdk.Stack):
                     bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
                         pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(
                             type=e["type"], action=e["action"]) for e in pii]) if pii else None),
+                contextual_grounding_policy_config=(
+                    bedrock.CfnGuardrail.ContextualGroundingPolicyConfigProperty(
+                        filters_config=grounding_filters) if grounding_filters else None),
             )
             ver = bedrock.CfnGuardrailVersion(self, "GuardrailVersion",
                                               guardrail_identifier=self.guardrail.attr_guardrail_id)

@@ -95,7 +95,11 @@ def guardrail_from_manifest():
     makes a from-zero CDK deploy self-contained instead of depending on a pre-created guardrail."""
     import yaml
     m = yaml.safe_load(open(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"), encoding="utf-8"))
-    return dict((m or {}).get("guardrail") or {})
+    g = dict((m or {}).get("guardrail") or {})
+    # #150: fold the manifest `grounding:` thresholds into the guardrail config so the compute stack can
+    # add a Bedrock CONTEXTUAL GROUNDING policy (GROUNDING + RELEVANCE) to the guardrail.
+    g["grounding"] = dict((m or {}).get("grounding") or {})
+    return g
 
 
 app = cdk.App()
