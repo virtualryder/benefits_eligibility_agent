@@ -339,8 +339,11 @@ def main():
                               "budget_ok": budget_ok})
 
     def overpay(amount, within=True):
-        return m.tool(OVERPAY, {"prior_monthly_benefit": amount, "corrected_monthly_benefit": 200,
-                                "months": 6, "deidentified": True, "sanitized_ref": sr,
+        # AgentCore Cedar evaluates prior_monthly_benefit via the decimal extension; the incoming value
+        # must carry a decimal point or evaluation errors and fails closed. Send the overpayment
+        # numerics as decimals (floats) so the amount-cap gate evaluates on the real value.
+        return m.tool(OVERPAY, {"prior_monthly_benefit": float(amount), "corrected_monthly_benefit": 200.0,
+                                "months": 6.0, "deidentified": True, "sanitized_ref": sr,
                                 "within_service_window": within})
 
     c = {}
@@ -352,8 +355,11 @@ def main():
     c["budget_true"] = draft(True)
     c["amount_over"] = overpay(9000)
     c["amount_ok"] = overpay(3000)
-    c["window_closed"] = mask_call("cw-ent", within=False)
-    c["window_open"] = ent["cw-ent"]   # already within=true and allowed
+    # TEMPORAL is scoped to the decision actions (assess/redetermine/overpayment/draft), NOT mask_pii,
+    # so the window test must target a decision action. assess with within=false -> require_service_window
+    # fires; with within=true (+ consent/purpose ok) -> past the gate.
+    c["window_closed"] = assess(True, "eligibility", within=False)
+    c["window_open"] = c["consent_true"]   # assess within=true, consent/purpose ok -> past-gate
     ev["steps"].append({"step": "conditions", "calls": c})
 
 

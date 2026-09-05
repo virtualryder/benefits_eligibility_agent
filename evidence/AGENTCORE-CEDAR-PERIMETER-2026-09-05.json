@@ -1,0 +1,268 @@
+{
+ "env": "perim",
+ "prefix": "ben-perim",
+ "gateway_url": "https://ben-perim-ben-gw-7wzhehcprt.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+ "enforcement": "ENFORCE",
+ "policy_engine": "ben_perim_ben_authz-stvxcjvf28",
+ "steps": [
+  {
+   "step": "entitlement_infra",
+   "custom_attr": "exists_or_InvalidParameterException",
+   "mapper_fn": "arn:aws:lambda:us-east-1:111122223333:function:ben-perim-entitlement-mapper",
+   "mapper": "attached PreTokenGeneration V2_0",
+   "group": "tools_granted"
+  },
+  {
+   "step": "identities",
+   "users": {
+    "cw-ent": [
+     "benefits_caseworker",
+     "tools_granted"
+    ],
+    "cw-noent": [
+     "benefits_caseworker"
+    ],
+    "cw-claim": [
+     "benefits_caseworker"
+    ]
+   },
+   "token_claims": {
+    "cw-ent": {
+     "cognito:groups": [
+      "benefits_caseworker",
+      "tools_granted"
+     ],
+     "custom:tools": "intake_application,mask_pii,assess_eligibility,redetermine,detect_overpayment,draft_notice,write_audit,request_signoff"
+    },
+    "cw-noent": {
+     "cognito:groups": [
+      "benefits_caseworker"
+     ],
+     "custom:tools": ""
+    },
+    "cw-claim": {
+     "cognito:groups": [
+      "benefits_caseworker"
+     ],
+     "custom:tools": "intake_application,mask_pii,assess_eligibility,redetermine,detect_overpayment,draft_notice,write_audit,request_signoff"
+    }
+   }
+  },
+  {
+   "step": "entitlement",
+   "calls": {
+    "cw-noent": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to require_entitlement-n0nmecl5ny]"
+      }
+     }
+    },
+    "cw-ent": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"d88ae9f8317f41f3829f20549ba17747\",\"sanitized_sha256\":\"52cb318505c9c04261532caa3adcf6cc83254b3047f2bccbf1a78b9395969d3d\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788605421,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"e0b4ab22531851ad4cc8092a2819b3d872a616eb5a2ece9b6fafa565759ce0c4\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:AWS_SECRET_KEY]\"}"
+        }
+       ]
+      }
+     }
+    },
+    "cw-claim": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"deidentified\":true,\"entities_masked\":4,\"comprehend_entities\":4,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"c5c6b9dc9dda4e029e83912a0d0d4cdf\",\"sanitized_sha256\":\"33f4ef6e2c5b51762b7bd19edab3b6f428e1d31a59fd653523a0719671b98fc7\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":4,\"ts\":1788605424,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"350df8883ead296033f368416a936e7f35552ca7c469ff6b7b0f6e72fb7e19ec\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. 2ef59c62-69fa-43ee-86ef-d1e060b5faed\"}"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "step": "sanitized_ref_minted",
+   "have_ref": true,
+   "masked_by": "comprehend:DetectPiiEntities+regex-backstop",
+   "deidentified": true
+  },
+  {
+   "step": "conditions",
+   "calls": {
+    "consent_false": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to consent_purpose_before_assess-nkat4xv9jo]"
+      }
+     }
+    },
+    "consent_true": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"assessed\":true,\"determination\":\"ELIGIBLE\",\"eligible\":true,\"processing_clock\":\"STANDARD\",\"processing_days\":30,\"income_pct_fpl\":79.1,\"household_size\":3,\"deidentified_input\":true,\"assessed_by\":\"rules:FPL/SNAP-gross(2026 authoritative)\",\"fpl_source\":\"HHS 2026 Poverty Guidelines (Federal Register 2026-00755); SNAP gross limit 130% FPL (7 CFR 273.9)\",\"fpl_year\":2026,\"reason\":\"gross monthly income 1800 is within the 130% FPL limit (2960)\",\"notes\":[\"FPL uses the authoritative 2026 HHS guidelines; AK/HI and program/state variations are configurable\",\"gross-income test only; net-income test and verification remain for caseworker review\"]}"
+        }
+       ]
+      }
+     }
+    },
+    "purpose_bad": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to consent_purpose_before_assess-nkat4xv9jo]"
+      }
+     }
+    },
+    "purpose_good": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 6,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"assessed\":true,\"determination\":\"ELIGIBLE\",\"eligible\":true,\"processing_clock\":\"STANDARD\",\"processing_days\":30,\"income_pct_fpl\":79.1,\"household_size\":3,\"deidentified_input\":true,\"assessed_by\":\"rules:FPL/SNAP-gross(2026 authoritative)\",\"fpl_source\":\"HHS 2026 Poverty Guidelines (Federal Register 2026-00755); SNAP gross limit 130% FPL (7 CFR 273.9)\",\"fpl_year\":2026,\"reason\":\"gross monthly income 1800 is within the 130% FPL limit (2960)\",\"notes\":[\"FPL uses the authoritative 2026 HHS guidelines; AK/HI and program/state variations are configurable\",\"gross-income test only; net-income test and verification remain for caseworker review\"]}"
+        }
+       ]
+      }
+     }
+    },
+    "budget_false": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 7,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to budget_before_draft-yrj8hpw86g]"
+      }
+     }
+    },
+    "budget_true": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 8,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"drafted_by\":\"us.anthropic.claude-sonnet-4-5-20250929-v1:0\",\"chars\":1194,\"guardrail_applied\":false,\"deidentified_input\":true,\"budget\":{\"metered\":true,\"tokens\":552,\"usd_micro\":5484,\"used_tokens\":1095,\"pct_tokens\":0.02,\"price_version\":\"benefits-2026-09-03-anthropic-platform-UNCONFIRMED-ON-BEDROCK\"},\"notice_ref\":\"case-1326ac2ad81d4a7fb147249130eefbe2\"}"
+        }
+       ]
+      }
+     }
+    },
+    "amount_over": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to amount_cap_overpayment-l1f0i18gqq]"
+      }
+     }
+    },
+    "amount_ok": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 10,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"computed\":true,\"classification\":\"OVERPAYMENT\",\"overpayment_amount\":16800.0,\"monthly_difference\":2800.0,\"months\":6,\"deidentified_input\":true,\"computed_by\":\"rules:overpayment(prior-corrected)*months\",\"note\":\"overpayment identified; recovery must follow adequate notice and the household's appeal rights, and any suspected-fraud referral is a HUMAN-only decision (the agent cannot refer).\"}"
+        }
+       ]
+      }
+     }
+    },
+    "window_closed": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 11,
+      "error": {
+       "code": -32002,
+       "message": "Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied due to require_service_window-iie630jhl2]"
+      }
+     }
+    },
+    "window_open": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"assessed\":true,\"determination\":\"ELIGIBLE\",\"eligible\":true,\"processing_clock\":\"STANDARD\",\"processing_days\":30,\"income_pct_fpl\":79.1,\"household_size\":3,\"deidentified_input\":true,\"assessed_by\":\"rules:FPL/SNAP-gross(2026 authoritative)\",\"fpl_source\":\"HHS 2026 Poverty Guidelines (Federal Register 2026-00755); SNAP gross limit 130% FPL (7 CFR 273.9)\",\"fpl_year\":2026,\"reason\":\"gross monthly income 1800 is within the 130% FPL limit (2960)\",\"notes\":[\"FPL uses the authoritative 2026 HHS guidelines; AK/HI and program/state variations are configurable\",\"gross-income test only; net-income test and verification remain for caseworker review\"]}"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "step": "teardown_mapper",
+   "result": {
+    "detached_trigger": true,
+    "deleted_fn": true,
+    "deleted_role": true
+   }
+  }
+ ],
+ "diagnostic_custom_tools_claim": {
+  "custom_tools_in_token": true,
+  "custom_tools_claim_enforced_in_cedar": true,
+  "cw-claim_result": "allowed"
+ },
+ "verdict": {
+  "entitlement_zero_default": true,
+  "consent_required": true,
+  "purpose_limited": true,
+  "budget_gate": true,
+  "amount_cap": true,
+  "temporal_window": true,
+  "PASS": true
+ }
+}
