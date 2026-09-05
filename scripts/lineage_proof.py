@@ -33,16 +33,34 @@ CORRELATION_KEYS = ("trace_id", "session_id", "execution_arn", "case_id")
 _LAMBDA_INVOKE_EVENTS = {"Invoke", "InvokeFunction", "Invoke20150331", "InvokeAsync"}
 
 
-def tool_of(function_name, tool_names):
-    """Map a CloudTrail Lambda functionName back to the logical governed tool it hosts. The governed
-    Lambdas embed the tool name in the function name (e.g. ben-gate-mask_pii). Longest match wins so
-    'signoff_register' is not shadowed by 'request_signoff' etc."""
-    fn = function_name or ""
-    hits = [t for t in tool_names if t and t in fn]
-    return max(hits, key=len) if hits else None
+def _canon(s):
+    return "".join(ch for ch in (s or "").lower() if ch.isalnum())
 
 
-def assess_coverage(sources, tool_names):
+def tool_of(function_name, tool_names, prefix="ben-gate-", aliases=None):
+    """Map a CloudTrail Lambda functionName to the aegis tool identity it hosts, tolerant of the
+    deployment differences between the function name (ben-gate-mask-pii, ben-gate-finalize) and the
+    aegis.call tool field (mask_pii, finalize_signoff): compare on the alphanumeric-only stem with
+    bidirectional containment, longest match wins so 'signoff_register' is not shadowed by
+    'request_signoff'. `aliases` maps a canonical function stem to an aegis tool for the cases with no
+    lexical overlap (the multi-tool 'core-tools' Lambda hosts the 'benefits_core' drafter)."""
+    raw = (function_name or "").split(":function:")[-1]  # ARN -> bare function name
+    fn = _canon(raw)
+    pf = _canon(prefix)
+    stem = fn[len(pf):] if pf and fn.startswith(pf) else fn
+    aliases = aliases or {}
+    if stem in aliases and aliases[stem] in tool_names:
+        return aliases[stem]
+    best = None
+    for t in tool_names:
+        ct = _canon(t)
+        if ct and (ct in stem or stem in ct):
+            if best is None or len(ct) > len(_canon(best)):
+                best = t
+    return best
+
+
+def assess_coverage(sources, tool_names, aliases=None):
     """The coverage assertion. `sources` is a dict of lists (cloudtrail, aegis, worm, model_log, sfn,
     gateway); see the fixtures in the offline test for the exact node shapes. Returns a verdict dict
     with covered:bool and the list of orphans."""
@@ -52,7 +70,7 @@ def assess_coverage(sources, tool_names):
     ct_invokes, aegis_calls = {}, {}
     for e in sources.get("cloudtrail", []):
         if e.get("event_source") == "lambda.amazonaws.com" and e.get("event_name") in _LAMBDA_INVOKE_EVENTS:
-            t = tool_of(e.get("target", ""), tool_names)
+            t = tool_of(e.get("target", ""), tool_names, aliases=aliases)
             if t:
                 ct_invokes[t] = ct_invokes.get(t, 0) + 1
     for a in sources.get("aegis", []):
@@ -169,20 +187,27 @@ def _iso_ms(ts):
         return 0
 
 
-def read_cloudtrail_capture(logs, capture_log_group, prefix, start, end):
-    """Read the account capture trail's CloudWatch Logs: every governed Lambda invoke, every S3 write
-    to a pack bucket, and Step Functions control-plane calls in the window."""
-    q = (r'fields @timestamp, eventSource, eventName, '
+def read_cloudtrail_capture(logs, capture_log_group, prefix, start, end, query_end=None):
+    """CloudTrail delivers to CloudWatch Logs at DELIVERY time (minutes after the API call), so query a
+    broad delivery window [start, query_end=now] but keep only events whose own eventTime falls in the
+    semantic window [start, end] - the execution window. Returns governed Lambda invokes, S3 writes to
+    pack buckets, and Step Functions calls."""
+    import time as _t
+    query_end = query_end or int(_t.time() * 1000)
+    q = (r'fields @timestamp, eventTime, eventSource, eventName, '
          r'requestParameters.functionName as fn, requestParameters.bucketName as bkt, '
          r'userIdentity.arn as who, requestParameters.stateMachineArn as sm '
          r'| filter (eventSource="lambda.amazonaws.com" and eventName like /Invoke/ and fn like /' + prefix + r'/) '
          r'or (eventSource="s3.amazonaws.com" and (eventName="PutObject" or eventName="CompleteMultipartUpload") and bkt like /' + prefix + r'/) '
          r'or (eventSource="states.amazonaws.com") '
-         r'| sort @timestamp asc | limit 2000')
-    rows = _insights(logs, [capture_log_group], q, start, end)
+         r'| sort @timestamp asc | limit 5000')
+    rows = _insights(logs, [capture_log_group], q, start, max(end, query_end))
     out = []
     for r in rows:
-        out.append({"ts": _iso_ms(r.get("@timestamp")), "event_source": r.get("eventSource", ""),
+        et = _iso_ms(r.get("eventTime"))
+        if et and not (start <= et <= end):
+            continue
+        out.append({"ts": et or _iso_ms(r.get("@timestamp")), "event_source": r.get("eventSource", ""),
                     "event_name": r.get("eventName", ""),
                     "target": r.get("fn") or r.get("bkt") or r.get("sm") or "",
                     "principal": r.get("who", "")})
@@ -205,14 +230,16 @@ def main():
     ap.add_argument("--lambda-log-prefix", default="")
     ap.add_argument("--capture-worm-bucket", default="", help="write the coverage evidence under Object-Lock")
     ap.add_argument("--window-min", type=int, default=60)
+    ap.add_argument("--start-ms", type=int, default=0)
+    ap.add_argument("--end-ms", type=int, default=0)
     ap.add_argument("--tool-names", default="")
     args = ap.parse_args()
 
-    end = int(time.time() * 1000)
-    start = end - args.window_min * 60 * 1000
+    end = args.end_ms or int(time.time() * 1000)
+    start = args.start_ms or (end - args.window_min * 60 * 1000)
 
     logs = boto3.client("logs", region_name=args.region)
-    ddb = boto3.resource("dynamodb", region_name=args.region)
+    ddb = boto3.client("dynamodb", region_name=args.region)
     sfn = boto3.client("stepfunctions", region_name=args.region)
 
     # Seed correlation keys from the case's WORM rows (same seed trace_case uses).
@@ -244,9 +271,12 @@ def main():
 
     sources = {
         "cloudtrail": cloudtrail,
-        "aegis": [_corr(a.get("keys", {}), {"tool": a.get("tool"), "ts": a.get("ts"), "args_sha256": a.get("args_sha256")})
+        "aegis": [dict({k: a.get(k) for k in CORRELATION_KEYS if a.get(k)},
+                       tool=a.get("tool"), ts=a.get("ts"), args_sha256=a.get("args_sha256"))
                   for a in aegis],
-        "model_log": [_corr(m.get("keys", {}), {"ts": m.get("ts"), "request_id": (m.get("keys") or {}).get("request_id")})
+        "model_log": [dict({k: (m.get(k) or (m.get("requestMetadata") or {}).get(k)) for k in CORRELATION_KEYS
+                            if (m.get(k) or (m.get("requestMetadata") or {}).get(k))},
+                       ts=m.get("ts"), request_id=m.get("requestId"))
                       for m in model],
         "worm": [{"ts": int(r.get("recorded_at", 0)) * 1000, "key": r.get("_key"),
                   **{k: (r.get("correlation") or {}).get(k) for k in CORRELATION_KEYS if (r.get("correlation") or {}).get(k)},
@@ -257,11 +287,13 @@ def main():
     }
 
     tool_names = [t for t in args.tool_names.split(",") if t] or [
-        "mask_pii", "assess_eligibility", "redetermine", "overpayment", "draft_award_notice",
-        "verify_income", "ingest_case", "request_signoff", "signoff_register", "approve_signoff",
-        "finalize_signoff", "write_audit"]
+        "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
+        "ingest_application", "intake_application", "workflow_guards",
+        "request_signoff", "signoff_register", "approve_signoff", "finalize_signoff", "write_audit"]
+    # the multi-tool core-tools Lambda hosts the benefits_core drafter (no lexical overlap in the name)
+    aliases = {"coretools": "benefits_core"}
 
-    verdict = assess_coverage(sources, tool_names)
+    verdict = assess_coverage(sources, tool_names, aliases=aliases)
     lineage = build_lineage(sources)
     md = verdict_markdown(args.case_id, args.tenant, lineage, verdict)
     print(md)
