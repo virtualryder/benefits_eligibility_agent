@@ -32,6 +32,10 @@ _PERIMETER_INPUT_FIELDS = {
     "purpose": {"type": "string", "description": "Perimeter gate: declared processing purpose (purpose-limitation), e.g. eligibility / redetermination."},
     "budget_ok": {"type": "boolean", "description": "Perimeter gate: the live per-tenant spend meter is under cap (interceptor-injected in production; coarse gateway gate)."},
     "within_service_window": {"type": "boolean", "description": "Perimeter gate: the request time is inside the deployment service window (interceptor-injected in production; coarse gateway gate)."},
+    # deep-dive #3: the case id the interceptor's authoritative_context resolver uses to look up the
+    # AUTHORITATIVE consent record + the case's authorized purpose (so consent/purpose above are derived
+    # from a trusted record, not the caller). Declared so it flows through the gateway to the interceptor.
+    "case_id": {"type": "string", "description": "The case identifier; the gateway interceptor resolves the authoritative consent/purpose for this case from the server-side authz store."},
 }
 
 

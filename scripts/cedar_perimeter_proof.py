@@ -327,54 +327,55 @@ def main():
 
     m = Mcp(url, tok["cw-ent"]); m.init()
 
-    def assess(consent, purpose, within=True):
-        return m.tool(ASSESS, {"household_size": 3, "monthly_income": 1800, "liquid_resources": 400,
-                               "categorical_eligibility": False, "deidentified": True,
-                               "sanitized_ref": sr, "within_service_window": within,
-                               "consent": consent, "purpose": purpose})
+    # ---- #3 AUTHORITATIVE consent/purpose (end-to-end). The interceptor STRIPS caller-supplied
+    # consent/purpose and the authoritative_context resolver injects them from the server-side authz
+    # store keyed by case_id. Seed ONE authorized case (consent recorded + authorized purpose); use one
+    # UNAUTHORIZED case. budget_ok / within_service_window are ALSO caller-uncontrollable now (server
+    # meter / server clock) - their negatives are covered by governed-core's offline interceptor tests
+    # and the live budget gate; here we prove the two the resolver owns.
+    data = outputs(cf, f"{prefix}-data")
+    authz_table = data.get("AuthzTableName") or f"{prefix}-authz-context"
+    authz = boto3.resource("dynamodb", region_name=a.region).Table(authz_table)
+    CASE_AUTH = "CASE-AUTH-" + uuid.uuid4().hex[:8]
+    CASE_NOAUTH = "CASE-NOAUTH-" + uuid.uuid4().hex[:8]
+    authz.put_item(Item={"case_id": CASE_AUTH, "consent": True, "authorized_purpose": "eligibility"})
+    ev["steps"].append({"step": "authz_seed", "table": authz_table,
+                        "authorized_case": CASE_AUTH, "unauthorized_case": CASE_NOAUTH})
 
-    def draft(budget_ok, within=True):
-        return m.tool(DRAFT, {"case": "Determination: eligible (synthetic).", "deidentified": True,
-                              "sanitized_ref": sr, "within_service_window": within,
-                              "budget_ok": budget_ok})
+    def assess(case_id, forge_consent=False):
+        args = {"household_size": 3, "monthly_income": 1800, "liquid_resources": 400,
+                "categorical_eligibility": False, "deidentified": True,
+                "sanitized_ref": sr, "case_id": case_id}
+        if forge_consent:   # the caller TRIES to assert consent/purpose — the interceptor MUST strip them
+            args.update({"consent": True, "purpose": "eligibility"})
+        return m.tool(ASSESS, args)
 
-    def overpay(amount, within=True):
-        # AgentCore Cedar evaluates prior_monthly_benefit via the decimal extension; the incoming value
-        # must carry a decimal point or evaluation errors and fails closed. Send the overpayment
-        # numerics as decimals (floats) so the amount-cap gate evaluates on the real value.
+    def overpay(amount):
+        # AgentCore Cedar evaluates prior_monthly_benefit via the decimal extension; send decimals so the
+        # amount-cap gate evaluates on the real value. amount is a REAL tool arg (not a stripped field).
         return m.tool(OVERPAY, {"prior_monthly_benefit": float(amount), "corrected_monthly_benefit": 200.0,
-                                "months": 6.0, "deidentified": True, "sanitized_ref": sr,
-                                "within_service_window": within})
+                                "months": 6.0, "deidentified": True, "sanitized_ref": sr, "case_id": CASE_AUTH})
 
     c = {}
-    c["consent_false"] = assess(False, "eligibility")
-    c["consent_true"] = assess(True, "eligibility")
-    c["purpose_bad"] = assess(True, "fraud")
-    c["purpose_good"] = assess(True, "redetermination")
-    c["budget_false"] = draft(False)
-    c["budget_true"] = draft(True)
+    c["authz_present"] = assess(CASE_AUTH)                             # authoritative record -> past-gate
+    c["forged_no_record"] = assess(CASE_NOAUTH, forge_consent=True)    # caller forges, no record -> DENIED
     c["amount_over"] = overpay(9000)
     c["amount_ok"] = overpay(3000)
-    # TEMPORAL is scoped to the decision actions (assess/redetermine/overpayment/draft), NOT mask_pii,
-    # so the window test must target a decision action. assess with within=false -> require_service_window
-    # fires; with within=true (+ consent/purpose ok) -> past the gate.
-    c["window_closed"] = assess(True, "eligibility", within=False)
-    c["window_open"] = c["consent_true"]   # assess within=true, consent/purpose ok -> past-gate
     ev["steps"].append({"step": "conditions", "calls": c})
-
 
     def allowed(x):
         return not is_denied(x)
 
     verdict = {
-        # #160 — the gating proofs
+        # #160 — zero-default entitlement
         "entitlement_zero_default": is_denied(ent["cw-noent"]) and allowed(ent["cw-ent"]),
-        # #161 — each gate proven by the contrast (only the tested field differs)
-        "consent_required":  is_denied(c["consent_false"]) and allowed(c["consent_true"]),
-        "purpose_limited":   is_denied(c["purpose_bad"]) and allowed(c["purpose_good"]),
-        "budget_gate":       is_denied(c["budget_false"]) and allowed(c["budget_true"]),
-        "amount_cap":        is_denied(c["amount_over"]) and allowed(c["amount_ok"]),
-        "temporal_window":   is_denied(c["window_closed"]) and allowed(c["window_open"]),
+        # #3 END-TO-END — consent/purpose are AUTHORITATIVE, not caller-asserted. A case with a real
+        # authz record passes; a caller that FORGES consent/purpose on a case with NO record is DENIED
+        # (interceptor stripped the caller values, resolver found no record -> Cedar sees them unset).
+        # NOTE: this ALSO proves the interceptor's injection reaches the Cedar decision — if Cedar read
+        # the pre-interceptor caller args, the pattern would invert (authz_present denied, forged allowed).
+        "consent_purpose_authoritative": allowed(c["authz_present"]) and is_denied(c["forged_no_record"]),
+        "amount_cap": is_denied(c["amount_over"]) and allowed(c["amount_ok"]),
     }
     # diagnostic (NON-gating): does the per-user custom:tools claim alone reach Cedar?
     diag = {

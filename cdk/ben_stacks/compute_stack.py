@@ -150,6 +150,11 @@ class ComputeStack(cdk.Stack):
             "SANITIZED_TABLE": data.sanitized_table.table_name,
             "PENDING_TABLE": data.pending_table.table_name,
             "CASE_TABLE": data.case_table.table_name,   # R3-2 pass-by-reference store
+            # deep-dive #3: the AUTHORITATIVE consent/authorized-purpose store the interceptor's
+            # authoritative_context resolver reads so Cedar's consent/purpose come from a trusted record,
+            # never a caller-asserted boolean. Per-tenant routed via AUTHZ_TABLE_TEMPLATE in MT mode.
+            "AUTHZ_TABLE": data.authz_table.table_name,
+            "AUTHZ_TABLE_TEMPLATE": f"{prefix}-{{tenant}}-authz-context",
         }
         # Gate-B B5: the deployment's pinned tenant (one agency per isolated deployment). Tenant identity
         # is DERIVED from this env, never from a request body (lib/controls/tenancy.py).
@@ -305,6 +310,14 @@ class ComputeStack(cdk.Stack):
         data.audit_table.grant(self.tenant_interceptor, "dynamodb:PutItem", "dynamodb:GetItem",
                                "dynamodb:TransactWriteItems")
         data.worm_bucket.grant_put(self.tenant_interceptor)
+        # deep-dive #3: the interceptor's authoritative_context resolver READS the authoritative
+        # consent/authorized-purpose record (least privilege: GetItem only). In multi-tenant mode it also
+        # needs the per-tenant authz tables (name pattern <prefix>-*-authz-context), granted below.
+        data.authz_table.grant(self.tenant_interceptor, "dynamodb:GetItem")
+        if multitenant:
+            self.tenant_interceptor.add_to_role_policy(iam.PolicyStatement(
+                sid="AuthzPerTenantRead", actions=["dynamodb:GetItem"],
+                resources=[f"arn:aws:dynamodb:{self.region}:{self.account}:table/{prefix}-*-authz-context"]))
         # Budget meter grants (least privilege): the interceptor only READS the meter (check); the drafter
         # (server-side Bedrock call) READS + UPDATES it (commit) and publishes the Aegis/Budget metrics.
         # The Runtime's exec role is granted the same by lib/runtime/_obs_setup.sh (it is created by the
