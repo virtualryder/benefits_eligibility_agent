@@ -47,6 +47,9 @@ COUNT_PATTERNS = [
     re.compile(r"\b(\d{2,4}) tests?\b"),
     re.compile(r"\b(\d{2,4})-test\b"),
     re.compile(r"\b(\d{2,4}) passing\b"),
+    # "**244** passing" - bold markers between the number and the word slipped past every pattern above
+    # (RELEASE-MANIFEST.md carried a stale bold count for two bumps).
+    re.compile(r"\*\*(\d{2,4})\*\*\s+passing\b"),
     re.compile(r"\b(\d{2,4}) / \1\b"),
     re.compile(r"\b(\d{2,4})/\1\b"),
 ]
@@ -124,7 +127,9 @@ def test_cdk_assertion_count_in_docs_matches_the_cdk_test_module():
         text = p.read_text(encoding="utf-8")
         # "7 CDK stacks" is a stack count, not an assertion count - only judge
         # numbers that are actually describing assertions.
-        for m in re.finditer(r"\b(\d{1,3}) CDK(?! stacks?\b)\b", text):
+        # exclude "7 CDK stacks" (a stack count) but NOT "25 CDK stack-synthesis assertions" (an assertion
+        # count that hid behind the old lookahead because "stack" is followed by "-", a word boundary).
+        for m in re.finditer(r"\b(\d{1,3}) CDK(?! stacks?(?![\w-]))\b", text):
             n = int(m.group(1))
             if n != cdk_tests:
                 line = text[: m.start()].count("\n") + 1

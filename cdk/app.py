@@ -184,6 +184,7 @@ tenant_data = {t: DataStack(app, f"{prefix}-{t}-data", prefix=prefix, retention_
 network = None
 if (app.node.try_get_context("network_mode") or "public") == "private":
     network = NetworkStack(app, f"{prefix}-network", prefix=prefix,
+                           azs=tuple(a.strip() for a in str(app.node.try_get_context("vpc_azs") or "").split(",") if a.strip()),
                            bedrock_principals=tuple(
                                a.strip() for a in str(app.node.try_get_context("approved_bedrock_principals") or "").split(",")
                                if a.strip()))

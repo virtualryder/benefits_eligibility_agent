@@ -25,14 +25,24 @@ ALLOWED_DOMAINS = []
 
 
 class NetworkStack(cdk.Stack):
-    def __init__(self, scope: Construct, cid: str, *, prefix: str, bedrock_principals=(), **kw):
+    # AZs every interface endpoint this VPC needs is offered in (us-east-1, checked 2026-09-05 with
+    # `aws ec2 describe-vpc-endpoint-services`): cognito-idp is offered ONLY in us-east-1b/1c/1d, while
+    # comprehend / bedrock-runtime / states / secretsmanager / logs / kms / sts are in every AZ. The
+    # previous pin (1a + 1b) failed the Tier-1 live gate on the cognito-idp endpoint ("does not support
+    # the availability zone of the subnet") - the endpoint had only ever been unit-synthesized. Override
+    # per account/region with -c vpc_azs=<az>,<az>; AZ-name-to-physical mapping differs per account, so
+    # re-check the cognito-idp AZ list when deploying elsewhere.
+    DEFAULT_AZS = ("us-east-1b", "us-east-1c")
+
+    def __init__(self, scope: Construct, cid: str, *, prefix: str, bedrock_principals=(), azs=(), **kw):
         super().__init__(scope, cid, **kw)
+        self.azs = [a for a in (azs or self.DEFAULT_AZS) if a]
 
         # Isolated-only VPC: no public subnets, no NAT, no IGW. The app subnets have no default route
-        # to 0.0.0.0/0 at all. AZs pinned to the us-east-1 deployment path (parity with the siblings).
+        # to 0.0.0.0/0 at all. AZs pinned to ones every required interface endpoint is offered in.
         self.vpc = ec2.Vpc(
             self, "Vpc", vpc_name=f"{prefix}-net",
-            availability_zones=["us-east-1a", "us-east-1b"], nat_gateways=0,
+            availability_zones=list(self.azs), nat_gateways=0,
             subnet_configuration=[
                 ec2.SubnetConfiguration(name="app", subnet_type=ec2.SubnetType.PRIVATE_ISOLATED, cidr_mask=24),
             ])

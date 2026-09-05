@@ -644,3 +644,21 @@ def test_bedrock_runtime_endpoint_policy_admits_only_the_governed_drafter():
     # every other endpoint keeps the default (no restrictive policy needed there)
     others = [v for v in eps.values() if "bedrock-runtime" not in json.dumps(v["Properties"]["ServiceName"])]
     assert all("PolicyDocument" not in v["Properties"] for v in others)
+
+
+def test_private_vpc_azs_are_ones_every_endpoint_service_offers():
+    """Live-found (Tier-1 gate, 2026-09-05): cognito-idp is offered only in us-east-1b/1c/1d, so a VPC
+    pinned to 1a broke the network stack on its first real private-mode deploy. Every subnet must sit in
+    the vetted AZ set, every interface endpoint must span exactly those subnets, and -c vpc_azs overrides."""
+    t = T_NET
+    subnets = t.find_resources("AWS::EC2::Subnet")
+    azs = {v["Properties"]["AvailabilityZone"] for v in subnets.values()}
+    assert azs == set(NetworkStack.DEFAULT_AZS), azs
+    assert "us-east-1a" not in azs
+    for v in t.find_resources("AWS::EC2::VPCEndpoint").values():
+        if v["Properties"].get("VpcEndpointType") == "Interface":
+            assert len(v["Properties"]["SubnetIds"]) == len(NetworkStack.DEFAULT_AZS)
+    app = aws_cdk.App()
+    n2 = Template.from_stack(NetworkStack(app, "naz", prefix="ben-az", azs=("us-east-1c", "us-east-1d")))
+    assert {v["Properties"]["AvailabilityZone"] for v in n2.find_resources("AWS::EC2::Subnet").values()} == {"us-east-1c", "us-east-1d"}
+

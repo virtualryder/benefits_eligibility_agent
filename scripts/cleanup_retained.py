@@ -34,17 +34,40 @@ def main():
             print("deleted table", t)
 
     s3 = s.client("s3")
+
+    def _locked(name):
+        try:
+            return s3.get_object_lock_configuration(Bucket=name)["ObjectLockConfiguration"].get(
+                "ObjectLockEnabled") == "Enabled"
+        except Exception:
+            return False
+
     for b in s3.list_buckets()["Buckets"]:
         if p in b["Name"]:
             try:
-                vs = s3.list_object_versions(Bucket=b["Name"])
-                for o in vs.get("Versions", []) + vs.get("DeleteMarkers", []):
-                    s3.delete_object(Bucket=b["Name"], Key=o["Key"], VersionId=o["VersionId"],
-                                     BypassGovernanceRetention=True)
+                # BypassGovernanceRetention is only VALID on an Object-Lock bucket - on a plain bucket
+                # it is an InvalidRequest (the 2026-09-05 residue: the observability data-events
+                # bucket survived every sweep). Decide per bucket.
+                bypass = {"BypassGovernanceRetention": True} if _locked(b["Name"]) else {}
+                paginator = s3.get_paginator("list_object_versions")
+                for page in paginator.paginate(Bucket=b["Name"]):
+                    for o in page.get("Versions", []) + page.get("DeleteMarkers", []):
+                        s3.delete_object(Bucket=b["Name"], Key=o["Key"], VersionId=o["VersionId"], **bypass)
                 s3.delete_bucket(Bucket=b["Name"])
                 print("deleted bucket", b["Name"])
             except Exception as e:
-                print("bucket", b["Name"], "->", type(e).__name__)
+                print("bucket", b["Name"], "->", type(e).__name__, str(e)[:120])
+
+    # log groups a destroy can leave (RETAIN'd invocation store, CloudTrail delivery group, vended logs)
+    lg = s.client("logs")
+    for pat in ("/aws/cloudtrail/%s" % p, "/aws/bedrock/modelinvocations/%s" % p, "/aws/lambda/%s" % p,
+                "/aws/vendedlogs/bedrock-agentcore/gateway/%s" % p, "/aws/vendedlogs/%s" % p):
+        for g in lg.describe_log_groups(logGroupNamePrefix=pat).get("logGroups", []):
+            try:
+                lg.delete_log_group(logGroupName=g["logGroupName"])
+                print("deleted log group", g["logGroupName"])
+            except Exception as e:
+                print("log group", g["logGroupName"], "->", type(e).__name__)
 
     cog = s.client("cognito-idp")
     for pool in cog.list_user_pools(MaxResults=60)["UserPools"]:
@@ -96,6 +119,10 @@ def main():
         "stacks": [st["StackName"] for st in s.client("cloudformation").describe_stacks()["Stacks"]
                    if st["StackName"].startswith(p)],
         "pools": [q["Name"] for q in cog.list_user_pools(MaxResults=60)["UserPools"] if q["Name"].startswith(p)],
+        "buckets": [b["Name"] for b in s3.list_buckets()["Buckets"] if p in b["Name"]],
+        "log_groups": [g["logGroupName"] for pat in ("/aws/cloudtrail/%s" % p, "/aws/bedrock/modelinvocations/%s" % p,
+                                                     "/aws/lambda/%s" % p, "/aws/vendedlogs/bedrock-agentcore/gateway/%s" % p)
+                       for g in lg.describe_log_groups(logGroupNamePrefix=pat).get("logGroups", [])],
     }
     clean = not any(residue.values())
     print(json.dumps({"prefix": p, "clean": clean, "residue": residue}, indent=2))
