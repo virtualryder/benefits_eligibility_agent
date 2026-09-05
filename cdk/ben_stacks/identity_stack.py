@@ -11,14 +11,14 @@ ENFORCED, and an enterprise OIDC IdP can be attached AS IaC (issuer/client id vi
 secret via a Secrets Manager dynamic reference — never plaintext in the template). Federated users
 land in the SAME pool and hit the SAME deny-by-default Cedar policies as native operators."""
 import aws_cdk as cdk
-from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_cognito as cognito, aws_wafv2 as wafv2
 from constructs import Construct
 
 
 class IdentityStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str,
                  identity_mode: str = "sandbox", federation: dict | None = None,
-                 tenants: tuple = (), **kw):
+                 tenants: tuple = (), waf: bool = False, **kw):
         super().__init__(scope, cid, **kw)
         if identity_mode not in ("sandbox", "pilot"):
             raise ValueError(f"unknown identity_mode {identity_mode!r}; choose sandbox or pilot")
@@ -93,6 +93,52 @@ class IdentityStack(cdk.Stack):
         cognito.CfnUserPoolGroup(self, "ReviewerGroup", user_pool_id=self.pool.user_pool_id,
                                  group_name="benefits_caseworker",
                                  description="Qualified benefits caseworkers (Cedar role group)")
+
+        # ── #170: WAFv2 on the auth front door ───────────────────────────────
+        # The AgentCore Gateway and Runtime are MANAGED endpoints and are NOT WAF-associable resource
+        # types (WAFv2 associates only with ALB / API Gateway / CloudFront / AppSync / Cognito user pool
+        # / App Runner). The Cognito user pool IS the token-issuance surface for the whole runtime path,
+        # and it IS associable — so the perimeter WAF sits here (`-c waf=1`): a REGIONAL Web ACL with the
+        # AWS managed Common Rule Set + a per-IP rate limit, default-allow. (No ATP managed rule set and
+        # no CAPTCHA action: Cognito forbids ATP on a pool and CAPTCHA can break managed-login TOTP.)
+        self.web_acl = None
+        self.web_acl_arn = ""
+        if waf:
+            self.web_acl = wafv2.CfnWebACL(
+                self, "AuthWebAcl",
+                name=f"{prefix}-auth-waf", scope="REGIONAL",
+                default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
+                visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                    sampled_requests_enabled=True, cloud_watch_metrics_enabled=True,
+                    metric_name=f"{prefix}-auth-waf"),
+                rules=[
+                    wafv2.CfnWebACL.RuleProperty(
+                        name="CommonRuleSet", priority=1,
+                        override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
+                        statement=wafv2.CfnWebACL.StatementProperty(
+                            managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                                vendor_name="AWS", name="AWSManagedRulesCommonRuleSet")),
+                        visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                            sampled_requests_enabled=True, cloud_watch_metrics_enabled=True,
+                            metric_name=f"{prefix}-waf-common")),
+                    wafv2.CfnWebACL.RuleProperty(
+                        name="RateLimitPerIp", priority=2,
+                        action=wafv2.CfnWebACL.RuleActionProperty(block={}),
+                        statement=wafv2.CfnWebACL.StatementProperty(
+                            rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                                limit=2000, aggregate_key_type="IP")),
+                        visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                            sampled_requests_enabled=True, cloud_watch_metrics_enabled=True,
+                            metric_name=f"{prefix}-waf-ratelimit")),
+                ])
+            self.web_acl_arn = self.web_acl.attr_arn
+            pool_arn = f"arn:aws:cognito-idp:{self.region}:{self.account}:userpool/{self.pool.user_pool_id}"
+            assoc = wafv2.CfnWebACLAssociation(self, "AuthWebAclAssoc",
+                                               resource_arn=pool_arn, web_acl_arn=self.web_acl.attr_arn)
+            assoc.add_dependency(self.web_acl)
+            cdk.CfnOutput(self, "WebAclArn", value=self.web_acl.attr_arn)
+            cdk.CfnOutput(self, "WafAssociatedResource", value=pool_arn)
+
         cdk.CfnOutput(self, "UserPoolId", value=self.pool.user_pool_id)
         cdk.CfnOutput(self, "ClientId", value=self.client.user_pool_client_id)
         cdk.CfnOutput(self, "IdentityMode", value=identity_mode)

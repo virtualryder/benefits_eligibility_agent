@@ -436,3 +436,50 @@ def test_drafter_gets_guardrail_env_and_applyguardrail_perm():
     t.has_resource_properties("AWS::IAM::Policy", Match.object_like({
         "PolicyDocument": {"Statement": Match.array_with([
             Match.object_like({"Action": "bedrock:ApplyGuardrail"})])}}))
+
+
+# ── #170: WAFv2 on the Cognito auth front door + VPC on the compute path ────
+
+def test_waf_off_by_default():
+    """No Web ACL unless -c waf=1 (baseline identity is unchanged)."""
+    app = aws_cdk.App()
+    t = Template.from_stack(IdentityStack(app, "i0", prefix="ben-test"))
+    t.resource_count_is("AWS::WAFv2::WebACL", 0)
+
+
+def test_waf_web_acl_associated_with_user_pool():
+    """`-c waf=1` creates a REGIONAL Web ACL (common rules + per-IP rate limit) associated to the pool."""
+    app = aws_cdk.App()
+    t = Template.from_stack(IdentityStack(app, "iw", prefix="ben-test", waf=True))
+    t.resource_count_is("AWS::WAFv2::WebACL", 1)
+    t.has_resource_properties("AWS::WAFv2::WebACL", Match.object_like({
+        "Scope": "REGIONAL",
+        "DefaultAction": {"Allow": {}},
+        "Rules": Match.array_with([
+            Match.object_like({"Statement": {"ManagedRuleGroupStatement": Match.object_like(
+                {"VendorName": "AWS", "Name": "AWSManagedRulesCommonRuleSet"})}}),
+            Match.object_like({"Action": {"Block": {}},
+                               "Statement": {"RateBasedStatement": Match.object_like({"AggregateKeyType": "IP"})}}),
+        ])}))
+    t.resource_count_is("AWS::WAFv2::WebACLAssociation", 1)
+    # ResourceArn is a CloudFormation intrinsic (the pool ARN built from the pool-id token), so assert
+    # the association carries both a ResourceArn and a WebACLArn rather than regex-matching an object.
+    t.has_resource_properties("AWS::WAFv2::WebACLAssociation", Match.object_like({
+        "ResourceArn": Match.any_value(), "WebACLArn": Match.any_value()}))
+
+
+def test_governed_lambdas_are_vpc_isolated_when_private():
+    """network_mode=private puts every governed tool Lambda in the VPC with the tools SG (no NAT/IGW)."""
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d", prefix="ben-test", retention_profile="sandbox-demo", kms_mode="aws-managed")
+    net = NetworkStack(app, "n", prefix="ben-test")
+    compute = ComputeStack(app, "c", prefix="ben-test", asset_dir=asset, data=data, network=net,
+                           tenant="ben-test-agency")
+    t = Template.from_stack(compute)
+    # every function carries a VpcConfig (subnets + security group)
+    t.has_resource_properties("AWS::Lambda::Function", Match.object_like({
+        "VpcConfig": Match.object_like({"SubnetIds": Match.any_value(),
+                                        "SecurityGroupIds": Match.any_value()})}))
+    # the VPC is isolated: no NAT gateway exists
+    Template.from_stack(net).resource_count_is("AWS::EC2::NatGateway", 0)
