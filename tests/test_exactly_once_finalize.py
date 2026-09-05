@@ -99,6 +99,10 @@ def _make_finalize(monkeypatch, allow_unverified):
     # governed-core 1.10.0 (#162): finalize recomputes the approval binding; the stub returns a stable
     # value (the seeded pending rows carry no binding, so it is computed but not enforced).
     fake_evidence.approval_binding = lambda fields=None: "bind-stub"
+    # governed-core 1.10.1: finalize gates the commit on evidence.is_durable (ledger + WORM). The fake
+    # record_event returns worm:True, so the durable predicate is satisfied for the exactly-once tests.
+    fake_evidence.is_durable = lambda res: bool(
+        (res.get("stored") or res.get("replay") or "already recorded" in (res.get("reason") or "")) and res.get("worm"))
     monkeypatch.setitem(sys.modules, "evidence", fake_evidence)
 
     mod = importlib.import_module("finalize_signoff")

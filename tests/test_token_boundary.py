@@ -62,7 +62,7 @@ def test_signoff_audit_payload_contains_no_token(monkeypatch):
     rs = load("request_signoff")
     recorded = {}
     monkeypatch.setattr(rs.evidence, "record_event",
-                        lambda ev, ctx, source=None: recorded.update(ev) or {"stored": True})
+                        lambda ev, ctx, source=None: recorded.update(ev) or {"stored": True, "worm": True})
     monkeypatch.setattr(rs.identity, "verify_access_token",
                         lambda tok, require_group=True: ({"username": "caseworker", "sub": "u-1"}, None))
 
