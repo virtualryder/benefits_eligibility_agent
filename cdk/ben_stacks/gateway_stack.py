@@ -151,6 +151,13 @@ class GatewayStack(cdk.Stack):
                 "bedrock-agentcore:GetGatewayTarget", "bedrock-agentcore:DeleteGatewayTarget",
                 "bedrock-agentcore:CreatePolicy", "bedrock-agentcore:GetPolicy",
                 "bedrock-agentcore:ListPolicies", "bedrock-agentcore:DeletePolicy",
+                # LIVE-FOUND (Tier-1 gate, 2026-09-05): CreateGateway creates a WORKLOAD IDENTITY as a
+                # dependency ("Failed to create gateway dependencies: ... not authorized to perform
+                # bedrock-agentcore:CreateWorkloadIdentity on workload-identity-directory/default"). The
+                # former bedrock-agentcore:* grant had hidden this; the enumerated list must carry it,
+                # with the matching Get/Delete for teardown.
+                "bedrock-agentcore:CreateWorkloadIdentity", "bedrock-agentcore:GetWorkloadIdentity",
+                "bedrock-agentcore:DeleteWorkloadIdentity", "bedrock-agentcore:ListWorkloadIdentities",
             ],
             resources=["*"]))
         provider_fn.add_to_role_policy(iam.PolicyStatement(

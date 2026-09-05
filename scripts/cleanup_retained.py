@@ -95,21 +95,42 @@ def main():
             except Exception as e:
                 print("cmk ->", type(e).__name__)
 
-    # AgentCore engines can resurface (async deletes) — always re-sweep by name prefix
+    # AgentCore engines can resurface (async deletes) — always re-sweep by name prefix. Gateways FIRST:
+    # an engine attached to a surviving gateway (e.g. a FAILED gateway left by a rolled-back stack)
+    # cannot be deleted, which is how ben_perim_ben_authz outlived its gate on 2026-09-05 while the
+    # old sweep swallowed the error.
+    engp = p.replace("-", "_")
+    agentcore_residue = []
     try:
         cc = s.client("bedrock-agentcore-control")
-        engp = p.replace("-", "_")
+        for g in cc.list_gateways().get("items", []):
+            if g.get("name", "").startswith(p):
+                try:
+                    for t in cc.list_gateway_targets(gatewayIdentifier=g["gatewayId"]).get("items", []):
+                        cc.delete_gateway_target(gatewayIdentifier=g["gatewayId"], targetId=t["targetId"])
+                    cc.delete_gateway(gatewayIdentifier=g["gatewayId"])
+                    print("deleted orphan gateway", g["name"], g.get("status"))
+                except Exception as e:
+                    print("gateway", g["name"], "->", type(e).__name__, str(e)[:120]); agentcore_residue.append(g["name"])
         for e in cc.list_policy_engines().get("policyEngines", []):
             if e.get("name", "").startswith(engp):
                 try:
                     for pol in cc.list_policies(policyEngineId=e["policyEngineId"]).get("policies", []):
                         cc.delete_policy(policyEngineId=e["policyEngineId"], policyId=pol["policyId"])
-                    cc.delete_policy_engine(policyEngineId=e["policyEngineId"])
+                    # policy deletes are async: "Policy engine still contains N policies" clears in seconds
+                    import time as _t
+                    for attempt in range(6):
+                        try:
+                            cc.delete_policy_engine(policyEngineId=e["policyEngineId"]); break
+                        except Exception as ex:
+                            if "still contains" not in str(ex) or attempt == 5:
+                                raise
+                            _t.sleep(5)
                     print("deleted orphan policy engine", e["name"])
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as ex:
+                    print("policy engine", e["name"], "->", type(ex).__name__, str(ex)[:120]); agentcore_residue.append(e["name"])
+    except Exception as ex:
+        print("agentcore sweep ->", type(ex).__name__, str(ex)[:120])
 
     # residual sweep
     residue = {
@@ -120,6 +141,7 @@ def main():
                    if st["StackName"].startswith(p)],
         "pools": [q["Name"] for q in cog.list_user_pools(MaxResults=60)["UserPools"] if q["Name"].startswith(p)],
         "buckets": [b["Name"] for b in s3.list_buckets()["Buckets"] if p in b["Name"]],
+        "agentcore": agentcore_residue,
         "log_groups": [g["logGroupName"] for pat in ("/aws/cloudtrail/%s" % p, "/aws/bedrock/modelinvocations/%s" % p,
                                                      "/aws/lambda/%s" % p, "/aws/vendedlogs/bedrock-agentcore/gateway/%s" % p)
                        for g in lg.describe_log_groups(logGroupNamePrefix=pat).get("logGroups", [])],

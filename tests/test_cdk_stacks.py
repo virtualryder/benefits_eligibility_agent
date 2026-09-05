@@ -522,6 +522,9 @@ def test_agentcore_attachment_provider_is_least_privilege():
     assert '"bedrock-agentcore:*"' not in g, "the attachment provider still holds bedrock-agentcore:* (over-privileged)"
     assert '"bedrock-agentcore:UpdateGateway"' in g and '"bedrock-agentcore:CreatePolicy"' in g, \
         "the provider is missing the enumerated control-plane actions it needs"
+    # live-found: CreateGateway needs CreateWorkloadIdentity (gateway dependency) - keep it enumerated
+    for a in ("CreateWorkloadIdentity", "DeleteWorkloadIdentity", "GetWorkloadIdentity"):
+        assert f'"bedrock-agentcore:{a}"' in g, f"provider lacks bedrock-agentcore:{a} (CreateGateway fails without it)"
 
 
 # ── Enforcement-perimeter review (2026-09-05): account-boundary capture + detection + hardening ──
