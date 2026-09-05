@@ -1,4 +1,4 @@
-// budget_before_draft  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS)
+// budget_before_draft  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS  ·  scope: perimeter)
 // BUDGET (#161) on the model-spending drafter. draft_notice is the only tool that spends model
 // tokens, so it carries the spend gate: budget_ok is set by the gateway REQUEST interceptor from
 // the LIVE per-tenant meter (<prefix>-budgets), not asserted by the caller. When the tenant is at

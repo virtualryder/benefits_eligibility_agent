@@ -1,4 +1,4 @@
-// amount_cap_overpayment  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS)
+// amount_cap_overpayment  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS  ·  scope: perimeter)
 // QUANTITATIVE (#161): an overpayment computation whose prior_monthly_benefit exceeds the
 // caseworker amount cap ($5000) is refused at the gateway - a large-dollar case needs elevated
 // authorization, not a routine caseworker call. This is the coarse quantitative gate; the

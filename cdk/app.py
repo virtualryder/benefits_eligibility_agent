@@ -140,8 +140,12 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        budget=budget_from_manifest(app))
 workflow = WorkflowStack(app, f"{prefix}-workflow", prefix=prefix, compute=compute, data=data,
                          multitenant=multitenant)
+# -c perimeter=1 attaches the #160/#161 nine-condition perimeter Cedar gates (entitlement, temporal,
+# consent/purpose, budget, quantitative) and declares the context.input fields they read. Opt-in so the
+# proven baseline policy set is byte-for-byte unchanged; proven live by scripts/cedar_perimeter_proof.py.
+perimeter = str(app.node.try_get_context("perimeter") or "").lower() in ("1", "true", "yes")
 gateway = GatewayStack(app, f"{prefix}-gateway", prefix=prefix, compute=compute, identity=identity,
-                       multitenant=multitenant)
+                       multitenant=multitenant, perimeter=perimeter)
 # Phase 110 (full transparency): -c model_logging=1 turns on Bedrock MODEL INVOCATION LOGGING for the
 # account+region (it is an account-level singleton - it replaces any existing configuration, so it is
 # opt-in) and delivers the gateway's vended request logs; the runtime's spans/logs are AgentCore-managed.

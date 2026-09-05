@@ -162,11 +162,15 @@ def main():
                     '&& principal.getTag("cognito:groups") like "*tenant_*") };')
             mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
         elif kind == "forbid" and p.get("require_entitlement"):
-            # ENTITLEMENT (zero-default tools): a principal with no NON-EMPTY custom:tools entitlement
-            # claim may call NOTHING - being in the role group is not enough. Defense in depth for the
-            # gateway interceptor, which already drops the whole tool list when the claim is missing.
+            # ENTITLEMENT (zero-default tools): a principal with NO explicit tool grant may call NOTHING -
+            # being in the role group is not enough. The grant is EITHER a non-empty per-user custom:tools
+            # claim (richest form; injected into the access token by the pre-token-generation trigger from
+            # the user's authoritative entitlement) OR membership in the tools_granted group (the group form,
+            # which rides in cognito:groups - always present in a Cognito access token). Either satisfies the
+            # unless; neither present => zero tools. Defense in depth for the gateway interceptor.
             stmt = ('forbid(principal, action, resource is AgentCore::Gateway) '
-                    'unless { principal.hasTag("custom:tools") && principal.getTag("custom:tools") != "" };')
+                    'unless { (principal.hasTag("custom:tools") && principal.getTag("custom:tools") != "") '
+                    '|| (principal.hasTag("cognito:groups") && principal.getTag("cognito:groups") like "*tools_granted*") };')
             mode = p.get("validation_mode", "IGNORE_ALL_FINDINGS")
         elif kind == "forbid" and p.get("require_service_window"):
             # TEMPORAL: no governed action outside the deployment's service window. `within_service_window`

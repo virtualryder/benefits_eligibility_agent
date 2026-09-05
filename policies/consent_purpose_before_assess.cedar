@@ -1,4 +1,4 @@
-// consent_purpose_before_assess  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS)
+// consent_purpose_before_assess  (kind: forbid  ·  validation: IGNORE_ALL_FINDINGS  ·  scope: perimeter)
 // CONSENT + PURPOSE (#161) on the eligibility decision. assess_eligibility is refused unless
 // recorded consent is present AND the declared purpose is one of the allowed purposes
 // (eligibility or redetermination) - purpose-limitation. These are COARSE gateway gates layered
