@@ -62,3 +62,25 @@ logging was never touched (observability stack not deployed).
 
 Raw redacted record: `evidence/AGENTCORE-NETWORK-WAF-2026-09-05.json` (verdict shows the VPC checks true
 and the WAF association error verbatim).
+
+
+## Addendum (#189) — isolated repro confirms an ACCOUNT-LEVEL block, not a config/timing bug
+
+To finish the WAF↔Cognito association (#189), the failure was reproduced in a **clean, fully isolated
+setup** — a fresh throwaway user pool + a **Managed Login v2** domain confirmed **ACTIVE** + a minimal
+REGIONAL Web ACL aged several minutes + multiple `AssociateWebACL` retries. Every attempt returned the
+same **`WAFUnavailableEntityException`: "AWS WAF couldn't retrieve the resource that you requested."**,
+and `get-web-acl-for-resource` stayed `null`. The throwaway resources were then deleted (zero residue).
+
+Because the error persists with a correct, ACTIVE Managed Login v2 configuration and is identical across
+two independent pools, it is **not** the native-CFN-hang, not a propagation race, not a feature-plan
+issue, and not Managed Login v1 vs v2. The signature — WAF unable to *retrieve* the Cognito resource on
+an otherwise valid association — points to an **account/region-level constraint** (an SCP or permission
+boundary preventing WAF from reaching Cognito, or a service-side enablement gap) on this sandbox account
+`111122223333`. That is the same class of limitation already flagged for #172 (Organizations perimeter),
+which needs access beyond this single sandbox account.
+
+**Resolution path (outside this session's reach):** run the same `-c waf=1` deploy + the retrying
+association in an account without the sandbox restriction, or open AWS Support to confirm whether an SCP
+/ permission boundary is denying WAF↔Cognito association. The IaC (Web ACL) and the retrying-association
+harness are in place and correct; only the account-level permission to bind them is missing.
