@@ -50,7 +50,7 @@ the FPL-pinned drift gate, **R3-2 pass-by-reference in both directions** (applic
 **Plus the full 7-stack AWS CDK set + Gate-B posture** (zero-public-egress private networking ·
 customer-managed KMS · MFA identity · tenant pin), release discipline (RELEASE + manifest +
 VALIDATED_RELEASE + consistency and cross-vertical gates), and the operating-model doc bundle.
-Suite: **227 offline tests** (control-plane + 18 CDK synthesis + 3 doc-integrity gates + 4
+Suite: **230 offline tests** (control-plane + 21 CDK synthesis + 3 doc-integrity gates + 4
 independent-verification gates + 3 CI-completeness gates + the doc-count gate) — authoritative count in
 [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). Locally you see `124 passed, 1 skipped`: one gate asserts
 the CDK libraries are installed and runs only inside CI.

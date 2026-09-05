@@ -391,3 +391,48 @@ def test_budget_meter_alarms_and_usd_ceiling_are_wired():
     o2 = Template.from_stack(ObservabilityStack(app2, "o7", prefix="ben-bg2", compute=c2, workflow=w2, data=d2))
     assert not o2.find_resources("AWS::Budgets::Budget")
     assert "ben-bg2-budget-default-TokensUsedPct-100" in {a["Properties"].get("AlarmName", "") for a in o2.find_resources("AWS::CloudWatch::Alarm").values()}
+
+
+# ── #166: Bedrock Guardrail as IaC ─────────────────────────────────────────
+
+def _compute_with_guardrail():
+    """A compute stack built from the manifest guardrail block (as app.py does), no external id."""
+    import yaml
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d", prefix="ben-test", retention_profile="sandbox-demo", kms_mode="aws-managed")
+    gcfg = dict((yaml.safe_load(
+        (ROOT / "agents" / "benefits-eligibility" / "manifest.yaml").read_text(encoding="utf-8")) or {}
+    ).get("guardrail") or {})
+    compute = ComputeStack(app, "c", prefix="ben-test", asset_dir=asset, data=data,
+                           tenant="ben-test-agency", guardrail_config=gcfg)
+    return Template.from_stack(compute)
+
+
+def test_guardrail_created_as_iac():
+    """The manifest guardrail block becomes a real AWS::Bedrock::Guardrail (no pre-created id needed)."""
+    t = _compute_with_guardrail()
+    t.resource_count_is("AWS::Bedrock::Guardrail", 1)
+    t.has_resource_properties("AWS::Bedrock::Guardrail", Match.object_like({
+        "ContentPolicyConfig": {"FiltersConfig": Match.array_with([
+            Match.object_like({"Type": "PROMPT_ATTACK", "InputStrength": "HIGH"})])},
+        "SensitiveInformationPolicyConfig": {"PiiEntitiesConfig": Match.array_with([
+            Match.object_like({"Type": "US_SOCIAL_SECURITY_NUMBER", "Action": "ANONYMIZE"})])},
+    }))
+
+
+def test_guardrail_version_pinned():
+    """A published version is created and PINNED (the drafter never assesses against DRAFT)."""
+    t = _compute_with_guardrail()
+    t.resource_count_is("AWS::Bedrock::GuardrailVersion", 1)
+
+
+def test_drafter_gets_guardrail_env_and_applyguardrail_perm():
+    """The drafter Lambda receives GUARDRAIL_ID/VERSION and an ApplyGuardrail grant."""
+    t = _compute_with_guardrail()
+    t.has_resource_properties("AWS::Lambda::Function", Match.object_like({
+        "Environment": {"Variables": Match.object_like({"GUARDRAIL_ID": Match.any_value(),
+                                                        "GUARDRAIL_VERSION": Match.any_value()})}}))
+    t.has_resource_properties("AWS::IAM::Policy", Match.object_like({
+        "PolicyDocument": {"Statement": Match.array_with([
+            Match.object_like({"Action": "bedrock:ApplyGuardrail"})])}}))

@@ -89,6 +89,15 @@ def budget_from_manifest(app):
     return b
 
 
+def guardrail_from_manifest():
+    """#166: the Bedrock guardrail is created as IaC from the manifest `guardrail:` block (name, PII
+    ANONYMIZE entities, prompt-attack strength) unless an external `-c guardrail_id` is supplied. This
+    makes a from-zero CDK deploy self-contained instead of depending on a pre-created guardrail."""
+    import yaml
+    m = yaml.safe_load(open(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"), encoding="utf-8"))
+    return dict((m or {}).get("guardrail") or {})
+
+
 app = cdk.App()
 env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
@@ -128,6 +137,8 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        # generations are guardrail-assessed (-c guardrail_id=... -c guardrail_version=1)
                        guardrail_id=app.node.try_get_context("guardrail_id") or "",
                        guardrail_version=str(app.node.try_get_context("guardrail_version") or "1"),
+                       # #166: create the Bedrock guardrail as IaC from the manifest when no external id is given
+                       guardrail_config=guardrail_from_manifest(),
                        # G2 approval-path verification: the identity pool/client feed approve-signoff
                        # (Cognito token verification). approvals_client_id lets a sandbox pass a
                        # CLI-auth demo client without touching the IaC gateway client.

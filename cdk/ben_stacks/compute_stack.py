@@ -9,8 +9,9 @@ Benefits has ONE signing trust domain (only mask_pii signs a sanitized_ref — t
 authoritative source to sign), so a single per-deploy HMAC key suffices (GA-2 domain-split N/A).
 Exact ARNs are exported — nothing downstream discovers by name (P0-7)."""
 import aws_cdk as cdk
-from aws_cdk import (aws_dynamodb as ddb, aws_ec2 as ec2, aws_iam as iam, aws_kms as kms,
-                     aws_lambda as lambda_, aws_logs as logs, aws_secretsmanager as sm, aws_ssm as ssm)
+from aws_cdk import (aws_bedrock as bedrock, aws_dynamodb as ddb, aws_ec2 as ec2, aws_iam as iam,
+                     aws_kms as kms, aws_lambda as lambda_, aws_logs as logs,
+                     aws_secretsmanager as sm, aws_ssm as ssm)
 from constructs import Construct
 
 RUNTIME = lambda_.Runtime.PYTHON_3_12
@@ -19,11 +20,46 @@ RUNTIME = lambda_.Runtime.PYTHON_3_12
 class ComputeStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, asset_dir: str, data,
                  provenance_secret: str = "", network=None, tenant: str = "",
-                 guardrail_id: str = "", guardrail_version: str = "1",
+                 guardrail_id: str = "", guardrail_version: str = "1", guardrail_config: dict = None,
                  identity=None, approvals_client_id: str = "", multitenant: bool = False,
                  global_kill_switch: str = "", budget: dict = None, **kw):
         super().__init__(scope, cid, **kw)
         code = lambda_.Code.from_asset(asset_dir)
+
+        # ── #166: Bedrock Guardrail as IaC ───────────────────────────────────
+        # If an external guardrail id is supplied (-c guardrail_id) it wins (platform-managed guardrail);
+        # otherwise create the guardrail here from the manifest `guardrail:` block so a from-zero CDK
+        # deploy is self-contained. PII entities -> ANONYMIZE, prompt-attack -> the declared strength,
+        # both input+output. A published version is created and PINNED (never DRAFT) so the drafter
+        # assesses against an immutable version. The drafter (benefits_core) already fails closed on
+        # guardrail_intervened; wiring GUARDRAIL_ID/VERSION here makes every generation assessed.
+        gcfg = guardrail_config or {}
+        self.guardrail = None
+        self.guardrail_arn = ""
+        if not guardrail_id and gcfg.get("name"):
+            pa = (gcfg.get("prompt_attack") or "HIGH").upper()
+            pii = [{"type": t, "action": "ANONYMIZE"} for t in gcfg.get("pii_anonymize", [])]
+            self.guardrail = bedrock.CfnGuardrail(
+                self, "Guardrail",
+                name=f"{prefix}-{gcfg['name']}",
+                description=gcfg.get("description", "Aegis benefits output guardrail (IaC)"),
+                blocked_input_messaging="Blocked by the Aegis benefits guardrail.",
+                blocked_outputs_messaging="[Output withheld by the Aegis benefits guardrail.]",
+                content_policy_config=bedrock.CfnGuardrail.ContentPolicyConfigProperty(
+                    filters_config=[bedrock.CfnGuardrail.ContentFilterConfigProperty(
+                        type="PROMPT_ATTACK", input_strength=pa, output_strength="NONE")]),
+                sensitive_information_policy_config=(
+                    bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
+                        pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(
+                            type=e["type"], action=e["action"]) for e in pii]) if pii else None),
+            )
+            ver = bedrock.CfnGuardrailVersion(self, "GuardrailVersion",
+                                              guardrail_identifier=self.guardrail.attr_guardrail_id)
+            guardrail_id = self.guardrail.attr_guardrail_id
+            guardrail_version = ver.attr_version
+            self.guardrail_arn = self.guardrail.attr_guardrail_arn
+            cdk.CfnOutput(self, "GuardrailId", value=guardrail_id)
+            cdk.CfnOutput(self, "GuardrailArnOut", value=self.guardrail_arn)
         cmk = None
         if getattr(data, "cmk", None) is not None:
             cmk = kms.Key.from_key_arn(self, "DataCmk", data.cmk.key_arn)
