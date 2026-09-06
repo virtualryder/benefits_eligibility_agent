@@ -523,7 +523,8 @@ def test_agentcore_attachment_provider_is_least_privilege():
     assert '"bedrock-agentcore:UpdateGateway"' in g and '"bedrock-agentcore:CreatePolicy"' in g, \
         "the provider is missing the enumerated control-plane actions it needs"
     # live-found: CreateGateway needs CreateWorkloadIdentity (gateway dependency) - keep it enumerated
-    for a in ("CreateWorkloadIdentity", "DeleteWorkloadIdentity", "GetWorkloadIdentity"):
+    for a in ("CreateWorkloadIdentity", "DeleteWorkloadIdentity", "GetWorkloadIdentity",
+              "ManageResourceScopedPolicy", "ManageAdminPolicy", "UpdateGatewayTarget", "UpdatePolicy"):
         assert f'"bedrock-agentcore:{a}"' in g, f"provider lacks bedrock-agentcore:{a} (CreateGateway fails without it)"
 
 

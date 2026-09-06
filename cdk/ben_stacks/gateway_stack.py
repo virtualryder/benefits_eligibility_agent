@@ -141,21 +141,25 @@ class GatewayStack(cdk.Stack):
         # because several AgentCore List/Create actions are account-level and reject a resource condition.)
         provider_fn.add_to_role_policy(iam.PolicyStatement(
             sid="AgentCoreControlPlaneCrud",
+            # The COMPLETE documented set for a resource-management role ("AgentCore Gateway and Policy in
+            # AgentCore IAM Permissions"), minus InvokeGateway and policy generation, which the provider never
+            # calls. Two live gate attempts (2026-09-05) each failed on ONE missing action the old
+            # bedrock-agentcore:* wildcard had hidden (CreateWorkloadIdentity, then ManageResourceScopedPolicy):
+            # enumerate from the documentation, not from what the code appears to call.
             actions=[
-                "bedrock-agentcore:ListPolicyEngines", "bedrock-agentcore:CreatePolicyEngine",
-                "bedrock-agentcore:GetPolicyEngine", "bedrock-agentcore:DeletePolicyEngine",
-                "bedrock-agentcore:ListGateways", "bedrock-agentcore:CreateGateway",
-                "bedrock-agentcore:GetGateway", "bedrock-agentcore:UpdateGateway",
-                "bedrock-agentcore:DeleteGateway",
-                "bedrock-agentcore:ListGatewayTargets", "bedrock-agentcore:CreateGatewayTarget",
-                "bedrock-agentcore:GetGatewayTarget", "bedrock-agentcore:DeleteGatewayTarget",
-                "bedrock-agentcore:CreatePolicy", "bedrock-agentcore:GetPolicy",
-                "bedrock-agentcore:ListPolicies", "bedrock-agentcore:DeletePolicy",
-                # LIVE-FOUND (Tier-1 gate, 2026-09-05): CreateGateway creates a WORKLOAD IDENTITY as a
-                # dependency ("Failed to create gateway dependencies: ... not authorized to perform
-                # bedrock-agentcore:CreateWorkloadIdentity on workload-identity-directory/default"). The
-                # former bedrock-agentcore:* grant had hidden this; the enumerated list must carry it,
-                # with the matching Get/Delete for teardown.
+                "bedrock-agentcore:CreateGateway", "bedrock-agentcore:UpdateGateway", "bedrock-agentcore:GetGateway",
+                "bedrock-agentcore:DeleteGateway", "bedrock-agentcore:ListGateways",
+                "bedrock-agentcore:CreateGatewayTarget", "bedrock-agentcore:UpdateGatewayTarget",
+                "bedrock-agentcore:GetGatewayTarget", "bedrock-agentcore:DeleteGatewayTarget", "bedrock-agentcore:ListGatewayTargets",
+                "bedrock-agentcore:CreatePolicyEngine", "bedrock-agentcore:UpdatePolicyEngine", "bedrock-agentcore:GetPolicyEngine",
+                "bedrock-agentcore:DeletePolicyEngine", "bedrock-agentcore:ListPolicyEngines",
+                "bedrock-agentcore:CreatePolicy", "bedrock-agentcore:UpdatePolicy", "bedrock-agentcore:GetPolicy",
+                "bedrock-agentcore:DeletePolicy", "bedrock-agentcore:ListPolicies",
+                # permission GATES: Cedar policies that name a gateway ARN need ManageResourceScopedPolicy on that
+                # gateway; policies written against the gateway TYPE (`resource is AgentCore::Gateway`) need
+                # ManageAdminPolicy. The pack ships both kinds.
+                "bedrock-agentcore:ManageResourceScopedPolicy", "bedrock-agentcore:ManageAdminPolicy",
+                # CreateGateway creates a workload identity as a dependency (live-found)
                 "bedrock-agentcore:CreateWorkloadIdentity", "bedrock-agentcore:GetWorkloadIdentity",
                 "bedrock-agentcore:DeleteWorkloadIdentity", "bedrock-agentcore:ListWorkloadIdentities",
             ],
