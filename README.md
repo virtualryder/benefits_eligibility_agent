@@ -154,6 +154,8 @@ bash tools/install_hooks.sh          # REL-4: pre-commit refuses a lib/ change w
 python -m pytest -q                  # 291 collected on Python 3.12
 ```
 
+> **Parity note (2026-09-06).** This is the lead pack: every platform control lands and is live-gated here first. Which of them are wired in the other packs is recorded in the platform's generated matrix [`WOGplatform/docs/PACK-PARITY.md`](https://github.com/virtualryder/WOGplatform/blob/main/docs/PACK-PARITY.md) — a claim about "the platform" is a claim about this pack unless that matrix shows the check mark for the pack in question.
+
 **Runtime hardening (third external review, 2026-09-05).** The AgentCore runtime entrypoint enforces an
 **input contract** (`lib/runtime/agent.py: validate_input` — a bounded plain-string `prompt`, identifier-shaped
 `case_id`/`requester`; structured content is refused *before* the kill-switch read, tenant derivation, gateway
