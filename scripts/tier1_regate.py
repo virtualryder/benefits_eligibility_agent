@@ -62,6 +62,7 @@ def main():
     ap.add_argument("--region", default="us-east-1")
     ap.add_argument("--skip-deploy", action="store_true")
     ap.add_argument("--skip-teardown", action="store_true")
+    ap.add_argument("--teardown-on-fail", action="store_true", help="tear down even when a T1 proof failed (default: keep for diagnosis)")
     ap.add_argument("--alarm-wait-min", type=int, default=25)
     a = ap.parse_args()
     env, region, prefix = a.env, a.region, "ben-%s" % a.env
@@ -234,7 +235,14 @@ def main():
         print("FATAL " + fatal, flush=True)
     finally:
         # ── 10. teardown to zero residue ──────────────────────────────────────────────────────
-        if not a.skip_teardown:
+        proofs_failed = [k for k in ("T1a_guardrail_proof", "T1b_cedar_perimeter_proof") if not checks.get(k, {}).get("ok")]
+        if proofs_failed and not a.teardown_on_fail:
+            # keep the environment up for a live diagnosis (attempt-10 lesson: a torn-down stack leaves
+            # only the proof's summary; the failing call cannot be replayed). Tear down by hand with
+            # scripts/cleanup_retained.py + the stack deletes when done.
+            steps["teardown_skipped_for_diagnosis"] = proofs_failed
+            check("teardown_zero_residue", False, "SKIPPED: environment kept for diagnosis of %s" % proofs_failed)
+        elif not a.skip_teardown:
             # The capture WORM bucket holds CloudTrail deliveries under a GOVERNANCE lock; CloudFormation
             # cannot delete a non-empty bucket and CDK's auto-delete cannot bypass a lock, so the lineage
             # stack would end DELETE_FAILED. Empty it (bypass, sandbox retention only) BEFORE destroy.
