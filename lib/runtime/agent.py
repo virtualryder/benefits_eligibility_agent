@@ -252,7 +252,7 @@ def _bedrock_session(corr):
     session = boto3.Session(region_name=REGION)
     meta = {"tenant": corr.get("tenant", "silo"), "session_id": corr.get("session.id", ""),
             "case_id": corr.get("case_id", ""), "requester": corr.get("requester", ""),
-            "governed_by": "aegis"}
+            "component": "runtime", "governed_by": "aegis"}   # component: joins with the drafter's rows
     meta = {k: _meta_value(v) for k, v in meta.items() if v}
 
     tenant = corr.get("tenant") or os.environ.get("TENANT_ID") or "default"

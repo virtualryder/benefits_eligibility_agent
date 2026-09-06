@@ -13,7 +13,10 @@ import boto3
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import mt_two_tenant_proof as mt
 
-REGION, PREFIX, TENANT = "us-east-1", "ben-gate", "sp-a"
+import os
+REGION = os.environ.get("AWS_REGION", "us-east-1")
+PREFIX = os.environ.get("LINEAGE_PREFIX", "ben-gate")   # deployment prefix, e.g. ben-fp
+TENANT = os.environ.get("LINEAGE_TENANT", "sp-a")
 CASE = ("Applicant Jane Q Public, SSN 123-45-6789, DOB 1990-02-02, 742 Evergreen Terrace, "
         "phone 617-555-0142, email jane.public@example.com. Household of 3, monthly income 1800, "
         "liquid resources 400, no TANF. Source IP 10.1.2.3, card 4111 1111 1111 1111.")

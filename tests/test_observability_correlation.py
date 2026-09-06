@@ -49,7 +49,7 @@ def test_runtime_correlation_and_request_metadata_hook(monkeypatch):
                      "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}, "metrics": {"latencyMs": 1}},
                     {"modelId": "m", "messages": [{"role": "user", "content": [{"text": "q"}]}],
                      "requestMetadata": {"tenant": "pha-a", "session_id": "rt-sess-1", "case_id": "C-1",
-                                         "requester": "cw-a", "governed_by": "aegis"}})
+                                         "requester": "cw-a", "component": "runtime", "governed_by": "aegis"}})
     st.activate()
     assert c.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])["stopReason"] == "end_turn"
     st.assert_no_pending_responses()

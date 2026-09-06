@@ -171,7 +171,13 @@ class ObservabilityStack(cdk.Stack):
                                                 actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream",
                                                          "bedrock:Converse", "bedrock:ConverseStream"],
                                                 resources=["*"])])
-            target_roles = [compute.core.role.role_name] + ([runtime_role_name] if runtime_role_name else [])
+            # the IaC runtime execution role (compute stack, RT-2) is always a target; -c runtime_role adds a
+            # toolkit-generated one (development only)
+            target_roles = [compute.core.role.role_name]
+            if getattr(compute, "runtime_role", None) is not None:
+                target_roles.append(compute.runtime_role.role_name)
+            if runtime_role_name:
+                target_roles.append(runtime_role_name)
             exec_role = iam.Role(
                 self, "BudgetsActionRole", assumed_by=iam.ServicePrincipal("budgets.amazonaws.com"),
                 description="Lets AWS Budgets attach/detach the deny policy on the Bedrock-calling roles.")
