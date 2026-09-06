@@ -48,7 +48,7 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
     t0 = time.time()
     e = dict(os.environ); e.update(env or {})
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=timeout, shell=(os.name == "nt" and isinstance(cmd, str)), env=e)
+                       timeout=timeout, shell=(os.name == "nt"), env=e)   # npx/aws are .cmd shims on Windows
     return {"cmd": cmd if isinstance(cmd, str) else " ".join(cmd), "rc": r.returncode,
             "secs": round(time.time() - t0, 1), "out": (r.stdout or "")[-8000:], "err": (r.stderr or "")[-4000:]}
 
