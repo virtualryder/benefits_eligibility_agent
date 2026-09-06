@@ -164,6 +164,13 @@ class GatewayStack(cdk.Stack):
                 "bedrock-agentcore:DeleteWorkloadIdentity", "bedrock-agentcore:ListWorkloadIdentities",
             ],
             resources=["*"]))
+        # LIVE-FOUND (attempt 7): validating a Cedar policy that names a tool ACTION makes the policy engine
+        # read the gateway's tool list ON THE CALLER'S BEHALF - CreatePolicy fails with "Insufficient
+        # permissions to call gateway with ID ..." unless the provider may InvokeGateway. The provider never
+        # invokes tools itself, so this is scoped to this account's gateways only.
+        provider_fn.add_to_role_policy(iam.PolicyStatement(
+            sid="AgentCorePolicyValidationReadsGateway", actions=["bedrock-agentcore:InvokeGateway"],
+            resources=[f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/*"]))
         provider_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["ssm:PutParameter", "ssm:DeleteParameter"],
             resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter{ssm_param}"]))
