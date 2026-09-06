@@ -3,8 +3,10 @@
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
 **Validated release: [`v0.5.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.2-pilot-rc1)** (2026-09-06; Tier-1 hardening + enforcement perimeter, live re-gated on `ben-t1`; supersedes `v0.3.0-pilot-rc1` with the kill switch + per-tenant budget)
-— cut 2026-09-02 from the tree the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit
-routing and full-transparency runs validated live (governed-core 1.9.0, hash-pinned). The EP1 Gate-B
+— cut 2026-09-06 from the tree the Tier-1 live re-gate (`ben-t1`, from zero, private mode + CMK + perimeter) passed
+on (governed-core 1.10.1, hash-pinned); the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit routing,
+full-transparency, kill-switch and budget runs validated the 2026-09-02/03 ancestors of this tree (governed-core 1.9.0)
+and the 111 / kill-switch / budget / lineage gates have not yet been re-run on this exact tag. The EP1 Gate-B
 validation (2026-07-27/28, `ben-val1`/`ben-val2`, full runbook re-walk) was captured on `v0.1.2-pilot-rc1`.
 **Deploy the tag, never `main`.** Supported deployment path: **AWS CDK** (`cdk/ben_stacks`, 7 stacks + one data stack per tenant);
 the shell engine (`lib/engine/`) is legacy/internal only.
@@ -97,9 +99,13 @@ Control plane hardened, full CDK/Gate-B IaC, **live-validated twice** (2026-07-2
 2026-07-28 `ben-val2` full runbook re-walk, all gates PASS, zero residual), then on 2026-09-02
 **AgentCore ENFORCE re-proven from zero, hybrid multi-tenant (2 tenants) with per-tenant audit/WORM
 routing, and full per-case transparency through the real AgentCore Runtime — all live, all torn down**
-(governed-core 1.9.0, hash-pinned). Tag **`v0.5.1-pilot-rc1`** was cut from that tree (2026-09-03); `v0.3.0-pilot-rc1` (2026-09-02) is the 111-gate tree it builds on.
+(governed-core 1.9.0, hash-pinned); then on 2026-09-05/06 the enforcement perimeter, output guardrail, contextual
+grounding, capture-every-API-call lineage and the governed-core 1.10.1 fault-semantics fixes, **live re-gated from zero on
+`ben-t1` (2026-09-06, private mode, CMK, all 12 checks PASS, torn down)**. Tag **`v0.5.2-pilot-rc1`** was cut from that
+tree (2026-09-06, governed-core 1.10.1); `v0.5.1-pilot-rc1` (2026-09-05) and `v0.3.0-pilot-rc1` (2026-09-02, 111 gate) precede it.
 Suite: **285 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
-stood at 101; do not re-align). Next, in order: the consolidated 111 gate on the tag (one deployment
-proving isolation + audit routing + transparency + PII canary), independent redeploy of the tag,
+stood at 101; do not re-align). Next, in order: the consolidated 111 / kill-switch / budget / lineage gates re-run
+on this exact tag (last green at governed-core 1.10.0, 2026-09-05), the runtime gate on the IaC execution role (RT-2),
+independent redeploy of the tag,
 enterprise IdP round-trip, a one-state SNAP rule set with benefits-program SME sign-off, and
 independent security testing — before any real data.

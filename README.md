@@ -8,9 +8,12 @@
 > release tag [`v0.5.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.2-pilot-rc1)**
 > (`cdk/ben_stacks`, 7 stacks + one data stack per tenant in multi-tenant mode, prefix `ben-` — includes the AgentCore Gateway/Cedar attachment as IaC),
 > per [`DEPLOYMENT-GUIDE.md`](DEPLOYMENT-GUIDE.md) and [`VALIDATED_RELEASE.md`](VALIDATED_RELEASE.md). `v0.5.2-pilot-rc1`
-> (2026-09-03) is the tree the kill-switch (29/29) and per-tenant budget (24/24) gates validated live on top of the
-> `v0.3.0-pilot-rc1` tree (2026-09-02: AgentCore from-zero, hybrid multi-tenant, per-tenant audit routing, full transparency,
-> 111 gate); the older `v0.1.2-pilot-rc1` is the EP1 Gate-B tag (2026-07-27 — `evidence/EP1-VALIDATION.md`).
+> (2026-09-06, governed-core 1.10.1) is the tree the **Tier-1 live re-gate** passed on from zero (`ben-t1`: private network
+> mode, customer-managed KMS, enforcement perimeter, CMK invocation store, capture-all trail, guardrail + Cedar proofs, real
+> bypass alarm, teardown to zero residue — `evidence/TIER1-REGATE-2026-09-06.md`). What is NOT yet re-run on this exact tree:
+> the 111 consolidated / kill-switch / budget / lineage / two-tenant runtime gates (last green at governed-core 1.10.0 on
+> 2026-09-05; kill switch 29/29 + budget 24/24 on 2026-09-03). Older tags: `v0.5.1-pilot-rc1` (2026-09-05, pre-Tier-1),
+> `v0.3.0-pilot-rc1` (2026-09-02 111 gate), `v0.1.2-pilot-rc1` (EP1 Gate-B, 2026-07-27 — `evidence/EP1-VALIDATION.md`).
 > The shell engine (`lib/engine/`) is **legacy/internal reference only**. Product framing: a governed
 > eligibility **screening & determination-support Assistant** — it never adjudicates, denies, reduces,
 > terminates, or refers fraud (`PILOT-SCOPE.md`).
@@ -67,7 +70,7 @@ from a reusable, manifest-driven template.
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
 > Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **285 offline tests**;
-> tag `v0.5.1-pilot-rc1` was cut from this tree (2026-09-03; `v0.3.0-pilot-rc1` on 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
+> tag `v0.5.2-pilot-rc1` was cut from this tree (2026-09-06, after the Tier-1 live re-gate; `v0.5.1-pilot-rc1` of 2026-09-05 preceded it, `v0.3.0-pilot-rc1` of 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
 > Fresh from-zero ENFORCE re-proof (`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`); **hybrid multi-tenant**
@@ -147,7 +150,7 @@ a dependency, not a PYTHONPATH trick):
 python -m pip install --require-hashes -r requirements-core.txt   # governed-core 1.10.1, sha256-pinned
 python -m pip install -r cdk/requirements.txt pytest pyyaml cryptography
 python lib/verify_core.py            # governance-core integrity lock (CI gate)
-python -m pytest -q                  # 279 collected on Python 3.12
+python -m pytest -q                  # 285 collected on Python 3.12
 ```
 
 **Runtime hardening (third external review, 2026-09-05).** The AgentCore runtime entrypoint enforces an

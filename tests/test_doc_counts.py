@@ -50,6 +50,9 @@ COUNT_PATTERNS = [
     # "**244** passing" - bold markers between the number and the word slipped past every pattern above
     # (RELEASE-MANIFEST.md carried a stale bold count for two bumps).
     re.compile(r"\*\*(\d{2,4})\*\*\s+passing\b"),
+    # "**244** offline tests" and "279 collected" - both slipped past every pattern above (2026-09-06 drift audit)
+    re.compile(r"\*\*(\d{2,4})\*\*\s+offline tests?\b"),
+    re.compile(r"\b(\d{2,4}) collected\b"),
     re.compile(r"\b(\d{2,4}) / \1\b"),
     re.compile(r"\b(\d{2,4})/\1\b"),
 ]
