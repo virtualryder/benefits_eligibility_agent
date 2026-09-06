@@ -3,12 +3,12 @@
 *Single source of truth for the current release tag is the repo-root `RELEASE` file, enforced by
 `tests/test_release_consistency.py`. Authoritative counts + limitations: `RELEASE-MANIFEST.md`.*
 
-## Current release — `v0.5.1-pilot-rc1` (2026-09-03)
+## Current release — `v0.5.2-pilot-rc1` (2026-09-06)
 
 | Field | Value |
 |---|---|
-| Tag | `v0.5.1-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-03 after the kill-switch and budget gates passed on it. |
-| Commit SHA | `git rev-list -n1 v0.5.1-pilot-rc1` |
+| Tag | `v0.5.2-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-06 after the Tier-1 live re-gate (`ben-t1`: mandatory-guardrail IAM, #3 perimeter, advanced capture selectors, CMK invocation store, endpoint policy, bypass alarm, operator console) passed on it. |
+| Commit SHA | `git rev-list -n1 v0.5.2-pilot-rc1` |
 | Test count at the tag | **244** offline tests (243 local + 1 CI-only); 37 CDK assertions |
 | Governance core | `governed-core` **1.9.0**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`); `lib/core.lock` locked at 1.9.0 |
 | What this tag adds over `v0.3.0-pilot-rc1` | **Kill Switch on the AgentCore path** — `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md` (env `mt5`, 2 tenants, real Runtime, **29/29**, 13.9 s to effect). **Per-tenant token + USD budget** — `evidence/AGENTCORE-BUDGET-2026-09-03.md` (env `mt6`, **24/24**: meter == model-invocation log to the token, cap refusals at gateway / drafter / runtime incl. mid-session, 60/85 % alarms, AWS Budgets ceiling → kill switch) + `-regression.json` (0 unexpected). Two drafter fixes found by that gate: the append-only ledger grant so its workflow-hop DENIED record lands, and `requestMetadata` tagging on its server-side `Converse`. |

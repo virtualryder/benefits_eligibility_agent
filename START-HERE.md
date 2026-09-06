@@ -2,7 +2,7 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.5.1-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.1-pilot-rc1)** (2026-09-03; supersedes `v0.3.0-pilot-rc1` with the kill switch + per-tenant budget)
+**Validated release: [`v0.5.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.2-pilot-rc1)** (2026-09-06; Tier-1 hardening + enforcement perimeter, live re-gated on `ben-t1`; supersedes `v0.3.0-pilot-rc1` with the kill switch + per-tenant budget)
 — cut 2026-09-02 from the tree the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit
 routing and full-transparency runs validated live (governed-core 1.9.0, hash-pinned). The EP1 Gate-B
 validation (2026-07-27/28, `ben-val1`/`ben-val2`, full runbook re-walk) was captured on `v0.1.2-pilot-rc1`.
