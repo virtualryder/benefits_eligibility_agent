@@ -5,7 +5,7 @@ document in this repo disagrees with this table, **this table is correct and the
 
 Release `v0.5.2-pilot-rc1` (2026-09-06; Tier-1 hardening + enforcement perimeter on the 2026-09-05 tree; `v0.4.0-pilot-rc1` of 2026-09-03 carried kill switch + budget on the `v0.3.0-pilot-rc1` tree of 2026-09-02) · EP1 Gate-B run 2026-07-27 on `v0.1.2-pilot-rc1` (env `ben-val1`,
 us-east-1) · AgentCore multi-tenant / transparency runs 2026-09-02 (`ben-e2e`, `ben-mt`, `ben-mt2`, `ben-mt3`).
-Current offline suite: **296 tests** on main (authoritative count: `RELEASE-MANIFEST.md`); `v0.3.0-pilot-rc1` stood at 154 <!-- count-gate:historical -->.
+Current offline suite: **299 tests** on main (authoritative count: `RELEASE-MANIFEST.md`); `v0.3.0-pilot-rc1` stood at 154 <!-- count-gate:historical -->.
 
 ---
 
@@ -17,7 +17,7 @@ Current offline suite: **296 tests** on main (authoritative count: `RELEASE-MANI
 | AgentCore ENFORCE re-proven from zero on the current tree (2026-09-02) | Fresh `ben-e2e` deploy, live gateway calls, teardown | `evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md` |
 | Hybrid multi-tenant: cross-tenant deny + per-tenant routing (2 tenants) | `ben-mt`, cw-a / cw-b / cw-none through the live gateway | `evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md` |
 | Per-tenant audit ledger / WORM vault / approvals routing on the gateway AND workflow hops, fail-closed | `ben-mt2`, 12/12 | `evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md` |
-| Full per-case transparency through the real AgentCore Runtime (reasoning spans + every API call + model bodies + WORM record joined by session/trace id, per tenant; masked-before-model measured) | `ben-mt3`, 13/13 per tenant | `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md` |
+| Full per-case transparency through the real AgentCore Runtime (framework/model-invocation + tool spans, not private chain-of-thought; every governed-path API call + model bodies + WORM record joined by session/trace id, per tenant; masked-before-model measured) | `ben-mt3`, 13/13 per tenant | `evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md` |
 | Consolidated 111 gate on the release tag: isolation + audit routing + transparency + strict PII canary on ONE deployment, then a 0-unexpected-errors regression sweep | `ben-mt4`, tag `v0.3.0-pilot-rc1` | `evidence/AGENTCORE-111-GATE-2026-09-02.md` |
 | Kill Switch on the AgentCore path: engaged ⇒ interceptor 403 + DENIED WORM record per tenant, tool Lambdas + workflow fail with `KillSwitchEngaged`, runtime refuses new + stops in-flight sessions; engage/disengage via AWS_IAM function URLs with IAM + code SoD; base-ledger chain; recovery; 0-unexpected-errors sweep | `ben-mt5` (main after `v0.3.0-pilot-rc1`, governed-core 1.8.0) | `evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md` |
 | Per-tenant token + USD budget: reserve-before / commit-after on every model call (meter == model-invocation log), capped tenant refused at runtime (incl. mid-session) / gateway (403 + DENIED record) / drafter (→ ManualReview), 60/85/100 % alarms fire, AWS Budgets USD ceiling wired (IAM-deny action) and its breach engages the kill switch; 0-unexpected-errors sweep | `ben-mt6` (main, governed-core 1.9.0) | `evidence/AGENTCORE-BUDGET-2026-09-03.md` |

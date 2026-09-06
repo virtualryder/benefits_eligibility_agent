@@ -879,3 +879,68 @@ def test_ingest_writes_the_authoritative_consent_purpose_record():
             if "AuthzContext" in res or "authz-context" in res:
                 acts = st["Action"] if isinstance(st["Action"], list) else [st["Action"]]
                 assert "dynamodb:PutItem" not in acts, "the interceptor must never write the authz record"
+
+
+# ── Fourth external review (2026-09-06): R4-3 exact-guardrail IAM, R4-8 JWT-only identity paths ──
+
+def _role_statements(t, role_name_fragment):
+    pols = [v for v in t.find_resources("AWS::IAM::Policy").values()
+            if role_name_fragment in json.dumps(v["Properties"].get("Roles"))]
+    return [st for v in pols for st in v["Properties"]["PolicyDocument"]["Statement"]]
+
+
+def test_model_invocation_requires_the_exact_guardrail_with_explicit_deny_and_scoped_models():
+    """R4-3: not "a guardrail is present" (the old Null check let an altered drafter/runtime name a weaker
+    guardrail) but THE guardrail - allow on StringEquals <exact ARN[:version]> over the manifest model's
+    inference profile + foundation model only, and an explicit Deny on any other or missing guardrail value
+    for every model. Both the drafter and the runtime execution role carry the pair."""
+    t = _compute_with_guardrail()
+    for who, frag in (("Drafter", "CoreTools"), ("Runtime", "RuntimeExecutionRole")):
+        sts = _role_statements(t, frag)
+        allow = [s for s in sts if s.get("Sid") == f"{who}BedrockExactGuardrail"]
+        deny = [s for s in sts if s.get("Sid") == f"{who}DenyOtherOrNoGuardrail"]
+        assert len(allow) == 1 and len(deny) == 1, f"{who}: exact-guardrail allow/deny pair missing"
+        aj, dj = json.dumps(allow[0]), json.dumps(deny[0])
+        assert '"StringEquals"' in aj and "bedrock:GuardrailIdentifier" in aj and "Null" not in aj
+        assert deny[0]["Effect"] == "Deny" and '"StringNotEquals"' in dj and "bedrock:GuardrailIdentifier" in dj
+        assert deny[0]["Resource"] == "*"
+        # the allow names the IaC guardrail (a token to the created guardrail's ARN) with and without version
+        assert "Guardrail" in aj and "GuardrailVersion" in aj
+        # resources are scoped to the manifest model - no wildcard foundation-model or account-wide bedrock
+        res = json.dumps(allow[0]["Resource"])
+        assert "foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0" in res
+        assert "inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0" in res
+        assert "foundation-model/*" not in res and ":*\"" not in res
+    # no statement anywhere still uses the weaker present-check
+    assert '"Null"' not in json.dumps(t.find_resources("AWS::IAM::Policy")) or \
+        "bedrock:GuardrailIdentifier" not in json.dumps([s for s in _role_statements(t, "CoreTools") + _role_statements(t, "RuntimeExecutionRole") if "Null" in json.dumps(s)])
+
+
+def test_runtime_role_denies_the_user_id_identity_paths():
+    """R4-8: the runtime ALWAYS has a verified JWT, so GetWorkloadAccessTokenForUserId and
+    InvokeAgentRuntimeForUser are explicitly DENIED (AWS guidance) - identity comes only from the
+    cryptographically verified JWT path; the JWT/plain token grants remain."""
+    sts = _role_statements(T_COMPUTE, "RuntimeExecutionRole")
+    deny = [s for s in sts if s.get("Sid") == "DenyUserIdIdentityPaths"]
+    assert len(deny) == 1 and deny[0]["Effect"] == "Deny"
+    acts = deny[0]["Action"] if isinstance(deny[0]["Action"], list) else [deny[0]["Action"]]
+    assert set(acts) == {"bedrock-agentcore:GetWorkloadAccessTokenForUserId", "bedrock-agentcore:InvokeAgentRuntimeForUser"}
+    grant = [s for s in sts if s.get("Sid") == "GetAgentAccessToken"][0]
+    assert "bedrock-agentcore:GetWorkloadAccessTokenForUserId" not in json.dumps(grant)
+    assert "bedrock-agentcore:GetWorkloadAccessTokenForJWT" in json.dumps(grant)
+
+
+def test_runtime_image_pins_the_same_governed_core_as_the_lambdas():
+    """R4-5 (fourth review): the runtime image's requirements pinned governed-core 1.9.0 while the Lambda
+    bundle ran 1.10.1 - the runtime's budget meter was one core behind. The runtime requirements, the root
+    pin and the integrity lock must name the same version."""
+    import re
+    root = ROOT
+    lock_ver = re.search(r'"version":\s*"([^"]+)"', (root / "lib" / "core.lock").read_text(encoding="utf-8"))
+    core_ver = (root / "lib" / "CORE_VERSION").read_text(encoding="utf-8").strip()
+    req = (root / "lib" / "runtime" / "requirements.txt").read_text(encoding="utf-8")
+    m = re.search(r"governed-core @ .*/download/v([0-9.]+)/governed_core-([0-9.]+)-", req)
+    assert m, "runtime requirements must pin the governed-core release wheel"
+    assert m.group(1) == m.group(2) == core_ver, f"runtime pins {m.group(1)} but the pack runs {core_ver}"
+    if lock_ver:
+        assert lock_ver.group(1) == core_ver

@@ -8,7 +8,7 @@ What it re-proves on the exact tree (the "not re-run on this tag" list in VALIDA
   KS    kill switch                  kill_switch_proof.py  29/29 incl. in-flight mid-session stop
   BUD   per-tenant token+USD budget  budget_proof.py       24/24 incl. meter == model log
   LIN   #168 lineage, 0 orphans      drive_one_case.py + lineage_proof.py
-  RT-2  runtime on the IaC role      _configure.sh refuses a toolkit role; runtime model calls are
+  RT-2  runtime on the IaC role      _configure.sh refuses a toolkit role; MMDSv2 explicit + asserted (R4-6); runtime model calls are
                                      guardrail-assessed (invocation log) and allowlisted by the perimeter
   E2E   0-unexpected regression      e2e_regression.py
   TD    teardown to zero residue     runtime + cdk destroy + cleanup_retained; model-logging restored
@@ -194,6 +194,16 @@ def main():
                 break
             time.sleep(15)
         check("RT2_runtime_ready", st == "READY", "status=%s" % st)
+        # R4-6 (fourth review): MMDSv2 must be EXPLICIT and asserted on the deployed runtime, not an
+        # undocumented toolkit default - enforce (UpdateAgentRuntime if needed) and record the fact.
+        steps["mmds"] = sh([sys.executable, os.path.join(HERE, "runtime_mmds.py"), "--runtime-id", runtime_id,
+                            "--region", region, "--enforce"], cwd=REPO, timeout=900)
+        try:
+            mm = json.loads(steps["mmds"]["out"][steps["mmds"]["out"].index("{"):])
+        except Exception:
+            mm = {}
+        check("RT2_runtime_mmdsv2", steps["mmds"]["rc"] == 0 and mm.get("requireMMDSV2") is True,
+              "requireMMDSV2=%s before=%s enforced=%s" % (mm.get("requireMMDSV2"), mm.get("requireMMDSV2_before"), mm.get("enforced")))
 
         # -- 3. the proofs --
         common = ["--env", env, "--tenants", ",".join(TENANTS), "--region", region,

@@ -107,6 +107,13 @@ env_name = app.node.try_get_context("env") or "dev"
 profile = app.node.try_get_context("retention_profile") or "sandbox-demo"
 
 
+def model_id_from_manifest():
+    """The manifest `model.draft_model_id` - the single model the drafter and the runtime may invoke."""
+    import yaml
+    m = yaml.safe_load(open(os.path.join(REPO, "agents", "benefits-eligibility", "manifest.yaml"), encoding="utf-8"))
+    return (m.get("model") or {}).get("draft_model_id") or "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
 def runtime_name_from_manifest():
     """The AgentCore runtime name (manifest `runtime.name`, falling back to the render.py default) - the
     IaC execution role scopes its log-group and workload-identity resources to it."""
@@ -221,6 +228,8 @@ compute = ComputeStack(app, f"{prefix}-compute", prefix=prefix, asset_dir=asset_
                        guardrail_id=app.node.try_get_context("guardrail_id") or "",
                        guardrail_version=str(app.node.try_get_context("guardrail_version") or "1"),
                        runtime_name=runtime_name_from_manifest(),
+                       # R4-3: the only model the drafter + runtime may invoke (IAM resources scoped to it)
+                       model_id=model_id_from_manifest(),
                        # #166: create the Bedrock guardrail as IaC from the manifest when no external id is given
                        guardrail_config=guardrail_from_manifest(),
                        # G2 approval-path verification: the identity pool/client feed approve-signoff

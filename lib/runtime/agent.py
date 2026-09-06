@@ -228,12 +228,33 @@ def _meta_value(v):
     return _META_OK.sub("_", str(v or ""))[:256]
 
 
-def _correlation(context, session_tenant, case_id, requester):
+def _token_claim(token, name):
+    """One claim from the access token the AgentCore JWT authorizer already VERIFIED at the door (the
+    runtime never sees an unverified bearer); read-only, never an access decision."""
+    if not isinstance(token, str) or token.count(".") < 2:
+        return None
+    seg = token.split(".")[1]
+    seg += "=" * (-len(seg) % 4)
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(seg).decode("utf-8"))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        return None
+    v = claims.get(name)
+    return v if isinstance(v, str) and v else None
+
+
+def _correlation(context, session_tenant, case_id, requester, subject=None):
     """Phase 110: the ONE correlation set every signal of this invocation carries. The runtime session
     id comes from AgentCore (X-Amzn-Bedrock-AgentCore-Runtime-Session-Id -> context.session_id) and is
-    the mandatory `session.id` span attribute; tenant is the DERIVED session tenant."""
+    the mandatory `session.id` span attribute; tenant is the DERIVED session tenant.
+    R4-9 (fourth review, 2026-09-06) - which fields are AUTHORITATIVE and which are not: `tenant` (from
+    the verified JWT's custom:tenant) and `subject` (the verified JWT's `sub`) are authoritative identity;
+    `case_id` and `requester` are CALLER-SUPPLIED correlation labels (a caseworker's client names the case
+    and itself) - useful for joining evidence, never trusted as identity or tenancy, and labelled so in
+    every log line by `correlation_source`."""
     sid = getattr(context, "session_id", None) or os.environ.get("AGENTCORE_SESSION_ID") or ""
-    c = {"session.id": sid, "case_id": case_id, "requester": requester}
+    c = {"session.id": sid, "case_id": case_id, "requester": requester,
+         "subject": subject, "correlation_source": "case_id+requester:caller,tenant+subject:jwt"}
     if session_tenant:
         c["tenant"] = session_tenant
     return {k: v for k, v in c.items() if v}
@@ -259,8 +280,11 @@ def _bedrock_session(corr):
     (tenant, session_id, case_id, requester) - the model-invocation LOG rows become filterable per
     tenant/session without reading bodies (Bedrock model invocation logging: requestMetadata)."""
     session = boto3.Session(region_name=REGION)
+    # R4-9: `subject` + `tenant` come from the VERIFIED JWT (authoritative); `case_id` + `requester` are the
+    # caller's correlation labels (never identity) - `correlation_source` says so on every log row.
     meta = {"tenant": corr.get("tenant", "silo"), "session_id": corr.get("session.id", ""),
             "case_id": corr.get("case_id", ""), "requester": corr.get("requester", ""),
+            "subject": corr.get("subject", ""), "correlation_source": corr.get("correlation_source", ""),
             "component": "runtime", "governed_by": "aegis"}   # component: joins with the drafter's rows
     meta = {k: _meta_value(v) for k, v in meta.items() if v}
 
@@ -332,7 +356,7 @@ def invoke(payload, context=None):
         return {"error": "multi-tenant: your identity carries no tenant (custom:tenant); refusing",
                 "governed": True}
     log.info("session_tenant=%s multitenant=%s", session_tenant, _MULTITENANT)
-    corr = _correlation(context, session_tenant, case_id, requester)
+    corr = _correlation(context, session_tenant, case_id, requester, subject=_token_claim(token, "sub"))
     _attach_baggage(corr)
     log.info(json.dumps({"aegis": "invocation", **corr}, sort_keys=True))
 

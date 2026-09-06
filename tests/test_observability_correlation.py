@@ -31,8 +31,13 @@ def _load_agent(monkeypatch):
 def test_runtime_correlation_and_request_metadata_hook(monkeypatch):
     agent = _load_agent(monkeypatch)
     ctx = types.SimpleNamespace(session_id="rt-sess-1")
-    corr = agent._correlation(ctx, "pha-a", "C-1", "cw-a")
-    assert corr == {"session.id": "rt-sess-1", "case_id": "C-1", "requester": "cw-a", "tenant": "pha-a"}
+    corr = agent._correlation(ctx, "pha-a", "C-1", "cw-a", subject="sub-123")
+    # R4-9 (fourth review): tenant + subject are the VERIFIED-JWT identity; case_id + requester are the
+    # caller's correlation labels, and every row says so (correlation_source)
+    assert corr == {"session.id": "rt-sess-1", "case_id": "C-1", "requester": "cw-a", "tenant": "pha-a",
+                    "subject": "sub-123", "correlation_source": "case_id+requester:caller,tenant+subject:jwt"}
+    assert agent._token_claim("h." + __import__("base64").urlsafe_b64encode(b'{"sub":"abc","custom:tenant":"pha-a"}').decode().rstrip("=") + ".s", "sub") == "abc"
+    assert agent._token_claim("not-a-jwt", "sub") is None
     assert "tenant" not in agent._correlation(ctx, None, "C-1", "cw-a")           # silo: no tenant tag
     # the runtime's session-tenant mirror honours the tenant_<id> group (what Cognito access tokens carry)
     import base64
@@ -49,7 +54,9 @@ def test_runtime_correlation_and_request_metadata_hook(monkeypatch):
                      "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}, "metrics": {"latencyMs": 1}},
                     {"modelId": "m", "messages": [{"role": "user", "content": [{"text": "q"}]}],
                      "requestMetadata": {"tenant": "pha-a", "session_id": "rt-sess-1", "case_id": "C-1",
-                                         "requester": "cw-a", "component": "runtime", "governed_by": "aegis"}})
+                                         "requester": "cw-a", "subject": "sub-123",
+                                         "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+                                         "component": "runtime", "governed_by": "aegis"}})
     st.activate()
     assert c.converse(modelId="m", messages=[{"role": "user", "content": [{"text": "q"}]}])["stopReason"] == "end_turn"
     st.assert_no_pending_responses()

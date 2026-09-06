@@ -1,9 +1,17 @@
-"""LineageStack (#168) - capture EVERY API call in the account, into WORM custody.
+"""LineageStack (#168) - capture every MANAGEMENT event in the account plus the Bedrock / AgentCore / Lambda / S3
+DATA events the governed path uses, into WORM custody.
+
+Scope, stated exactly (fourth review R4-7, 2026-09-06): CloudTrail management events (all, multi-region -
+InvokeModel / Converse are recorded here) + advanced data-event selectors for every Bedrock data-plane
+resource type, the AgentCore Gateway / Runtime, Lambda invokes and S3 objects. It does NOT record every
+DynamoDB / S3 / service data event account-wide, and it does not see SageMaker-hosted or self-hosted models,
+Amazon Q, external model APIs, or uninstrumented workloads (PERIM-7). "Every API call" below means every
+call on the governed path; the account-wide net is management events.
 
 The pack's ObservabilityStack already captures the AGENT'S OWN activity: the AgentCore gateway request
 log, one `aegis.call` line per governed Lambda invocation, the Step Functions execution history, the
 Bedrock model-invocation log (tagged tenant/session/case), and CloudTrail S3 DATA events on the WORM
-evidence vault. What it did NOT have was an ACCOUNT-WIDE net: proof that EVERY AWS API call in the
+evidence vault. What it did NOT have was an ACCOUNT-WIDE net: proof that every AWS MANAGEMENT-plane call in the
 account - not just the ones the agent's own log sources emit - is captured and joinable into one
 lineage. That is the gap the 2026-09-03 platform review raised ("governs only gateway activity, not
 the whole account") and what this stack closes.

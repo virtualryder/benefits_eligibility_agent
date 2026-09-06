@@ -28,8 +28,13 @@ class ComputeStack(cdk.Stack):
                  provenance_secret: str = "", network=None, tenant: str = "",
                  guardrail_id: str = "", guardrail_version: str = "1", guardrail_config: dict = None,
                  identity=None, approvals_client_id: str = "", multitenant: bool = False,
-                 global_kill_switch: str = "", budget: dict = None, runtime_name: str = "", **kw):
+                 global_kill_switch: str = "", budget: dict = None, runtime_name: str = "",
+                 model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0", **kw):
         super().__init__(scope, cid, **kw)
+        # R4-3 (fourth review, 2026-09-06): the ONLY model the drafter and the runtime may invoke, from the
+        # manifest `model.draft_model_id` - IAM resources are scoped to it (inference profile + the
+        # foundation model it routes to), never `foundation-model/*` / `<account>:*`.
+        self._model_id = model_id
         code = lambda_.Code.from_asset(asset_dir)
         self._runtime_name = runtime_name or "benefits_runtime_agent"
         self._global_kill_switch = global_kill_switch
@@ -98,6 +103,14 @@ class ComputeStack(cdk.Stack):
             guardrail_id = self.guardrail.attr_guardrail_id
             guardrail_version = ver.attr_version
             self.guardrail_arn = self.guardrail.attr_guardrail_arn
+        # R4-3: the EXACT guardrail the IAM layer admits - `bedrock:GuardrailIdentifier` carries the guardrail
+        # ARN (optionally with `:<version>`), so the allow names both forms and the explicit Deny refuses
+        # every other value INCLUDING an absent one (StringNotEquals matches a missing key). An altered
+        # drafter/runtime can therefore neither drop the guardrail nor point at a weaker one.
+        self.guardrail_ref = []
+        if guardrail_id:
+            g_arn = self.guardrail_arn or f"arn:aws:bedrock:{self.region}:{self.account}:guardrail/{guardrail_id}"
+            self.guardrail_ref = [g_arn, f"{g_arn}:{guardrail_version}"]
             cdk.CfnOutput(self, "GuardrailId", value=guardrail_id)
             cdk.CfnOutput(self, "GuardrailVersionOut", value=guardrail_version, export_name=None)
             cdk.CfnOutput(self, "GuardrailArnOut", value=self.guardrail_arn)
@@ -426,10 +439,11 @@ class ComputeStack(cdk.Stack):
         # make an UNGOVERNED Bedrock call that bypasses the guardrail. This is the AWS-documented pattern
         # for enforcing a mandatory guardrail at the IAM layer (Null present-check on the condition key).
         _has_guardrail = bool(guardrail_id) or bool(self.guardrail)
-        self.core.add_to_role_policy(iam.PolicyStatement(
-            sid="DrafterBedrockGuardrailRequired" if _has_guardrail else "DrafterBedrock",
-            actions=["bedrock:InvokeModel"], resources=["*"],
-            conditions=({"Null": {"bedrock:GuardrailIdentifier": "false"}} if _has_guardrail else None)))
+        # R4-3 (fourth review): not "a guardrail is present" (the old Null check let an altered drafter name a
+        # weaker guardrail) but THE guardrail: allow on StringEquals <exact ARN[:version]>, explicit Deny on
+        # anything else, resources scoped to the manifest model (AWS "enforce a specific guardrail" pattern).
+        for st in self._bedrock_invoke_statements("Drafter", _has_guardrail):
+            self.core.add_to_role_policy(st)
         self.runtime_role = self._runtime_execution_role(prefix, _has_guardrail, guardrail_id)
         if guardrail_id:
             # Converse with guardrailConfig requires ApplyGuardrail on the specific guardrail.
@@ -522,6 +536,30 @@ class ComputeStack(cdk.Stack):
                           description="The ONLY working approve path: verifies the approver's Cognito "
                                       "access token, enforces SoD, consumes the single-use approval.")
 
+    def _model_resources(self):
+        """The model ARNs the pack may invoke: the (cross-region) inference profile in this account/region and
+        the foundation model it routes to (any region the profile spans) - nothing else."""
+        mid = self._model_id
+        fm = mid.split(".", 1)[1] if mid[:3] in ("us.", "eu.", "ap.", "jp.", "au.", "ca.") else mid
+        return [f"arn:aws:bedrock:*::foundation-model/{fm}",
+                f"arn:aws:bedrock:{self.region}:{self.account}:inference-profile/{mid}"]
+
+    def _bedrock_invoke_statements(self, who, has_guardrail):
+        """R4-3: model-invocation grant for a governed principal. With a guardrail: ALLOW only with the exact
+        guardrail (`StringEquals bedrock:GuardrailIdentifier` = ARN or ARN:version) on the scoped model
+        resources, plus an explicit DENY for any other or missing guardrail value on every model. Without a
+        guardrail (sandbox): the scoped allow only."""
+        actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+        if not has_guardrail:
+            return [iam.PolicyStatement(sid=f"{who}Bedrock", actions=actions, resources=self._model_resources())]
+        return [
+            iam.PolicyStatement(sid=f"{who}BedrockExactGuardrail", actions=actions, resources=self._model_resources(),
+                                conditions={"StringEquals": {"bedrock:GuardrailIdentifier": self.guardrail_ref}}),
+            iam.PolicyStatement(sid=f"{who}DenyOtherOrNoGuardrail", effect=iam.Effect.DENY, actions=actions,
+                                resources=["*"],
+                                conditions={"StringNotEquals": {"bedrock:GuardrailIdentifier": self.guardrail_ref}}),
+        ]
+
     def _runtime_execution_role(self, prefix, has_guardrail, guardrail_id):
         """AgentCore RUNTIME EXECUTION ROLE as IaC (third external review, 2026-09-05). The toolkit's
         `agentcore configure` otherwise auto-creates the role, and AWS states CLI-generated policies are
@@ -559,15 +597,17 @@ class ComputeStack(cdk.Stack):
                                 conditions={"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}}),
             iam.PolicyStatement(sid="BudgetMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"],
                                 conditions={"StringEquals": {"cloudwatch:namespace": "Aegis/Budget"}}),
+            # R4-8 (fourth review): the runtime ALWAYS has a verified JWT, so the user-id token path is never a
+            # legitimate need - AWS recommends an explicit Deny on GetWorkloadAccessTokenForUserId and
+            # InvokeAgentRuntimeForUser so identity can only come from the cryptographically verified JWT.
             iam.PolicyStatement(sid="GetAgentAccessToken",
-                                actions=["bedrock-agentcore:GetWorkloadAccessToken", "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-                                         "bedrock-agentcore:GetWorkloadAccessTokenForUserId"],
+                                actions=["bedrock-agentcore:GetWorkloadAccessToken", "bedrock-agentcore:GetWorkloadAccessTokenForJWT"],
                                 resources=[f"arn:aws:bedrock-agentcore:{region}:{acct}:workload-identity-directory/default",
                                            f"arn:aws:bedrock-agentcore:{region}:{acct}:workload-identity-directory/default/workload-identity/{rt}-*"]),
-            iam.PolicyStatement(sid="BedrockModelInvocationGuardrailRequired" if has_guardrail else "BedrockModelInvocation",
-                                actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-                                resources=["arn:aws:bedrock:*::foundation-model/*", f"arn:aws:bedrock:{region}:{acct}:*"],
-                                conditions=({"Null": {"bedrock:GuardrailIdentifier": "false"}} if has_guardrail else None)),
+            iam.PolicyStatement(sid="DenyUserIdIdentityPaths", effect=iam.Effect.DENY,
+                                actions=["bedrock-agentcore:GetWorkloadAccessTokenForUserId", "bedrock-agentcore:InvokeAgentRuntimeForUser"],
+                                resources=["*"]),
+            *self._bedrock_invoke_statements("Runtime", has_guardrail),
             iam.PolicyStatement(sid="GovernanceParameters", actions=["ssm:GetParameter"],
                                 resources=[f"arn:aws:ssm:{region}:{acct}:parameter/{prefix}-eligibility/*"]
                                 + ([f"arn:aws:ssm:{region}:{acct}:parameter{self._global_kill_switch}"] if self._global_kill_switch else [])),
