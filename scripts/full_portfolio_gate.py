@@ -74,6 +74,13 @@ def stack_outputs(cf, name):
 
 
 def main():
+    # the gate log is a redirected file on Windows (cp1252): the toolkit prints box-drawing characters, and a
+    # print() of a check detail must never take the whole gate down (attempt 1, 2026-09-06)
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", default="fp")
     ap.add_argument("--region", default="us-east-1")
@@ -237,7 +244,7 @@ def main():
         print("FATAL", fatal, flush=True)
 
     # -- 4. teardown --
-    failed = [k for k, v in checks.items() if not v["ok"]]
+    failed = [k for k, v in checks.items() if not v["ok"]] + (["FATAL: " + fatal] if fatal else [])
     if failed and not a.teardown_on_fail:
         steps["teardown_skipped_for_diagnosis"] = failed
         check("teardown_zero_residue", False, "SKIPPED: environment kept for diagnosis of %s" % failed)
