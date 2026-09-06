@@ -150,6 +150,7 @@ a dependency, not a PYTHONPATH trick):
 python -m pip install --require-hashes -r requirements-core.txt   # governed-core 1.10.1, sha256-pinned
 python -m pip install -r cdk/requirements.txt pytest pyyaml cryptography
 python lib/verify_core.py            # governance-core integrity lock (CI gate)
+bash tools/install_hooks.sh          # REL-4: pre-commit refuses a lib/ change whose core.lock does not verify
 python -m pytest -q                  # 285 collected on Python 3.12
 ```
 
