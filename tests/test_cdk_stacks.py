@@ -944,3 +944,45 @@ def test_runtime_image_pins_the_same_governed_core_as_the_lambdas():
     assert m.group(1) == m.group(2) == core_ver, f"runtime pins {m.group(1)} but the pack runs {core_ver}"
     if lock_ver:
         assert lock_ver.group(1) == core_ver
+
+
+# ── CHK-1: hardened trail log bucket + Log4j WAF rule group (2026-09-06) ────────────────────────
+
+
+def test_evidence_trail_delivers_into_a_declared_hardened_bucket():
+    """The data-events trail on the WORM vault proves nobody but the gateway touched the evidence.
+    Its OWN log bucket was a CDK auto-created default that synthesized with no properties at all -
+    no block-public-access, no TLS enforcement, no versioning, no declared encryption (checkov
+    CKV_AWS_53/54/55/56/21/35). Found by the CHK-1 sizing scan, 2026-09-06."""
+    from ben_stacks.observability_stack import ObservabilityStack
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "cd", prefix="ben-chk1")
+    compute = ComputeStack(app, "cc", prefix="ben-chk1", asset_dir=asset, data=data)
+    workflow = WorkflowStack(app, "cw", prefix="ben-chk1", compute=compute, data=data)
+    t = Template.from_stack(ObservabilityStack(app, "co", prefix="ben-chk1", compute=compute,
+                                               workflow=workflow, data=data))
+    t.has_resource_properties("AWS::S3::Bucket", Match.object_like({
+        "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": True, "BlockPublicPolicy": True,
+            "IgnorePublicAcls": True, "RestrictPublicBuckets": True},
+        "VersioningConfiguration": {"Status": "Enabled"},
+        "BucketEncryption": Match.any_value(),
+    }))
+    # and the trail is wired to a bucket this stack declares, not to an implicit one
+    t.has_resource_properties("AWS::CloudTrail::Trail", Match.object_like({
+        "TrailName": Match.string_like_regexp(r".*-worm-data-events$"),
+        "EnableLogFileValidation": True,
+        "S3BucketName": {"Ref": Match.string_like_regexp("WormDataEventsLogs.*")},
+    }))
+
+
+def test_waf_inspects_for_known_bad_inputs_including_log4j():
+    """checkov CKV_AWS_192: the Common Rule Set does not by itself inspect for a Log4j2 JNDI
+    lookup; the Known Bad Inputs managed group (Log4JRCE) is attached alongside it."""
+    t = Template.from_stack(IdentityStack(aws_cdk.App(), "iw2", prefix="ben-wtest", waf=True))
+    t.has_resource_properties("AWS::WAFv2::WebACL", Match.object_like({
+        "Rules": Match.array_with([
+            Match.object_like({"Statement": {"ManagedRuleGroupStatement": Match.object_like(
+                {"VendorName": "AWS", "Name": "AWSManagedRulesKnownBadInputsRuleSet"})}}),
+        ])}))

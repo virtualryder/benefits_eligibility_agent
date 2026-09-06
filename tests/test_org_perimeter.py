@@ -67,10 +67,10 @@ def test_render_substitutes_real_principals_and_stays_sound(tmp_path, monkeypatc
     monkeypatch.setattr(rop, "ORG", str(tmp_path))
     for name in ("scp-bedrock-runtime-perimeter.json", "vpce-policy-bedrock-runtime.json"):
         (tmp_path / name).write_text((ORG / name).read_text(encoding="utf-8"), encoding="utf-8")
-    drafter = "arn:aws:iam::210987654321:role/ben-prod-compute-coretools"
-    runtime = "arn:aws:iam::210987654321:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-9f8e7d"
-    deployer = "arn:aws:iam::210987654321:role/aegis-platform-deployer"
-    extra = "arn:aws:iam::210987654321:role/aegis-break-glass"
+    drafter = "arn:aws:iam::444455556666:role/ben-prod-compute-coretools"
+    runtime = "arn:aws:iam::444455556666:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-9f8e7d"
+    deployer = "arn:aws:iam::444455556666:role/aegis-platform-deployer"
+    extra = "arn:aws:iam::444455556666:role/aegis-break-glass"
     out = rop.render(drafter, runtime, deployer, extras=[extra])
     scp = json.loads(pathlib.Path(out["scp-bedrock-runtime-perimeter.json"]).read_text(encoding="utf-8"))
     vp = json.loads(pathlib.Path(out["vpce-policy-bedrock-runtime.json"]).read_text(encoding="utf-8"))
@@ -82,7 +82,7 @@ def test_render_substitutes_real_principals_and_stays_sound(tmp_path, monkeypatc
     protect = scp["Statement"][1]
     assert protect["Resource"] == [drafter, extra, runtime]
     assert protect["Condition"]["ArnNotLike"]["aws:PrincipalArn"] == [deployer]
-    assert vp["Statement"][0]["Condition"]["StringEquals"]["aws:PrincipalAccount"] == "210987654321"
+    assert vp["Statement"][0]["Condition"]["StringEquals"]["aws:PrincipalAccount"] == "444455556666"
     assert vp["Statement"][0]["Condition"]["ArnLike"]["aws:PrincipalArn"] == [drafter, extra]
 
 

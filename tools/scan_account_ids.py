@@ -31,7 +31,12 @@ import sys
 
 # Placeholders that are SUPPOSED to appear. 111122223333 is this portfolio's redaction target;
 # 123456789012 is the placeholder used throughout AWS's own documentation.
-ALLOWED = {"111122223333", "123456789012", "000000000000"}
+# AWS publishes a fixed set of example account ids for documentation; a test that must show a
+# SECOND account (to prove the renderer substitutes real principals rather than leaving the
+# redaction target in place) has to use one of them, or this gate and that test cannot both pass.
+ALLOWED = {"111122223333", "123456789012", "000000000000",
+           "444455556666", "555555555555", "666666666666",
+           "777788889999", "888888888888", "999999999999"}
 
 # 12 digits in a position that actually denotes an account. A bare 12-digit number elsewhere (a
 # timestamp, a hash fragment, a test fixture id) is not a finding, and treating it as one would train

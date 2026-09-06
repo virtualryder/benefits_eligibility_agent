@@ -230,6 +230,11 @@ def main():
     ap.add_argument("--lambda-log-prefix", default="")
     ap.add_argument("--capture-worm-bucket", default="", help="write the coverage evidence under Object-Lock")
     ap.add_argument("--window-min", type=int, default=60)
+    # L21: CloudTrail -> CloudWatch Logs delivery lags the recorded API call, and lags most on a
+    # freshly created trail. Wait for the capture to arrive rather than reading an empty group.
+    ap.add_argument("--settle-max-sec", type=int, default=900,
+                    help="max seconds to wait for CloudTrail/model/gateway log delivery (0 = read once)")
+    ap.add_argument("--settle-poll-sec", type=int, default=30)
     ap.add_argument("--start-ms", type=int, default=0)
     ap.add_argument("--end-ms", type=int, default=0)
     ap.add_argument("--tool-names", default="")
@@ -258,11 +263,39 @@ def main():
             pass
 
     aegis = tc.read_lambda_calls(logs, lambda_groups, args.case_id, keys, start, end) if lambda_groups else []
-    model = tc.read_model_rows(logs, args.model_log_group, args.case_id, session_ids, start, end) if args.model_log_group else []
     sfn_events = tc.read_sfn(sfn, exec_arns) if exec_arns else []
-    gateway = tc.read_gateway_rows(logs, args.gateway_log_group, session_ids, list(keys.get("mcp_session_id", [])),
-                                   list(keys.get("trace_id", [])), start, end) if args.gateway_log_group else []
-    cloudtrail = read_cloudtrail_capture(logs, args.capture_log_group, args.prefix, start, end)
+
+    # L21 SETTLE: the three sources below arrive through LOG DELIVERY, not a direct API read, so
+    # they lag the run. Poll until CloudTrail has delivered at least one governed Lambda invoke for
+    # this window, or the deadline passes. The wait is recorded either way; an expired deadline is
+    # still a FAIL, so a delivery gap is never silently converted into coverage.
+    def _read_delivered():
+        m = tc.read_model_rows(logs, args.model_log_group, args.case_id, session_ids, start, end) if args.model_log_group else []
+        g = tc.read_gateway_rows(logs, args.gateway_log_group, session_ids, list(keys.get("mcp_session_id", [])),
+                                 list(keys.get("trace_id", [])), start, end) if args.gateway_log_group else []
+        ct = read_cloudtrail_capture(logs, args.capture_log_group, args.prefix, start, end)
+        return m, g, ct
+
+    def _has_lambda_invoke(ct):
+        return any(e.get("event_source") == "lambda.amazonaws.com" and e.get("event_name") in _LAMBDA_INVOKE_EVENTS
+                   for e in ct)
+
+    settle = {"waited_sec": 0, "polls": 1, "max_sec": int(args.settle_max_sec),
+              "reason": "CloudTrail -> CloudWatch Logs delivery lags the API call it records"}
+    model, gateway, cloudtrail = _read_delivered()
+    t_settle = time.time()
+    while (not _has_lambda_invoke(cloudtrail)
+           and time.time() - t_settle < int(args.settle_max_sec)):
+        time.sleep(max(1, int(args.settle_poll_sec)))
+        settle["polls"] += 1
+        model, gateway, cloudtrail = _read_delivered()
+    settle["waited_sec"] = round(time.time() - t_settle, 1)
+    settle["cloudtrail_delivered"] = _has_lambda_invoke(cloudtrail)
+    if not settle["cloudtrail_delivered"]:
+        settle["note"] = ("no governed Lambda invoke was delivered to the capture log group within the "
+                          "settle window - this is reported as a coverage FAILURE, not waited away")
+    print("settle: waited %ss over %s poll(s); cloudtrail_delivered=%s"
+          % (settle["waited_sec"], settle["polls"], settle["cloudtrail_delivered"]))
 
     def _corr(node, extra):
         node = dict(node or {})
@@ -298,7 +331,7 @@ def main():
     md = verdict_markdown(args.case_id, args.tenant, lineage, verdict)
     print(md)
     print(json.dumps({"covered": verdict["covered"], "counts": verdict["counts"],
-                      "orphans": verdict["orphans"]}, indent=2))
+                      "settle": settle, "orphans": verdict["orphans"]}, indent=2))
 
     if args.capture_worm_bucket:
         try:

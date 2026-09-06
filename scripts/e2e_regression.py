@@ -24,6 +24,10 @@ EXPECTED = [
     (r"start_execution failed|governed-signoff|StateMachineDoesNotExist", "request_signoff targets the shell-engine sign-off machine (not provisioned by CDK) - a documented control block"),
     (r"case_ref unresolved|unknown ref or wrong tenant", "cross-tenant / unknown case_ref refused"),
     (r"refused|DENIED|not authorized|AccessDenied.*tools/call", "a governed refusal"),
+    # L22: the Cedar deny as the GATEWAY logs it. The platform's headline control fires here, and
+    # matching only uppercase DENIED made a correct deny read as an incident.
+    (r"Policy evaluation denied|Tool Execution Denied|\"decision\"\s*:\s*\"DENY\"",
+     "Cedar DENY at the gateway (the request never reached the tool) - the enforcement point working"),
     (r"DeprecationWarning: `url\.parse\(\)`", "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure"),
     # task 127: every refusal the kill-switch proof deliberately provokes (interceptor 403, tool Lambda
     # KillSwitchEngaged, workflow FAILED at Extract, runtime session stopped, SoD-refused release)
@@ -35,6 +39,51 @@ EXPECTED = [
 # warnings that are NOT errors but must be REPORTED (a working fallback hid a misconfiguration once)
 WARN_ONLY = [(r"SSM gateway lookup failed", "runtime fell back to the GATEWAY_URL env (the SSM grant did not cover the deployment's parameter path) - fixed in lib/runtime/_obs_setup.sh 2026-09-02")]
 PATTERNS = ["ERROR", "Traceback", "Task timed out", "Exception", "FAILED", "errorType"]
+
+
+
+# ---- L22: correlate the gateway's OPAQUE tool error with the tool Lambda's explicit refusal -------
+# The gateway logs "An error occurred while executing tool: mask-pii___mask_pii from target X" with
+# no reason attached, so no content pattern can separate a deliberate kill-switch/budget refusal
+# from a genuinely broken tool - and matching the wrapper text itself would blind this gate to real
+# tool failures. Instead: a gateway wrapper is EXPECTED only when the named tool's own Lambda log
+# carries an already-classified-EXPECTED refusal within a few seconds of it. No matching Lambda
+# refusal => the gateway error stays UNEXPECTED.
+_GATEWAY_WRAPPER = re.compile(r"An error occurred while executing tool:\s*([A-Za-z0-9_\-]+)")
+_CORRELATION_WINDOW_MS = 15000
+
+
+def correlate_gateway_wrappers(by_group, prefix):
+    """Reclassify gateway tool-execution wrappers that a Lambda refusal explains. Mutates rows."""
+    # tool name as the gateway spells it ("mask-pii___mask_pii") -> the Lambda log group
+    lambda_rows = {g: rows for g, rows in by_group.items() if g.startswith("/aws/lambda/%s-" % prefix)}
+
+    def _explained(tool_token, ts):
+        stem = tool_token.split("___", 1)[0].replace("_", "-").lower()
+        for g, rows in lambda_rows.items():
+            fn = g.rsplit("/", 1)[-1]
+            if not fn.startswith("%s-%s" % (prefix, stem)):
+                continue
+            for r in rows:
+                if (r["kind"] == "expected" and r.get("why")
+                        and abs(int(r.get("ts") or 0) - int(ts or 0)) <= _CORRELATION_WINDOW_MS):
+                    return g, r["why"]
+        return None, None
+
+    for g, rows in by_group.items():
+        if "/gateway/" not in g:
+            continue
+        for r in rows:
+            if r["kind"] != "unexpected":
+                continue
+            m = _GATEWAY_WRAPPER.search(r.get("excerpt") or "")
+            if not m:
+                continue
+            src, why = _explained(m.group(1), r.get("ts"))
+            if why:
+                r["kind"] = "expected"
+                r["why"] = ("gateway wrapper over a classified refusal in %s: %s"
+                            % (src.rsplit("/", 1)[-1], why))
 
 
 def classify(msg):
@@ -97,7 +146,7 @@ def main():
     groups += [f"/aws/vendedlogs/bedrock-agentcore/gateway/{prefix}"]
     if a.runtime_log_group:
         groups.append(a.runtime_log_group)
-    unexpected_total = 0
+    by_group = {}
     for g in groups:
         evs = sweep_logs(logs, g, since_ms, PATTERNS)
         rows = []
@@ -108,6 +157,12 @@ def main():
             if kind == "unexpected" and re.search(r'"severityText":"INFO"|"level": "INFO"|"aegis": "call"', m) and "Traceback" not in m and "exception" not in m.lower():
                 kind, why = "expected", "INFO-level line matched a pattern word (not an error)"
             rows.append({"ts": e.get("timestamp"), "stream": (e.get("logStreamName") or "")[:60], "kind": kind, "why": why, "excerpt": m[:260].replace("\n", " ")})
+        by_group[g] = rows
+
+    correlate_gateway_wrappers(by_group, prefix)
+
+    unexpected_total = 0
+    for g, rows in by_group.items():
         n_unexp = sum(1 for r in rows if r["kind"] == "unexpected")
         unexpected_total += n_unexp
         rep["log_groups"][g] = {"events": len(rows), "unexpected": n_unexp, "warnings": sum(1 for r in rows if r["kind"] == "warning"),
