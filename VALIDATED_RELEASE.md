@@ -9,7 +9,7 @@
 |---|---|
 | Tag | `v0.5.2-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-06 after the Tier-1 live re-gate (`ben-t1`: mandatory-guardrail IAM, #3 perimeter, advanced capture selectors, CMK invocation store, endpoint policy, bypass alarm, operator console) passed on it. |
 | Commit SHA | `git rev-list -n1 v0.5.2-pilot-rc1` |
-| Test count at the tag | **285** offline tests collected (284 pass + 1 CI-only skip locally); 37 CDK assertions |
+| Test count at the tag | **285** offline tests <!-- count-gate:historical --> collected at `v0.5.2-pilot-rc1` (284 pass + 1 CI-only skip locally; 37 CDK <!-- count-gate:historical --> assertions) — a record of the tag; current main carries more (README "Run the tests") |
 | Governance core | `governed-core` **1.10.1**, pinned by URL + sha256 (`requirements-core.txt`, `--require-hashes`); `lib/core.lock` locked at 1.10.1 (`lib/verify_core.py` OK) |
 | What this tag adds over `v0.5.1-pilot-rc1` | **Tier-1 live re-gate PASS** — `evidence/TIER1-REGATE-2026-09-06.md` (env `ben-t1`, from zero, PRIVATE network mode, customer-managed KMS, perimeter on, CMK model-invocation logging, capture-all trail with advanced selectors; 12/12: deploy, P2 selectors, P5 endpoint policy naming the pinned drafter role, P4 CMK store + delivery, T1a guardrail proof, T1b Cedar perimeter proof 6/6, P3 real-bypass alarm with exact accounting, D2 operator console, teardown to zero residue). Live-found defects L9–L13 fixed on the way (missing `ssm`/`monitoring` VPC endpoints, IaC entitlement grant, pinned drafter role for the endpoint policy, teardown late deliveries, gate accounting). |
 | What `v0.5.1-pilot-rc1` (2026-09-05) added over `v0.3.0-pilot-rc1` | governed-core 1.10.0/1.10.1 (audit-before-finalize, bound approvals, deepened PII, WORM-required commit, fail-closed sagas, authoritative Cedar context), Cedar perimeter + zero-default entitlement, output guardrail as IaC, contextual grounding end-to-end, capture-every-API-call lineage, token chargeback, the #3 `authoritative_context` resolver (live on `ben-perim`, 2026-09-05). |
@@ -38,7 +38,7 @@
 | Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. |
 | Commit SHA | the commit carrying tag `v0.1.2-pilot-rc1` (`git rev-list -n1 v0.1.2-pilot-rc1`) |
 | Test count at the tag | **101** offline tests <!-- count-gate:historical --> at the moment `v0.1.2-pilot-rc1` was cut — a record of that tag, not a claim about the current tree |
-| Test count on current main | **285 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
+| Test count on current main | **291 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |

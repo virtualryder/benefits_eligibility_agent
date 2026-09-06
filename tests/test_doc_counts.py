@@ -140,6 +140,9 @@ def test_cdk_assertion_count_in_docs_matches_the_cdk_test_module():
         # count that hid behind the old lookahead because "stack" is followed by "-", a word boundary).
         for m in re.finditer(r"\b(\d{1,3}) CDK(?! stacks?(?![\w-]))\b", text):
             n = int(m.group(1))
+            # a number-scoped historical marker (the count AT an older tag) is exempt, like the offline count
+            if "count-gate:historical" in text[m.end():m.end() + 40]:
+                continue
             if n != cdk_tests:
                 line = text[: m.start()].count("\n") + 1
                 problems.append(f"{rel}:{line} quotes {n} CDK, module has {cdk_tests}")

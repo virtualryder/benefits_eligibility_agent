@@ -346,16 +346,35 @@ class ObservabilityStack(cdk.Stack):
                                      "largeDataDeliveryS3Config": {"bucketName": big.bucket_name}},
                 "textDataDeliveryEnabled": True, "imageDataDeliveryEnabled": False,
                 "embeddingDataDeliveryEnabled": False, "videoDataDeliveryEnabled": False}}
-            put = cr.AwsSdkCall(service="bedrock", action="putModelInvocationLoggingConfiguration",
-                                parameters=cfg, physical_resource_id=cr.PhysicalResourceId.of(f"{prefix}-model-logging"))
-            res = cr.AwsCustomResource(
-                self, "ModelInvocationLogging", on_create=put, on_update=put,
-                on_delete=cr.AwsSdkCall(service="bedrock", action="deleteModelInvocationLoggingConfiguration"),
-                policy=cr.AwsCustomResourcePolicy.from_statements([
-                    iam.PolicyStatement(actions=["bedrock:PutModelInvocationLoggingConfiguration",
-                                                 "bedrock:DeleteModelInvocationLoggingConfiguration"], resources=["*"]),
-                    iam.PolicyStatement(actions=["iam:PassRole"], resources=[role.role_arn])]))
+            # Live-found L6 (Tier-1 gate 2026-09-05): logging is an ACCOUNT singleton. A plain Delete on
+            # teardown removed the account's pre-existing (platform runbook) configuration. The provider
+            # snapshots the prior config into an SSM parameter on Create and RESTORES it on Delete
+            # (cdk/model_logging_provider/handler.py; unit-tested with fakes).
+            import pathlib as _pl
+            snapshot_param = f"/{prefix}/model-logging/prior"
+            provider_fn = lambda_.Function(
+                self, "ModelLoggingProviderFn", runtime=lambda_.Runtime.PYTHON_3_12, handler="handler.handler",
+                code=lambda_.Code.from_asset(str(_pl.Path(__file__).resolve().parents[1] / "model_logging_provider")),
+                timeout=cdk.Duration.minutes(2), description="Restore-aware Bedrock model-invocation logging (L6)")
+            provider_fn.add_to_role_policy(iam.PolicyStatement(
+                sid="ModelLoggingAccountSingleton",
+                actions=["bedrock:GetModelInvocationLoggingConfiguration", "bedrock:PutModelInvocationLoggingConfiguration",
+                         "bedrock:DeleteModelInvocationLoggingConfiguration"], resources=["*"]))
+            provider_fn.add_to_role_policy(iam.PolicyStatement(
+                sid="PriorConfigSnapshot", actions=["ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
+                resources=[f"arn:aws:ssm:{self.region}:{self.account}:parameter{snapshot_param}"]))
+            # PassRole for OUR delivery role and for whatever role the restored prior config names
+            provider_fn.add_to_role_policy(iam.PolicyStatement(
+                sid="PassDeliveryRoles", actions=["iam:PassRole"], resources=["*"],
+                conditions={"StringEquals": {"iam:PassedToService": "bedrock.amazonaws.com"}}))
+            provider = cr.Provider(self, "ModelLoggingProvider", on_event_handler=provider_fn)
+            res = cdk.CustomResource(
+                self, "ModelInvocationLogging", service_token=provider.service_token,
+                resource_type="Custom::AegisModelInvocationLogging",
+                properties={"LoggingConfig": cdk.Stack.of(self).to_json_string(cfg["loggingConfig"]),
+                            "SnapshotParameter": snapshot_param, "PhysicalId": f"{prefix}-model-logging"})
             res.node.add_dependency(role)
+            self.model_logging_snapshot_param = snapshot_param
             self.model_log_group = lg
             cdk.CfnOutput(self, "ModelInvocationLogGroup", value=lg.log_group_name)
             cdk.CfnOutput(self, "ModelInvocationLargeDataBucket", value=big.bucket_name)

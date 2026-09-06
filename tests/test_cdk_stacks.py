@@ -621,6 +621,26 @@ def test_bedrock_perimeter_bypass_alarm_from_capture_trail():
     assert Template.from_stack(obs2).find_resources("AWS::Logs::MetricFilter") == {}
 
 
+def test_model_invocation_logging_is_restore_aware():
+    """Live-found L6 (Tier-1 gate 2026-09-05): model-invocation logging is an ACCOUNT singleton and the old
+    AwsCustomResource simply DELETED it on teardown, switching off the account's pre-existing config. The
+    resource is now a Lambda-backed provider that snapshots the prior config to SSM on create and restores
+    it on delete - it needs Get (snapshot) as well as Put/Delete, the SSM parameter, and PassRole scoped
+    to the bedrock service (the restored config names a different delivery role)."""
+    _, _, obs = _perimeter_stacks()
+    t = Template.from_stack(obs)
+    t.resource_count_is("Custom::AegisModelInvocationLogging", 1)
+    crs = t.find_resources("Custom::AegisModelInvocationLogging")
+    props = list(crs.values())[0]["Properties"]
+    assert props["SnapshotParameter"] == "/ben-qtest/model-logging/prior" and "LoggingConfig" in props
+    pols = json.dumps(t.find_resources("AWS::IAM::Policy"))
+    assert "bedrock:GetModelInvocationLoggingConfiguration" in pols and "bedrock:PutModelInvocationLoggingConfiguration" in pols
+    assert "ssm:PutParameter" in pols and "model-logging/prior" in pols
+    assert '"iam:PassedToService": "bedrock.amazonaws.com"' in pols
+    # the old shape is gone: no AwsSdkCall custom resource deleting the account config outright
+    assert "deleteModelInvocationLoggingConfiguration" not in json.dumps(t.to_json())
+
+
 def test_invocation_log_store_is_regulated_data_under_production_settings():
     """The model-invocation store records EVERY caller's prompts (account setting), so under
     customer-managed KMS + model_log_lock_days>0 it must be CMK-encrypted (log group AND large-payload
