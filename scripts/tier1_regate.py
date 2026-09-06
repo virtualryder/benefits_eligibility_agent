@@ -205,6 +205,13 @@ def main():
             # cannot delete a non-empty bucket and CDK's auto-delete cannot bypass a lock, so the lineage
             # stack would end DELETE_FAILED. Empty it (bypass, sandbox retention only) BEFORE destroy.
             try:
+                # stop the trail FIRST - otherwise CloudTrail keeps delivering between the emptying below
+                # and CloudFormation's bucket delete, and the lineage stack ends DELETE_FAILED anyway
+                try:
+                    s.client("cloudtrail").stop_logging(Name="%s-capture-all" % prefix)
+                    time.sleep(20)
+                except Exception as exc:
+                    steps["capture_trail_stopped"] = "%s" % type(exc).__name__
                 s3 = s.client("s3")
                 wb = "%s-capture-worm-%s" % (prefix, acct)
                 for page in s3.get_paginator("list_object_versions").paginate(Bucket=wb):
