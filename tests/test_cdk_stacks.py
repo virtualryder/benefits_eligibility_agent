@@ -168,6 +168,22 @@ def test_identity_creates_no_users_and_no_passwords():
     assert "ChangeMe" not in json.dumps(tpl)
 
 
+def test_identity_provisions_the_zero_default_entitlement_grant():
+    """Live-found L11 (Tier-1 gate attempt 9, 2026-09-06): the manifest's require_entitlement policy admits a
+    caller only via a non-empty custom:tools claim or the tools_granted group. Neither was IaC - a proof
+    script created them by hand - so a fresh deploy denied every tool to every operator. Both forms of the
+    grant must be provisioned by the identity stack whenever the manifest carries the policy."""
+    import yaml
+    m = yaml.safe_load((ROOT / "agents" / "benefits-eligibility" / "manifest.yaml").read_text(encoding="utf-8"))
+    pols = [p for p in (m.get("policies") or []) if isinstance(p, dict) and p.get("require_entitlement")]
+    assert pols, "manifest must carry the zero-default entitlement policy (#160)"
+    T_IDENTITY.has_resource_properties("AWS::Cognito::UserPoolGroup", Match.object_like({
+        "GroupName": "tools_granted"}))
+    T_IDENTITY.has_resource_properties("AWS::Cognito::UserPool", Match.object_like({
+        "Schema": Match.array_with([Match.object_like({"Name": "tools", "AttributeDataType": "String",
+                                                       "Mutable": True})])}))
+
+
 def test_no_default_password_anywhere_in_any_template():
     for t in (T_DATA, T_COMPUTE, T_WORKFLOW, T_IDENTITY, T_NET):
         assert "ChangeMe" not in json.dumps(t.to_json())
@@ -643,7 +659,15 @@ def test_bedrock_runtime_endpoint_policy_admits_only_the_governed_drafter():
     bedrock = [v for v in eps.values() if "bedrock-runtime" in json.dumps(v["Properties"]["ServiceName"])]
     assert len(bedrock) == 1
     pol = json.dumps(bedrock[0]["Properties"]["PolicyDocument"])
-    assert "GovernedDrafterOnly" in pol and "coretoolsServiceRole" in pol and "break-glass" in pol
+    assert "GovernedDrafterOnly" in pol and "break-glass" in pol
+    # L12: the policy names the EXACT pinned drafter role, and the compute stack really pins that name
+    from ben_stacks.compute_stack import drafter_role_name
+    assert f":role/{drafter_role_name('ben-ptest')}\"" in pol and "*ServiceRole" not in pol
+    roles = T_COMPUTE.find_resources("AWS::IAM::Role", {"Properties": {"RoleName": drafter_role_name("ben-test")}})
+    assert len(roles) == 1, "the drafter role must carry the pinned physical name"
+    fn = T_COMPUTE.find_resources("AWS::Lambda::Function", {"Properties": {"FunctionName": "ben-test-core-tools"}})
+    assert list(fn.values())[0]["Properties"]["Role"]["Fn::GetAtt"][0] == list(roles)[0]
+    T_COMPUTE.has_output("DrafterRoleArn", {})
     assert "aws:PrincipalArn" in pol and "aws:PrincipalAccount" in pol
     assert '"bedrock:InvokeModel"' in pol and '"bedrock:InvokeModelWithResponseStream"' in pol
     assert "userId" not in pol

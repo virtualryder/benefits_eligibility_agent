@@ -87,7 +87,9 @@ def main():
 
     # caseworker identity
     pw = "Gr-" + secrets.token_urlsafe(12) + "aA1!"
-    make_user(idp, pool, "cw-gr", ["benefits_caseworker"], pw)
+    # #160 zero-default entitlement: the role group alone is denied every tool; tools_granted is the grant
+    # (provisioned by the identity stack - live-found L11).
+    make_user(idp, pool, "cw-gr", ["benefits_caseworker", "tools_granted"], pw)
     time.sleep(4)
     tok = access_token(pool, client, a.region, "cw-gr", pw)
 

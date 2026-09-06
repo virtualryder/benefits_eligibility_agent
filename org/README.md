@@ -19,7 +19,7 @@ these templates provide. Without them the pack is a governed application path pl
 
 ```bash
 python scripts/render_org_perimeter.py \
-  --drafter-role-arn  arn:aws:iam::<acct>:role/<prefix>-compute-coretoolsServiceRole...   # ComputeStack output
+  --drafter-role-arn  arn:aws:iam::<acct>:role/<prefix>-compute-coretools                # ComputeStack output DrafterRoleArn (pinned name, L12)
   --runtime-role-arn  arn:aws:iam::<acct>:role/AmazonBedrockAgentCoreSDKRuntime-...       # toolkit-created
   --deployer-role-arn arn:aws:iam::<acct>:role/<your platform deployer / pipeline role>
   [--extra-principal arn:aws:iam::<acct>:role/<break-glass>]

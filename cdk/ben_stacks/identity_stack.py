@@ -45,6 +45,13 @@ class IdentityStack(cdk.Stack):
             password_policy=cognito.PasswordPolicy(
                 min_length=14, require_lowercase=True, require_uppercase=True,
                 require_digits=True, require_symbols=True),
+            # Live-found L11 (Tier-1 gate attempt 9, 2026-09-06): the manifest's zero-default entitlement
+            # policy (#160, require_entitlement) admits a caller ONLY via a non-empty custom:tools claim or
+            # membership in tools_granted - but neither the attribute nor the group was IaC; a proof script
+            # had been creating them by hand, so a fresh deploy denied every tool to every operator. The
+            # per-user claim attribute is provisioned here (a pre-token-generation trigger copies it into
+            # the access token; see scripts/entitlement_mapper.py) and the group form below.
+            custom_attributes={"tools": cognito.StringAttribute(min_len=0, max_len=2048, mutable=True)},
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
@@ -93,6 +100,11 @@ class IdentityStack(cdk.Stack):
         cognito.CfnUserPoolGroup(self, "ReviewerGroup", user_pool_id=self.pool.user_pool_id,
                                  group_name="benefits_caseworker",
                                  description="Qualified benefits caseworkers (Cedar role group)")
+        # ENTITLEMENT (#160, zero-default tools): the explicit grant. A caseworker in the role group but NOT
+        # in this group (and without a custom:tools claim) is denied every tool by Cedar require_entitlement.
+        cognito.CfnUserPoolGroup(self, "EntitlementGroup", user_pool_id=self.pool.user_pool_id,
+                                 group_name="tools_granted",
+                                 description="Explicit tool entitlement grant (zero-default #160)")
 
         # ── #170: WAFv2 on the auth front door ───────────────────────────────
         # The AgentCore Gateway and Runtime are MANAGED endpoints and are NOT WAF-associable resource

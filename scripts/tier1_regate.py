@@ -114,7 +114,7 @@ def main():
         ec2 = s.client("ec2")
         eps = ec2.describe_vpc_endpoints(Filters=[{"Name": "service-name", "Values": ["com.amazonaws.%s.bedrock-runtime" % region]}])["VpcEndpoints"]
         pol = " ".join(e.get("PolicyDocument", "") for e in eps)
-        check("P5_endpoint_policy_present", len(eps) >= 1 and "GovernedDrafterOnly" in pol and "coretoolsServiceRole" in pol,
+        check("P5_endpoint_policy_present", len(eps) >= 1 and "GovernedDrafterOnly" in pol and "-compute-coretools" in pol,
               "endpoints=%d" % len(eps))
 
         # ── 4. P-4 invocation log group is CMK-encrypted ──────────────────────────────────────
@@ -184,9 +184,15 @@ def main():
                 if not tok:
                     break
             return n
+        # Attempt-9 lesson: the metric filter counts only INFERENCE-family event names (GetGuardrail by a
+        # human is a management read, not a bypass), so the capture-log counts use the SAME event set.
+        sys.path.insert(0, os.path.join(REPO, "cdk"))
+        from ben_stacks.observability_stack import ObservabilityStack
+        from ben_stacks.compute_stack import drafter_role_name
+        inv = "(" + " || ".join('($.eventName = "%s")' % e for e in ObservabilityStack.BEDROCK_INVOKE_EVENTS) + ")"
         try:
-            human = _count('{ ($.eventSource = "bedrock.amazonaws.com") && (($.userIdentity.type = "IAMUser") || ($.userIdentity.type = "Root")) }')
-            drafter = _count('{ ($.eventSource = "bedrock.amazonaws.com") && ($.userIdentity.type = "AssumedRole") && ($.userIdentity.sessionContext.sessionIssuer.arn = "*%s-compute-coretoolsServiceRole*") }' % prefix)
+            human = _count('{ ($.eventSource = "bedrock.amazonaws.com") && %s && (($.userIdentity.type = "IAMUser") || ($.userIdentity.type = "Root")) }' % inv)
+            drafter = _count('{ ($.eventSource = "bedrock.amazonaws.com") && %s && ($.userIdentity.type = "AssumedRole") && ($.userIdentity.sessionContext.sessionIssuer.arn = "arn:aws:iam::*:role/%s") }' % (inv, drafter_role_name(prefix)))
         except Exception as exc:
             human, drafter = -1, -1
             steps["p3_capture_counts_error"] = str(exc)[:200]
@@ -242,13 +248,46 @@ def main():
                     steps["capture_trail_stopped"] = "%s" % type(exc).__name__
                 s3 = s.client("s3")
                 wb = "%s-capture-worm-%s" % (prefix, acct)
-                for page in s3.get_paginator("list_object_versions").paginate(Bucket=wb):
-                    for o in page.get("Versions", []) + page.get("DeleteMarkers", []):
-                        s3.delete_object(Bucket=wb, Key=o["Key"], VersionId=o["VersionId"], BypassGovernanceRetention=True)
-                steps["capture_bucket_emptied"] = True
+
+                def _empty_capture_bucket():
+                    n = 0
+                    for page in s3.get_paginator("list_object_versions").paginate(Bucket=wb):
+                        for o in page.get("Versions", []) + page.get("DeleteMarkers", []):
+                            s3.delete_object(Bucket=wb, Key=o["Key"], VersionId=o["VersionId"], BypassGovernanceRetention=True)
+                            n += 1
+                    return n
+                steps["capture_bucket_emptied"] = _empty_capture_bucket()
             except Exception as exc:
                 steps["capture_bucket_emptied"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+                _empty_capture_bucket = lambda: 0
             steps["destroy"] = sh(cdk_cmd("destroy", "--all", "--force", *ctx(env)), cwd=CDK, timeout=3600)
+            # Attempt-9 lesson (L13): CloudTrail keeps delivering for minutes after StopLogging, so the
+            # capture bucket can be non-empty again by the time CloudFormation deletes it; `cdk destroy`
+            # then aborts on the lineage stack and leaves every stack below it standing. Finish the job:
+            # re-empty the bucket and delete whatever is still up, dependents first, with waits and retries.
+            cf = s.client("cloudformation")
+            order = ["lineage", "observability", "gateway", "workflow", "compute", "network", "identity", "data"]
+            notes = []
+            for rnd in range(3):
+                present = {st["StackName"]: st["StackStatus"] for st in cf.describe_stacks()["Stacks"]
+                           if st["StackName"].startswith(prefix + "-")}
+                if not present:
+                    break
+                try:
+                    notes.append("round %d: re-emptied %d late deliveries" % (rnd, _empty_capture_bucket()))
+                except Exception as exc:
+                    notes.append("round %d: empty -> %s" % (rnd, type(exc).__name__))
+                for suffix in order:
+                    name = "%s-%s" % (prefix, suffix)
+                    if name not in present:
+                        continue
+                    try:
+                        cf.delete_stack(StackName=name)
+                        cf.get_waiter("stack_delete_complete").wait(StackName=name, WaiterConfig={"Delay": 15, "MaxAttempts": 100})
+                        notes.append("%s deleted" % name)
+                    except Exception as exc:
+                        notes.append("%s: %s %s" % (name, type(exc).__name__, str(exc)[:100]))
+            steps["destroy_remaining"] = notes
             steps["cleanup"] = sh([sys.executable, os.path.join(HERE, "cleanup_retained.py"), "--prefix", prefix,
                                    "--region", region, "--i-know-this-deletes-evidence"], cwd=REPO, timeout=1200)
             try:
@@ -263,8 +302,16 @@ def main():
                 except Exception as exc:
                     steps["model_logging_restored"] = "%s: %s" % (type(exc).__name__, str(exc)[:150])
             restored = (cfg == pre_cfg) if pre_cfg else (not cfg or "modelinvocations/%s" % prefix not in json.dumps(cfg))
-            check("teardown_zero_residue", steps["destroy"]["rc"] == 0 and steps["cleanup"]["rc"] == 0 and restored,
-                  "destroy_rc=%s cleanup_rc=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], steps["cleanup"]["rc"], restored))
+            # zero residue is what matters: the cleanup's own residue report (stacks/buckets/lambdas/...) is
+            # the verdict; a first-pass `cdk destroy` failure that the retry loop finished is recorded, not fatal
+            clean = False
+            try:
+                rep = json.loads(steps["cleanup"]["out"][steps["cleanup"]["out"].rindex("{\n  \"prefix\""):])
+                clean = bool(rep.get("clean"))
+            except Exception:
+                clean = steps["cleanup"]["rc"] == 0
+            check("teardown_zero_residue", clean and restored,
+                  "destroy_rc=%s cleanup_rc=%s clean=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], steps["cleanup"]["rc"], clean, restored))
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     result = {"gate": "tier1-regate", "env": env, "region": region, "pass": ok, "fatal": fatal, "checks": checks, "steps": steps,

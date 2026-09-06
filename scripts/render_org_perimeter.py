@@ -141,7 +141,7 @@ def _sub(obj, mapping):
 
 
 def render(drafter, runtime, deployer, extras=()):
-    mapping = {"coretoolsServiceRole": [drafter] + list(extras), "AgentCoreSDKRuntime": [runtime] if runtime else [],
+    mapping = {"compute-coretools": [drafter] + list(extras), "AgentCoreSDKRuntime": [runtime] if runtime else [],
                "platform-deployer": [deployer]}
     out_dir = os.path.join(ORG, "rendered")
     os.makedirs(out_dir, exist_ok=True)

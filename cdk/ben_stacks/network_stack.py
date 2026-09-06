@@ -86,7 +86,9 @@ class NetworkStack(cdk.Stack):
         # credentials is refused at the endpoint - the in-VPC counterpart of the org SCP under org/.
         # aws:PrincipalArn resolves to the ROLE arn for a role session, so a caller-chosen session name
         # cannot satisfy it. Converse / ConverseStream authorize as InvokeModel / ...WithResponseStream.
-        drafter_role_pattern = f"arn:aws:iam::{self.account}:role/{prefix}-compute-coretoolsServiceRole*"
+        # L12: the EXACT pinned drafter role (see compute_stack.drafter_role_name) - no wildcard, no case guess.
+        from .compute_stack import drafter_role_name
+        drafter_role_pattern = f"arn:aws:iam::{self.account}:role/{drafter_role_name(prefix)}"
         self.bedrock_endpoint_principals = [drafter_role_pattern] + [p for p in bedrock_principals if p]
         self.endpoints["BedrockEp"].add_to_policy(iam.PolicyStatement(
             sid="GovernedDrafterOnly", effect=iam.Effect.ALLOW,

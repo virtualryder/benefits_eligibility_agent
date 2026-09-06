@@ -14,7 +14,7 @@
       "Condition": {
         "ArnLike": {
           "aws:PrincipalArn": [
-            "arn:aws:iam::111122223333:role/ben-prod-compute-coretoolsServiceRole-EXAMPLE"
+            "arn:aws:iam::111122223333:role/ben-prod-compute-coretools-EXAMPLE"
           ]
         },
         "StringEquals": {

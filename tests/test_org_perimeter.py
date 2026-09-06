@@ -67,7 +67,7 @@ def test_render_substitutes_real_principals_and_stays_sound(tmp_path, monkeypatc
     monkeypatch.setattr(rop, "ORG", str(tmp_path))
     for name in ("scp-bedrock-runtime-perimeter.json", "vpce-policy-bedrock-runtime.json"):
         (tmp_path / name).write_text((ORG / name).read_text(encoding="utf-8"), encoding="utf-8")
-    drafter = "arn:aws:iam::210987654321:role/ben-prod-compute-coretoolsServiceRoleAB12CD34-XyZ"
+    drafter = "arn:aws:iam::210987654321:role/ben-prod-compute-coretools"
     runtime = "arn:aws:iam::210987654321:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-9f8e7d"
     deployer = "arn:aws:iam::210987654321:role/aegis-platform-deployer"
     extra = "arn:aws:iam::210987654321:role/aegis-break-glass"
