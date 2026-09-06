@@ -25,12 +25,54 @@ def _send(event, context, status, data=None, reason=""):
     urllib.request.urlopen(req, timeout=30)
 
 
-def _wait(fn, want, tries=40, delay=6):
+def _wait(fn, want, tries=40, delay=6, label="resource", failed=("FAILED", "CREATE_FAILED", "UPDATE_FAILED", "DELETE_FAILED")):
+    """Poll fn() until it returns `want`. A terminal failure status raises IMMEDIATELY (no 4-minute wait
+    on a resource that will never arrive), and every raise names the resource and its last status - the
+    2026-09-05 live gate spent a full cycle on a bare "resource did not reach ACTIVE"."""
+    last = None
     for _ in range(tries):
-        if fn() == want:
+        last = fn()
+        if last == want:
             return
+        if last in failed:
+            raise RuntimeError(f"{label} reached {last} (wanted {want})")
         time.sleep(delay)
-    raise RuntimeError(f"resource did not reach {want}")
+    raise RuntimeError(f"{label} did not reach {want} (last status {last})")
+
+
+def _policy_status(cc, engine_id, pid):
+    d = cc.get_policy(policyEngineId=engine_id, policyId=pid)
+    return d.get("status"), d.get("statusReasons") or []
+
+
+def _create_policy_active(cc, engine_id, name, definition, mode, attempts=3):
+    """Create a Cedar policy and wait for ACTIVE. The engine validates tool ACTIONS against the gateway
+    targets' tool schemas; right after the targets report READY the validator can still see an empty
+    tool set ("unrecognized action ...") - a propagation race the 2026-09-05 live gate hit. A
+    CREATE_FAILED whose reasons say "unrecognized action" is deleted and retried after a settle; any other
+    validation failure raises at once WITH the engine's reasons (so the stack event says what was wrong)."""
+    last_reasons = []
+    for attempt in range(attempts):
+        pid = cc.create_policy(policyEngineId=engine_id, name=name,
+                               definition={"cedar": {"statement": definition}}, validationMode=mode)["policyId"]
+        status, reasons = None, []
+        for _ in range(40):
+            status, reasons = _policy_status(cc, engine_id, pid)
+            if status in ("ACTIVE", "CREATE_FAILED", "FAILED"):
+                break
+            time.sleep(4)
+        if status == "ACTIVE":
+            return pid
+        last_reasons = reasons
+        try:
+            cc.delete_policy(policyEngineId=engine_id, policyId=pid)
+        except Exception:
+            pass
+        transient = any("unrecognized action" in str(r) for r in reasons)
+        if not transient or attempt == attempts - 1:
+            break
+        time.sleep(20 * (attempt + 1))
+    raise RuntimeError("policy %s did not reach ACTIVE: %s" % (name, "; ".join(str(r)[:400] for r in last_reasons) or "no reasons"))
 
 
 def _find_engine(cc, name):
@@ -105,7 +147,7 @@ def _create(cc, ssm, p, region, acct):
                                             description=p.get("EngineDesc", ""))["policyEngineId"]
     engine_arn = f"arn:aws:bedrock-agentcore:{region}:{acct}:policy-engine/{engine_id}"
     try:
-        _wait(lambda: cc.get_policy_engine(policyEngineId=engine_id)["status"], "ACTIVE")
+        _wait(lambda: cc.get_policy_engine(policyEngineId=engine_id)["status"], "ACTIVE", label="policy engine")
     except cc.exceptions.ResourceNotFoundException:
         # the reused engine vanished under us (deletion still propagating): create a fresh one
         engine_id = cc.create_policy_engine(name=p["EngineName"],
@@ -127,29 +169,31 @@ def _create(cc, ssm, p, region, acct):
                            policyEngineConfiguration={"arn": engine_arn, "mode": "LOG_ONLY"},
                            description=p.get("GatewayDesc", ""), **_interceptors(p))
     gw_id = gw["gatewayId"]
-    _wait(lambda: cc.get_gateway(gatewayIdentifier=gw_id)["status"], "READY")
+    _wait(lambda: cc.get_gateway(gatewayIdentifier=gw_id)["status"], "READY", label="gateway")
     g = cc.get_gateway(gatewayIdentifier=gw_id)
     gw_arn, gw_url = g["gatewayArn"], g["gatewayUrl"]
     ssm.put_parameter(Name=p["SsmParam"], Type="String", Overwrite=True, Value=gw_url)
 
-    last = None
+    target_ids = []
     for t in json.loads(p["TargetsJson"]):
-        last = cc.create_gateway_target(
+        target_ids.append(cc.create_gateway_target(
             gatewayIdentifier=gw_id, name=t["name"],
             targetConfiguration={"mcp": {"lambda": {
                 "lambdaArn": t["lambda_arn"],
                 "toolSchema": {"inlinePayload": t["tools"]}}}},
             credentialProviderConfigurations=[{"credentialProviderType": "GATEWAY_IAM_ROLE"}],
-        )["targetId"]
-    if last:
-        _wait(lambda: cc.get_gateway_target(gatewayIdentifier=gw_id, targetId=last)["status"], "READY")
+        )["targetId"])
+    # EVERY target must be READY (not just the last one created) before the Cedar policies that name
+    # their tools are validated against the gateway's tool set - then a short settle for propagation.
+    for tid in target_ids:
+        _wait(lambda tid=tid: cc.get_gateway_target(gatewayIdentifier=gw_id, targetId=tid)["status"], "READY",
+              label="gateway target %s" % tid)
+    if target_ids:
+        time.sleep(15)
 
     for pol in json.loads(p["PoliciesJson"]):
         definition = pol["definition"].replace("__GATEWAY_ARN__", gw_arn)
-        pid = cc.create_policy(policyEngineId=engine_id, name=pol["name"],
-                               definition={"cedar": {"statement": definition}},
-                               validationMode=pol.get("validation_mode", "FAIL_ON_ANY_FINDINGS"))["policyId"]
-        _wait(lambda: cc.get_policy(policyEngineId=engine_id, policyId=pid)["status"], "ACTIVE")
+        _create_policy_active(cc, engine_id, pol["name"], definition, pol.get("validation_mode", "FAIL_ON_ANY_FINDINGS"))
 
     cc.update_gateway(gatewayIdentifier=gw_id, name=p["GatewayName"], roleArn=p["GatewayRoleArn"],
                       protocolType="MCP", authorizerType="CUSTOM_JWT",
