@@ -293,6 +293,41 @@ def main():
         except Exception as exc:
             steps["capture_trail_stopped"] = type(exc).__name__
         steps["capture_bucket_emptied"] = _empty_capture_bucket()
+
+        # L23 (live-found, attempt 7 teardown 2026-09-06): the workflow stack sat in
+        # DELETE_IN_PROGRESS for 30 minutes on the state machine. The PII-canary probe starts an
+        # execution that PARKS at the human sign-off wait by design and is never resumed, so it is
+        # still RUNNING when teardown begins and CloudFormation waits on it. Any proof that leaves
+        # an execution parked at a wait state does the same. Stop them first - they belong to a
+        # disposable proof environment that is being destroyed.
+        def _stop_running_executions():
+            stopped = []
+            try:
+                sfn_c = s.client("stepfunctions")
+                for m in sfn_c.list_state_machines().get("stateMachines", []):
+                    if not m["name"].startswith(prefix):
+                        continue
+                    tok = None
+                    while True:
+                        kw = {"stateMachineArn": m["stateMachineArn"], "statusFilter": "RUNNING"}
+                        if tok:
+                            kw["nextToken"] = tok
+                        page = sfn_c.list_executions(**kw)
+                        for ex in page.get("executions", []):
+                            try:
+                                sfn_c.stop_execution(executionArn=ex["executionArn"],
+                                                     cause="teardown: proof environment %s is being destroyed" % prefix)
+                                stopped.append(ex["name"])
+                            except Exception as exc:
+                                stopped.append("%s: %s" % (ex["name"], type(exc).__name__))
+                        tok = page.get("nextToken")
+                        if not tok:
+                            break
+            except Exception as exc:
+                return "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return stopped
+
+        steps["executions_stopped"] = _stop_running_executions()
         steps["destroy"] = sh(cdk_cmd("destroy", "--all", "--force", *ctx(env)), cwd=CDK, timeout=3600)
         order = ["lineage", "observability", "gateway", "workflow", "compute"] + ["%s-data" % t for t in TENANTS] + ["network", "identity", "data"]
         notes = []
@@ -300,7 +335,7 @@ def main():
             present = {st["StackName"] for st in cf.describe_stacks()["Stacks"] if st["StackName"].startswith(prefix + "-")}
             if not present:
                 break
-            notes.append("round %d: re-emptied %d" % (rnd, _empty_capture_bucket()))
+            notes.append("round %d: re-emptied %d, stopped %s" % (rnd, _empty_capture_bucket(), _stop_running_executions()))
             for suffix in order:
                 name = "%s-%s" % (prefix, suffix)
                 if name in present:
