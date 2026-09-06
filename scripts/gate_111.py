@@ -73,7 +73,7 @@ def main():
     cf = boto3.client("cloudformation", region_name=a.region); idp = boto3.client("cognito-idp", region_name=a.region)
     ident = outputs(cf, f"{prefix}-identity")
     pw = "Gate-" + secrets.token_urlsafe(12) + "aA1!"
-    make_user(idp, ident["UserPoolId"], "cw-a", ["benefits_caseworker", f"tenant_{ta}"], pw)
+    make_user(idp, ident["UserPoolId"], "cw-a", ["benefits_caseworker", "tools_granted", f"tenant_{ta}"], pw)
     time.sleep(2)
     tok = access_token(ident["UserPoolId"], ident["ClientId"], a.region, "cw-a", pw)
     obs_outputs = outputs(cf, f"{prefix}-observability")

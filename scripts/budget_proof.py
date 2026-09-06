@@ -140,8 +140,8 @@ def main():
 
     pool, client = ident["UserPoolId"], ident["ClientId"]
     pw = "Bg-" + secrets.token_urlsafe(12) + "aA1!"
-    make_user(idp, pool, "bg-cw-a", ["benefits_caseworker", f"tenant_{ta}"], pw)
-    make_user(idp, pool, "bg-cw-b", ["benefits_caseworker", f"tenant_{tb}"], pw)
+    make_user(idp, pool, "bg-cw-a", ["benefits_caseworker", "tools_granted", f"tenant_{ta}"], pw)
+    make_user(idp, pool, "bg-cw-b", ["benefits_caseworker", "tools_granted", f"tenant_{tb}"], pw)
     time.sleep(3)
     tok_a, tok_b = (access_token(pool, client, region, u, pw) for u in ("bg-cw-a", "bg-cw-b"))
 

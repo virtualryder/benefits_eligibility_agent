@@ -31,7 +31,7 @@ pool, client = ident["UserPoolId"], ident["ClientId"]
 ctrl = mt.outputs(cf, f"{PREFIX}-workflow")["ControllerArn"]
 
 pw = "Ln-" + secrets.token_urlsafe(12) + "aA1!"
-mt.make_user(idp, pool, "lineage-cw", ["benefits_caseworker", "tenant_" + TENANT], pw)
+mt.make_user(idp, pool, "lineage-cw", ["benefits_caseworker", "tools_granted", "tenant_" + TENANT], pw)
 time.sleep(3)
 tok = mt.access_token(pool, client, REGION, "lineage-cw", pw)
 

@@ -91,8 +91,12 @@ class WorkflowStack(cdk.Stack):
 
         # R3-2: no content in the payload — the drafter loads the masked text SERVER-SIDE from the
         # sanitized-artifact store via the signed ref, and returns notice_ref (not the notice text).
+        # L14 (2026-09-06): the grounded drafter states ONLY the deterministic engine's determination, so
+        # the assessment output (structured, non-PII) travels with the signed ref. Without it every real
+        # notice was contextual-grounding-blocked (the proof had pre-baked it into the masked text).
         draft = invoke("DraftNotice", compute.core,
-                       {"deidentified": True, "sanitized_ref.$": "$.mask.out.sanitized_ref"},
+                       {"deidentified": True, "sanitized_ref.$": "$.mask.out.sanitized_ref",
+                        "determination.$": "$.assessment.out"},
                        "$.draft")
         audit_intent = invoke("AuditIntent", compute.write_audit,
                               {"icsr_id.$": "$.case_id", "action": "benefits-determination",

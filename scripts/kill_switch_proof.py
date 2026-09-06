@@ -178,8 +178,8 @@ def main():
     # ---- cognito users + tokens (tenanted caseworkers) --------------------------------------------
     pool, client, gw_url = ident["UserPoolId"], ident["ClientId"], gw["GatewayUrl"]
     pw = "Ks-" + secrets.token_urlsafe(12) + "aA1!"
-    make_user(idp, pool, "ks-cw-a", ["benefits_caseworker", f"tenant_{ta}"], pw)
-    make_user(idp, pool, "ks-cw-b", ["benefits_caseworker", f"tenant_{tb}"], pw)
+    make_user(idp, pool, "ks-cw-a", ["benefits_caseworker", "tools_granted", f"tenant_{ta}"], pw)
+    make_user(idp, pool, "ks-cw-b", ["benefits_caseworker", "tools_granted", f"tenant_{tb}"], pw)
     time.sleep(3)
     tok_a, tok_b = (access_token(pool, client, region, u, pw) for u in ("ks-cw-a", "ks-cw-b"))
 

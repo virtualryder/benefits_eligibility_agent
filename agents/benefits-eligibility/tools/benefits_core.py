@@ -46,6 +46,34 @@ _NOTICE_BOILERPLATE = (
 )
 
 
+# L14 (full-portfolio gate attempt 3, 2026-09-06): the grounded-core drafter may state ONLY a
+# determination that is IN its grounding source. The workflow's DraftNotice used to pass just the masked
+# application, so EVERY real notice was blocked by the contextual-grounding filter (the earlier guardrail
+# proof had pre-baked the determination into the masked text - a proof artifact, not the production
+# path). The deterministic engine's output is therefore a REQUIRED, structured, non-PII drafter input,
+# rendered into the grounding source from an allowlist of fields (never free text from the caller).
+_DETERMINATION_FIELDS = ("determination", "eligible", "reason", "processing_clock", "processing_days",
+                         "income_pct_fpl", "household_size", "assessed_by")
+_DET_OK = re.compile(r"[^a-zA-Z0-9\s:_@$#=/+,\-.%()\[\]]")
+
+
+def _determination_text(d):
+    """Render assess_eligibility's output for the grounding source. Dict -> allowlisted fields only;
+    string -> the string (a caller-supplied determination text, bounded). Empty when absent/unusable."""
+    if isinstance(d, str):
+        try:
+            d = json.loads(d)
+        except Exception:
+            return _DET_OK.sub("_", d.strip())[:600]
+    if not isinstance(d, dict):
+        return ""
+    parts = []
+    for k in _DETERMINATION_FIELDS:
+        if d.get(k) is not None and d.get(k) != "":
+            parts.append("%s=%s" % (k, _DET_OK.sub("_", str(d[k]))[:300]))
+    return "; ".join(parts)
+
+
 def _coerce(event):
     e = event or {}
     if isinstance(e, str):
@@ -98,16 +126,25 @@ def _draft(e):
     # The standard notice boilerplate (timeframe / appeal rights / draft framing) - which is not in the
     # grounding source and would sink the grounding score - is appended DETERMINISTICALLY after the model
     # call (fixed template, no invented specifics), so a legitimate notice is never blocked by boilerplate.
+    # L14: the determination the notice states comes from the deterministic engine and MUST be in the
+    # grounding source; without it the drafter refuses fail-closed BEFORE any model spend.
+    det_text = _determination_text(e.get("determination"))
+    if GUARDRAIL_ID and not det_text:
+        return {"error": "refused: determination required - the grounded drafter states only a determination "
+                         "present in its grounding source; pass assess_eligibility's output as `determination`",
+                "drafted_by": None, "determination_present": False, "guardrail_applied": True}
+    source = case + ("\n\nDeterministic eligibility determination (rules engine, not the model): " + det_text
+                     if det_text else "")
     if GUARDRAIL_ID:
         system = [{"text": _SYSTEM_GROUNDED_CORE}]
         content = [
-            {"guardContent": {"text": {"text": case, "qualifiers": ["grounding_source"]}}},
+            {"guardContent": {"text": {"text": source, "qualifiers": ["grounding_source"]}}},
             {"guardContent": {"text": {"text": "What is the eligibility determination and the reason, "
                                                "based only on these case facts?", "qualifiers": ["query"]}}},
         ]
     else:
         system = [{"text": _SYSTEM}]
-        content = [{"text": "De-identified case + determination:\n" + case}]
+        content = [{"text": "De-identified case + determination:\n" + source}]
     kwargs = dict(
         modelId=DRAFT_MODEL_ID,
         system=system,

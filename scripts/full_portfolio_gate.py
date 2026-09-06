@@ -14,7 +14,7 @@ What it re-proves on the exact tree (the "not re-run on this tag" list in VALIDA
   TD    teardown to zero residue     runtime + cdk destroy + cleanup_retained; model-logging restored
 
 Usage: python scripts/full_portfolio_gate.py --env fp --region us-east-1 [--skip-deploy] [--skip-runtime]
-       [--skip-teardown] [--teardown-on-fail]
+       [--skip-teardown] [--teardown-on-fail] [--teardown-only]
 Writes evidence/FULL-PORTFOLIO-GATE-<date>.json (+ the per-proof evidence files the proofs write).
 Runs from the Windows host (Python 3.12 with governed_core + aws_cdk; Git-Bash for the runtime scripts).
 """
@@ -73,6 +73,10 @@ def stack_outputs(cf, name):
         return {}
 
 
+class _TeardownOnly(Exception):
+    """--teardown-only: skip straight from the runtime-state read to the teardown block."""
+
+
 def main():
     # the gate log is a redirected file on Windows (cp1252): the toolkit prints box-drawing characters, and a
     # print() of a check detail must never take the whole gate down (attempt 1, 2026-09-06)
@@ -88,7 +92,11 @@ def main():
     ap.add_argument("--skip-runtime", action="store_true", help="reuse the runtime already launched for this env")
     ap.add_argument("--skip-teardown", action="store_true")
     ap.add_argument("--teardown-on-fail", action="store_true")
+    ap.add_argument("--teardown-only", action="store_true",
+                    help="no proofs: tear down the env this script left behind (runtime from .bedrock_agentcore.yaml + stacks)")
     a = ap.parse_args()
+    if a.teardown_only:
+        a.skip_deploy = a.skip_runtime = a.teardown_on_fail = True
     env, region, prefix = a.env, a.region, "ben-%s" % a.env
     date = datetime.date.today().isoformat()
     s = boto3.Session(region_name=region)
@@ -172,6 +180,8 @@ def main():
         check("RT2_runtime_uses_iac_role", bool(runtime_arn) and exec_role == comp.get("RuntimeExecutionRoleArn"),
               "runtime=%s role=%s" % (runtime_id, exec_role.rsplit("/", 1)[-1] if exec_role else None))
         steps["runtime"] = {"arn": runtime_arn, "id": runtime_id, "log_group": runtime_log_group, "exec_role": exec_role}
+        if a.teardown_only:
+            raise _TeardownOnly()
         # wait until the runtime is READY
         acc = s.client("bedrock-agentcore-control")
         st = ""
@@ -239,6 +249,8 @@ def main():
                            "--runtime-log-group", runtime_log_group, "--out", os.path.join(ev, "FULL-PORTFOLIO-GATE-%s-regression.json" % date)],
                           cwd=REPO, timeout=1800)
         check("E2E_zero_unexpected", steps["e2e"]["rc"] == 0, "rc=%s %s" % (steps["e2e"]["rc"], steps["e2e"]["out"][-200:].replace("\n", " | ")))
+    except _TeardownOnly:
+        steps["teardown_only"] = True
     except Exception as exc:
         fatal = "%s: %s" % (type(exc).__name__, str(exc)[:300])
         print("FATAL", fatal, flush=True)
@@ -295,14 +307,16 @@ def main():
             cfg = bedrock.get_model_invocation_logging_configuration().get("loggingConfig")
         except Exception:
             cfg = None
-        if pre_cfg and cfg != pre_cfg:
+        # --teardown-only starts while the env's own logging config is active, so pre_cfg is NOT the
+        # baseline: the L6 provider restores the real prior config on delete; only judge that it did.
+        if pre_cfg and cfg != pre_cfg and not a.teardown_only:
             try:
                 bedrock.put_model_invocation_logging_configuration(loggingConfig=pre_cfg)
                 cfg = bedrock.get_model_invocation_logging_configuration().get("loggingConfig")
                 steps["model_logging_restored"] = True
             except Exception as exc:
                 steps["model_logging_restored"] = "%s: %s" % (type(exc).__name__, str(exc)[:150])
-        restored = (cfg == pre_cfg) if pre_cfg else (not cfg or "modelinvocations/%s" % prefix not in json.dumps(cfg))
+        restored = (cfg == pre_cfg) if (pre_cfg and not a.teardown_only) else (not cfg or "modelinvocations/%s" % prefix not in json.dumps(cfg))
         clean = False
         try:
             out = steps["cleanup"]["out"]; rep = json.loads(out[out.rindex('{\n  "prefix"'):]); clean = bool(rep.get("clean"))
@@ -317,7 +331,8 @@ def main():
         check("teardown_zero_residue", clean and restored, "destroy_rc=%s clean=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], clean, restored))
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
-    out = os.path.join(REPO, "evidence", "FULL-PORTFOLIO-GATE-%s.json" % date)
+    out = os.path.join(REPO, ".build" if a.teardown_only else "evidence",
+                       "FULL-PORTFOLIO-GATE-%s%s.json" % (date, "-teardown" if a.teardown_only else ""))
     with open(out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"env": env, "prefix": prefix, "region": region, "date": date, "PASS": ok, "fatal": fatal,
                    "checks": checks, "steps": steps, "evidence": out}, fh, indent=1, default=str)

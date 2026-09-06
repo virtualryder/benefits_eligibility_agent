@@ -2,9 +2,9 @@
 """Phase 111 - LIVE two-tenant proof for the hybrid multi-tenant control plane.
 
 Drives the deployed AgentCore gateway as THREE identities and records verbatim results:
-  * cw-a   : benefits_caseworker + tenant_pha-a  -> allowed; mask_pii routes to pha-a's OWN store
-  * cw-b   : benefits_caseworker + tenant_pha-b  -> allowed; routes to pha-b's OWN store
-  * cw-none: benefits_caseworker, NO tenant      -> DENIED at the gateway (require_tenant / interceptor)
+  * cw-a   : benefits_caseworker + tools_granted + tenant_pha-a  -> allowed; mask_pii routes to pha-a's OWN store
+  * cw-b   : benefits_caseworker + tools_granted + tenant_pha-b  -> allowed; routes to pha-b's OWN store
+  * cw-none: benefits_caseworker + tools_granted, NO tenant -> DENIED at the gateway (require_tenant / interceptor)
 Then proves physical isolation: after cw-a's call only pha-a's sanitized store holds the artifact,
 and after cw-b's only pha-b's - never the other tenant's, never the base silo table.
 
@@ -152,9 +152,11 @@ def main():
           "enforcement": gw.get("Enforcement"), "policy_engine": gw.get("PolicyEngineId"), "steps": []}
 
     pw = "Mt-" + secrets.token_urlsafe(12) + "aA1!"
-    users = {"cw-a": ["benefits_caseworker", f"tenant_{ta}"],
-             "cw-b": ["benefits_caseworker", f"tenant_{tb}"],
-             "cw-none": ["benefits_caseworker"]}
+    # #160 zero-default entitlement: every identity carries tools_granted so that cw-none is denied
+    # for the ABSENCE OF A TENANT (require_tenant), not for the absence of an entitlement.
+    users = {"cw-a": ["benefits_caseworker", "tools_granted", f"tenant_{ta}"],
+             "cw-b": ["benefits_caseworker", "tools_granted", f"tenant_{tb}"],
+             "cw-none": ["benefits_caseworker", "tools_granted"]}
     for name, groups in users.items():
         make_user(idp, pool, name, groups, pw)
     ev["steps"].append({"step": "users", "created": {k: v for k, v in users.items()}})

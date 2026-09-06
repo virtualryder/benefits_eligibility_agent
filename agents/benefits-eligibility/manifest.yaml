@@ -136,7 +136,8 @@ tools:
           case: { type: string, description: "De-identified case + determination JSON/text (optional when sanitized_ref is given: the drafter loads the masked text server-side)." }
           deidentified: { type: boolean, description: "True if masked by mask_pii." }
           sanitized_ref: { type: object, description: "The signed sanitized_ref returned by mask_pii (proof of de-identification; pass it verbatim)." }
-        required: [deidentified, sanitized_ref]
+          determination: { type: object, description: "The assess_eligibility output, verbatim (the deterministic engine's determination). The grounded drafter states ONLY this determination; a draft without it is refused." }
+        required: [deidentified, sanitized_ref, determination]
       - name: finalize_determination
         description: "Commit a benefits determination; agent must never call this directly."
         input: { case_id: { type: string, description: "Case id." } }
@@ -208,7 +209,7 @@ workflow:
     - "intake_application - extract the non-PII decision fields from the raw application."
     - "mask_pii - de-identify the raw application; use the returned masked_case for the notice and audit."
     - "assess_eligibility - on the extracted fields with deidentified true, determine eligibility and the processing clock (expedited vs standard)."
-    - "draft_notice - draft the determination notice, passing the masked case and deidentified true."
+    - "draft_notice - draft the determination notice, passing deidentified true, the sanitized_ref from mask_pii and the assess_eligibility output as determination."
     - "write_audit - record an INTENT audit entry for the determination."
     - "request_signoff - request caseworker sign-off to commit (a DIFFERENT qualified person must approve)."
 
