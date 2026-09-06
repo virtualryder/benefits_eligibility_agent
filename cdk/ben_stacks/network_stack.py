@@ -59,6 +59,15 @@ class NetworkStack(cdk.Stack):
                           ("LogsEp", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS),
                           ("KmsEp", ec2.InterfaceVpcEndpointAwsService.KMS),
                           ("StsEp", ec2.InterfaceVpcEndpointAwsService.STS),
+                          # Live-found L9 (Tier-1 gate attempt 8, 2026-09-06): EVERY governed tool reads the
+                          # kill switch from Parameter Store before doing anything else, and the budget
+                          # meter publishes to CloudWatch metrics. Neither ssm nor monitoring had an
+                          # endpoint, so in private mode every tool hung on the SSM read until the 30s
+                          # Lambda timeout and the gateway surfaced it as a 500 (not even a Cedar deny
+                          # could be observed). tests/test_cdk_stacks.py now derives the required endpoint
+                          # set from the boto3 clients in the deployed Lambda bundle.
+                          ("SsmEp", ec2.InterfaceVpcEndpointAwsService.SSM),
+                          ("MonitoringEp", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING),
                           # deep-dive #5: the approval/requester verifier fetches the Cognito JWKS
                           # (https://cognito-idp.<region>.amazonaws.com/<pool>/.well-known/jwks.json) at
                           # cold start to verify RS256 access tokens. In a zero-egress VPC there is no
@@ -89,7 +98,7 @@ class NetworkStack(cdk.Stack):
 
         # ── the governed Lambdas' security group: egress 443 only ────────────────────
         # allow_all_outbound=False keeps the intent explicit. Egress is TLS-443 to any IPv4 — but this
-        # can ONLY reach (a) the in-VPC interface endpoints (Comprehend/Bedrock/Secrets/SFN/Logs/KMS/STS)
+        # can ONLY reach (a) the in-VPC interface endpoints (Comprehend/Bedrock/Secrets/SFN/Logs/KMS/STS/SSM/Monitoring/Cognito)
         # and (b) the S3 + DynamoDB GATEWAY endpoints, whose traffic is routed to the AWS service
         # prefix-lists (NOT the VPC CIDR — a VPC-CIDR-only rule silently blocks DynamoDB/S3). There is no
         # NAT/IGW, so no arbitrary internet host is reachable regardless of this rule.
@@ -97,7 +106,7 @@ class NetworkStack(cdk.Stack):
             self, "LambdaSg", vpc=self.vpc, allow_all_outbound=False,
             security_group_name=f"{prefix}-tools",
             description="Governed tool Lambdas - egress 443 only; reachable set = in-VPC AWS endpoints + S3/DDB gateway prefix-lists; no internet route exists")
-        # Interface endpoints (Comprehend/Bedrock/Secrets/SFN/Logs/KMS/STS) live in the VPC CIDR; the
+        # Interface endpoints (Comprehend/Bedrock/Secrets/SFN/Logs/KMS/STS/SSM/Monitoring/Cognito) live in the VPC CIDR; the
         # S3 + DynamoDB GATEWAY endpoints route to the AWS service prefix-lists (NOT the VPC CIDR — a
         # VPC-CIDR-only rule silently blocks DynamoDB/S3). Allowing 443 to any IPv4 covers both, and with
         # no NAT/IGW there is no route to any arbitrary internet host regardless.

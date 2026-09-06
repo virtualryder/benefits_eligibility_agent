@@ -113,7 +113,7 @@ def test_network_zero_public_egress():
     assert "AWS::EC2::NatGateway" not in types, "zero-egress design has no NAT gateway"
     assert "AWS::EC2::InternetGateway" not in types, "zero-egress design has no internet gateway"
     assert "AWS::NetworkFirewall::Firewall" not in types, "benefits needs no egress firewall (no external dependency)"
-    assert types.count("AWS::EC2::VPCEndpoint") >= 7, "AWS services must be reachable via private endpoints"
+    assert types.count("AWS::EC2::VPCEndpoint") >= 12, "AWS services must be reachable via private endpoints"
 
 
 # ── workflow: deterministic controller shape + due-process HOLD (P0-2) ───────
@@ -667,6 +667,68 @@ def test_private_vpc_azs_are_ones_every_endpoint_service_offers():
     app = aws_cdk.App()
     n2 = Template.from_stack(NetworkStack(app, "naz", prefix="ben-az", azs=("us-east-1c", "us-east-1d")))
     assert {v["Properties"]["AvailabilityZone"] for v in n2.find_resources("AWS::EC2::Subnet").values()} == {"us-east-1c", "us-east-1d"}
+
+
+# boto3 service name -> VPC endpoint ServiceName suffix. Every service a DEPLOYED Lambda talks to
+# must have an endpoint in the private VPC; anything else hangs until the Lambda timeout.
+_BOTO3_TO_ENDPOINT = {
+    "ssm": "ssm", "cloudwatch": "monitoring", "logs": "logs", "kms": "kms", "sts": "sts",
+    "secretsmanager": "secretsmanager", "stepfunctions": "states", "comprehend": "comprehend",
+    "bedrock-runtime": "bedrock-runtime", "bedrock-agentcore": "bedrock-agentcore",
+    "cognito-idp": "cognito-idp", "s3": "s3", "dynamodb": "dynamodb",
+}
+
+
+def _deployed_handler_modules():
+    """The handler modules ComputeStack actually deploys (the `fn("name", "module")` calls)."""
+    src = (ROOT / "cdk" / "ben_stacks" / "compute_stack.py").read_text(encoding="utf-8")
+    import re
+    return sorted(set(re.findall(r'=\s*fn\(\s*"[^"]+",\s*"([A-Za-z0-9_]+)"', src)))
+
+
+def _bundle_boto3_services(bundle_dir, roots):
+    """boto3 client/resource service names reachable from `roots` through the bundle's own modules
+    (transitive local imports), so an undeployed reference module does not inflate the set."""
+    import ast
+    bundle = pathlib.Path(bundle_dir)
+    local = {p.stem for p in bundle.glob("*.py")}
+    seen, todo, services = set(), list(roots), set()
+    while todo:
+        mod = todo.pop()
+        if mod in seen or mod not in local:
+            continue
+        seen.add(mod)
+        tree = ast.parse((bundle / f"{mod}.py").read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                todo.extend(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                todo.append(node.module.split(".")[0])
+            elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                  and node.func.attr in ("client", "resource")
+                  and isinstance(node.func.value, ast.Name) and node.func.value.id == "boto3"
+                  and node.args and isinstance(node.args[0], ast.Constant)):
+                services.add(node.args[0].value)
+    return services
+
+
+def test_private_vpc_has_an_endpoint_for_every_service_the_deployed_lambdas_call():
+    """Live-found L9 (Tier-1 gate attempt 8, 2026-09-06): every governed tool reads the kill switch from
+    SSM first and the budget meter publishes CloudWatch metrics, but the private VPC had no ssm or
+    monitoring endpoint - every tool hung to its 30s timeout and the gateway returned 500s. Derive the
+    required endpoint set from the boto3 clients in the DEPLOYED bundle and assert each one exists."""
+    services = _bundle_boto3_services(stage_lambda_bundle(), _deployed_handler_modules())
+    assert {"ssm", "cloudwatch", "dynamodb"} <= services, services   # sanity: the scan sees the core controls
+    unknown = services - set(_BOTO3_TO_ENDPOINT)
+    assert not unknown, f"add these boto3 services to _BOTO3_TO_ENDPOINT: {unknown}"
+    present = set()
+    for v in T_NET.find_resources("AWS::EC2::VPCEndpoint").values():
+        name = v["Properties"]["ServiceName"]
+        if isinstance(name, dict):     # {"Fn::Join": ["", ["com.amazonaws.", {"Ref": "AWS::Region"}, ".ssm"]]}
+            name = "".join(x for x in name["Fn::Join"][1] if isinstance(x, str))
+        present.add(name.rsplit(".", 1)[-1])
+    missing = {_BOTO3_TO_ENDPOINT[s] for s in services} - present
+    assert not missing, f"deployed Lambdas call services with no VPC endpoint (would hang in private mode): {missing}"
 
 
 def test_cmk_logs_grant_covers_every_log_group_family():

@@ -166,7 +166,35 @@ def main():
                                       EndTime=datetime.now(tz=timezone.utc), Period=3600, Statistics=["Sum"])
         total = sum(d["Sum"] for d in ms.get("Datapoints", []))
         check("P3_bypass_alarm_fired", state == "ALARM", "alarm=%s; bypass=%s" % (state, bypass_call))
-        check("P3_drafter_calls_not_counted", total == 1, "metric_sum=%s (expected exactly 1 = the human call)" % total)
+        # Attempt-8 lesson: the metric legitimately counts EVERY non-allowlisted Bedrock call in the window,
+        # not just this script's converse - the guardrail proof's direct ApplyGuardrail calls by the deployer
+        # user are real bypasses too (and proved the data-event selectors live). So the assertion is
+        # exactness against the capture log: metric_sum == non-allowlisted events, and the drafter's
+        # own calls (allowlisted sessionIssuer) exist but are NOT counted.
+        cap = "/aws/cloudtrail/%s-capture-all" % prefix
+        def _count(pattern):
+            n, tok = 0, None
+            for _ in range(50):
+                kw = dict(logGroupName=cap, startTime=t_start - 60000, filterPattern=pattern)
+                if tok:
+                    kw["nextToken"] = tok
+                r = logs.filter_log_events(**kw)
+                n += len(r.get("events", []))
+                tok = r.get("nextToken")
+                if not tok:
+                    break
+            return n
+        try:
+            human = _count('{ ($.eventSource = "bedrock.amazonaws.com") && (($.userIdentity.type = "IAMUser") || ($.userIdentity.type = "Root")) }')
+            drafter = _count('{ ($.eventSource = "bedrock.amazonaws.com") && ($.userIdentity.type = "AssumedRole") && ($.userIdentity.sessionContext.sessionIssuer.arn = "*%s-compute-coretoolsServiceRole*") }' % prefix)
+        except Exception as exc:
+            human, drafter = -1, -1
+            steps["p3_capture_counts_error"] = str(exc)[:200]
+        steps["p3_counts"] = {"metric_sum": total, "human_events": human, "drafter_events": drafter}
+        check("P3_metric_counts_exactly_the_non_allowlisted_calls", human >= 1 and total == human,
+              "metric_sum=%s human_events=%s" % (total, human))
+        check("P3_drafter_calls_not_counted", drafter >= 1 and total == human,
+              "drafter_events=%s (allowlisted, must exist and be excluded); metric_sum=%s" % (drafter, total))
         # what the capture log recorded for it
         try:
             ev = logs.filter_log_events(logGroupName="/aws/cloudtrail/%s-capture-all" % prefix, startTime=bypass_t - 60000,
