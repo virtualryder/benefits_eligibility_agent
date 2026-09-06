@@ -215,7 +215,7 @@ def main():
     # mint a case + signed binding for the workflow hop BEFORE engaging (ingest refuses while engaged)
     case_id = "KS-" + uuid.uuid4().hex[:6].upper()
     ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
-                                Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id,
+                                Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id,
                                                     "access_token": tok_a}).encode())["Payload"].read())
     binding = ing.get("tenant_binding", {})
 
@@ -263,7 +263,7 @@ def main():
 
     # ---- 3. tool Lambda + workflow hop -------------------------------------------------------------
     direct = lam.invoke(FunctionName=f"{prefix}-intake-application",
-                        Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id, **binding}).encode())
+                        Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id, **binding}).encode())
     direct_payload = json.loads(direct["Payload"].read() or b"{}")
     C["tool_lambda_refuses_direct_invoke"] = direct.get("FunctionError") == "Unhandled" and direct_payload.get("errorType") == "KillSwitchEngaged"
     ex_status, ex_err, ex_states = None, None, []

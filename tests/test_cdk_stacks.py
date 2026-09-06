@@ -825,3 +825,57 @@ def test_runtime_execution_role_without_guardrail_has_no_guardrail_condition():
     pols = json.dumps([v for v in t.find_resources("AWS::IAM::Policy").values()
                        if "RuntimeExecutionRole" in json.dumps(v["Properties"].get("Roles"))])
     assert "bedrock:InvokeModel" in pols and "bedrock:GuardrailIdentifier" not in pols
+
+
+def test_grounding_blocks_and_relevance_is_detective_by_default():
+    """L17 (full-portfolio gate attempt 4, 2026-09-06): GROUNDING is the hallucination guard and BLOCKS;
+    RELEVANCE scored faithful factual cores 0.32-0.56 at threshold 0.55 (grounding 0.99 on the same
+    answers), so it is DETECTIVE by default (scored + traced, action NONE) unless the manifest sets
+    grounding.relevance_action: BLOCK. The pinned version's signature changes with the action so a flip
+    republishes the version the drafter enforces."""
+    t = _compute_with_guardrail()
+    t.has_resource_properties("AWS::Bedrock::Guardrail", Match.object_like({
+        "ContextualGroundingPolicyConfig": {"FiltersConfig": Match.array_with([
+            Match.object_like({"Type": "GROUNDING", "Action": "BLOCK"}),
+            Match.object_like({"Type": "RELEVANCE", "Action": "NONE"}),
+        ])}}))
+    ver = list(t.find_resources("AWS::Bedrock::GuardrailVersion").values())[0]["Properties"]["Description"]
+    assert "relact=NONE" in ver
+    import yaml
+    app = aws_cdk.App()
+    asset = stage_lambda_bundle()
+    data = DataStack(app, "d", prefix="ben-test", retention_profile="sandbox-demo", kms_mode="aws-managed")
+    _m = yaml.safe_load((ROOT / "agents" / "benefits-eligibility" / "manifest.yaml").read_text(encoding="utf-8")) or {}
+    gcfg = dict(_m.get("guardrail") or {})
+    gcfg["grounding"] = dict(_m.get("grounding") or {}, relevance_action="BLOCK")
+    t2 = Template.from_stack(ComputeStack(app, "c", prefix="ben-test", asset_dir=asset, data=data,
+                                          tenant="ben-test-agency", guardrail_config=gcfg))
+    t2.has_resource_properties("AWS::Bedrock::Guardrail", Match.object_like({
+        "ContextualGroundingPolicyConfig": {"FiltersConfig": Match.array_with([
+            Match.object_like({"Type": "RELEVANCE", "Action": "BLOCK"})])}}))
+    assert "relact=BLOCK" in list(t2.find_resources("AWS::Bedrock::GuardrailVersion").values())[0]["Properties"]["Description"]
+
+
+def test_ingest_writes_the_authoritative_consent_purpose_record():
+    """L18: the authoritative consent/purpose record the interceptor's resolver reads (#3) is written by
+    ingest (the verified caseworker's attestation at the one door raw content enters) - it has the authz
+    store in its env and PutItem on it (silo and per-tenant); nothing else may write it (the interceptor
+    keeps GetItem only)."""
+    fn = list(T_COMPUTE.find_resources("AWS::Lambda::Function", {"Properties": {"FunctionName": "ben-test-ingest-application"}}).values())[0]
+    env = fn["Properties"]["Environment"]["Variables"]
+    assert "AUTHZ_TABLE" in env and env.get("AUTHZ_TABLE_TEMPLATE") == "ben-test-{tenant}-authz-context"
+    pols = T_COMPUTE.find_resources("AWS::IAM::Policy")
+    ingest_role = fn["Properties"]["Role"]["Fn::GetAtt"][0]
+    mine = [v for v in pols.values() if any(r.get("Ref") == ingest_role for r in v["Properties"].get("Roles", []))]
+    doc = json.dumps([v["Properties"]["PolicyDocument"] for v in mine])
+    assert "dynamodb:PutItem" in doc and "AuthzContext" in doc or "authz-context" in doc
+    # the interceptor reads only
+    ic = list(T_COMPUTE.find_resources("AWS::Lambda::Function", {"Properties": {"FunctionName": "ben-test-tenant-interceptor"}}).values())[0]
+    ic_role = ic["Properties"]["Role"]["Fn::GetAtt"][0]
+    ic_pols = [v for v in pols.values() if any(r.get("Ref") == ic_role for r in v["Properties"].get("Roles", []))]
+    for v in ic_pols:
+        for st in v["Properties"]["PolicyDocument"]["Statement"]:
+            res = json.dumps(st.get("Resource"))
+            if "AuthzContext" in res or "authz-context" in res:
+                acts = st["Action"] if isinstance(st["Action"], list) else [st["Action"]]
+                assert "dynamodb:PutItem" not in acts, "the interceptor must never write the authz record"

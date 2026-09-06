@@ -152,7 +152,10 @@ def _draft(e):
         inferenceConfig={"maxTokens": 700, "temperature": 0.2},
     )
     if GUARDRAIL_ID:
-        kwargs["guardrailConfig"] = {"guardrailIdentifier": GUARDRAIL_ID, "guardrailVersion": GUARDRAIL_VERSION}
+        # L17: trace enabled so a BLOCKED draft's assessment (which filter, which score) lands in the
+        # model-invocation log - attempt 4 could not tell GROUNDING from RELEVANCE without it.
+        kwargs["guardrailConfig"] = {"guardrailIdentifier": GUARDRAIL_ID, "guardrailVersion": GUARDRAIL_VERSION,
+                                     "trace": "enabled"}
     # task 128 (governed-core 1.9.0): the budget meter on the SERVER-SIDE model call. reserve() before the
     # spend (the workflow hop has no gateway interceptor, so this is where a capped tenant is stopped on
     # the DraftNotice state -> ManualReview, fail-closed); commit() the real Converse usage after.

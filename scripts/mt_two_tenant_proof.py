@@ -236,10 +236,10 @@ def main():
     ctrl = outputs(cf, f"{prefix}-workflow").get("ControllerArn")
     case_id = "MT-WF-" + uuid.uuid4().hex[:6].upper()
     ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
-                                Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id,
+                                Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id,
                                                     "access_token": tok["cw-a"]}).encode())["Payload"].read())
     ing_notoken = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
-                                        Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id + "-X",
+                                        Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id + "-X",
                                                             "tenant": ta}).encode())["Payload"].read())
     p0 = {k: has_item(ddb, v, {"case_id": {"S": case_id}}) for k, v in pend.items()}
     w0 = audit_counts()

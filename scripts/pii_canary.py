@@ -148,7 +148,7 @@ def main():
         # R3-2 pass-by-reference: raw content enters ONLY through ingest; the execution starts with an
         # opaque case_ref — exactly what the strict sweep verifies.
         lam = boto3.client("lambda")
-        payload = {"application": case["application"], "case_id": case["case_id"]}
+        payload = {"application": case["application"], "consent_attested": True, "purpose": "eligibility", "case_id": case["case_id"]}
         if args.access_token:
             payload["access_token"] = args.access_token
         ing = json.loads(lam.invoke(FunctionName=f"{args.prefix}-ingest-application",

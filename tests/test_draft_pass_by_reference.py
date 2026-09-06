@@ -96,7 +96,8 @@ def test_draft_grounds_core_and_appends_boilerplate_when_guardrail_bound(monkeyp
                       "determination": DETERMINATION}, None)
 
     # the guardrail is bound on the Converse call, on the PINNED enforced version
-    assert seen.get("guardrailConfig") == {"guardrailIdentifier": "gr-abc123", "guardrailVersion": "1"}
+    # L17: trace enabled so a blocked draft's assessment (filter + score) lands in the model-invocation log
+    assert seen.get("guardrailConfig") == {"guardrailIdentifier": "gr-abc123", "guardrailVersion": "1", "trace": "enabled"}
     # grounded-core system prompt, not the full-notice system prompt
     assert seen["system"] == [{"text": core._SYSTEM_GROUNDED_CORE}]
     # the case is the grounding_source and a query is present -> grounding scores the model's claims

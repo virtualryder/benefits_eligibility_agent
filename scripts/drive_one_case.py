@@ -38,7 +38,7 @@ tok = mt.access_token(pool, client, REGION, "lineage-cw", pw)
 case_id = "LIN-" + uuid.uuid4().hex[:6].upper()
 start_ms = int(time.time() * 1000)
 ing = json.loads(lam.invoke(FunctionName=f"{PREFIX}-ingest-application",
-                            Payload=json.dumps({"application": CASE, "case_id": case_id,
+                            Payload=json.dumps({"application": CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id,
                                                 "access_token": tok}).encode())["Payload"].read())
 ex = sfn.start_execution(stateMachineArn=ctrl, name="lineage-" + case_id.lower(),
                          input=json.dumps({"case_id": case_id, "requester": "lineage-cw",

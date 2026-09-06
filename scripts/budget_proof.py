@@ -172,7 +172,7 @@ def main():
     # workflow hop: B's execution reaches DraftNotice, the drafter refuses, controller -> ManualReview
     case_b = "BG-WF-" + uuid.uuid4().hex[:6].upper()
     ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
-                                Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_b, "access_token": tok_b}).encode())["Payload"].read())
+                                Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_b, "access_token": tok_b}).encode())["Payload"].read())
     ex_states, ex_status, draft_out = [], None, {}
     if ing.get("case_ref"):
         ex = sfn.start_execution(stateMachineArn=wf["ControllerArn"], name="bgproof-" + case_b.lower(),

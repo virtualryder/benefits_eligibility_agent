@@ -85,7 +85,7 @@ def run_load(prefix, n):
         # R3-2 pass-by-reference: ingest raw content first; start with the opaque ref only.
         raw = case.get("application") or case.get("application_text") or json.dumps(case)
         ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-case",
-                                    Payload=json.dumps({"application": raw,
+                                    Payload=json.dumps({"application": raw, "consent_attested": True, "purpose": "eligibility",
                                                         "case_id": case["case_id"]}).encode()
                                     )["Payload"].read())
         ex = sfn.start_execution(stateMachineArn=arn, name=f"load-{case['case_id'].lower()}",

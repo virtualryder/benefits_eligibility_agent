@@ -108,7 +108,7 @@ def main():
     for name, tenant in (("cw-a", ta), ("cw-b", tb)):
         case_id = "OBS-%s-%s" % (tenant.upper().replace("-", ""), uuid.uuid4().hex[:5].upper())
         ing = json.loads(lam.invoke(FunctionName=f"{prefix}-ingest-application",
-                                    Payload=json.dumps({"application": SYNTHETIC_CASE, "case_id": case_id,
+                                    Payload=json.dumps({"application": SYNTHETIC_CASE, "consent_attested": True, "purpose": "eligibility", "case_id": case_id,
                                                         "access_token": tok[name]}).encode())["Payload"].read())
         session_id = "aegis-%s-%s" % (tenant, uuid.uuid4().hex)
         t0 = time.time()

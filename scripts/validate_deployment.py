@@ -79,6 +79,7 @@ def main():
     # R3-2 pass-by-reference: raw content enters ONLY via ingest-application; the execution starts with a case_ref
     _wr("/tmp/_i.json",
         {"application": "Applicant Jane Doe, SSN 123-45-6789, 5 Main St. Household size 3. Monthly income $1200. Liquid resources $50.",
+         "consent_attested": True, "purpose": "eligibility",   # L18: the caseworker's attestation -> authz record
          "case_id": f"VAL-{int(time.time())}"})
     rc, _ = aws("lambda", "invoke", "--function-name", f"{p}-ingest-application", "--region", a.region,
                 "--cli-binary-format", "raw-in-base64-out", "--payload", "file:///tmp/_i.json", "/tmp/_io.json")

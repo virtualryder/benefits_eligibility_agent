@@ -171,3 +171,48 @@ def test_ingest_multitenant_boundary_derives_tenant_from_verified_token_only(mon
     out = ingest_case.handler({"application": "raw text"}, None)
     assert out["ingested"] and "tenant_binding" not in out
     tenancy.clear_request_claims()
+
+
+def test_ingest_records_authoritative_consent_and_purpose_fail_closed(monkeypatch):
+    """L18 (full-portfolio gate attempt 4, 2026-09-06): with -c perimeter=1 every real runtime flow was denied at
+    assess_eligibility because NOTHING in the production path wrote the authoritative consent/purpose record
+    the interceptor's resolver reads (only the Cedar proof seeded it). Ingest now writes it from the verified
+    caseworker's explicit attestation with an allowed purpose - and writes NOTHING otherwise (fail-closed:
+    the absence of the record is the Cedar denial)."""
+    import ingest_case
+    monkeypatch.setenv("PROVENANCE_SECRET", "ben-unit-provenance-secret")
+    monkeypatch.setattr(ingest_case.case_store, "put_case", lambda text, kind="application", case_id="": "case-x")
+    _reset(monkeypatch, pinned="agency-1")
+    written = []
+
+    class _T:
+        def __init__(self, name):
+            self.name = name
+
+        def put_item(self, Item):
+            written.append((self.name, Item))
+
+    class _R:
+        def Table(self, name):
+            return _T(name)
+
+    import boto3
+    monkeypatch.setattr(boto3, "resource", lambda *a, **k: _R())
+    monkeypatch.setenv("AUTHZ_TABLE", "ben-unit-authz-context")
+    monkeypatch.setenv("AUTHZ_TABLE_TEMPLATE", "ben-unit-{tenant}-authz-context")
+    # attested + allowed purpose -> record written (silo table; tenant template unused without a tenant claim)
+    out = ingest_case.handler({"application": "raw", "case_id": "C-1", "consent_attested": True, "purpose": "eligibility"}, None)
+    assert out["ingested"] and out["authz_recorded"] is True
+    assert written and written[-1][1]["case_id"] == "C-1" and written[-1][1]["consent"] is True
+    assert written[-1][1]["authorized_purpose"] == "eligibility"
+    # not attested / wrong purpose / no case id -> nothing written, ingestion itself still succeeds
+    for bad in ({"application": "raw", "case_id": "C-2", "purpose": "eligibility"},
+                {"application": "raw", "case_id": "C-3", "consent_attested": "yes", "purpose": "eligibility"},
+                {"application": "raw", "case_id": "C-4", "consent_attested": True, "purpose": "marketing"},
+                {"application": "raw", "consent_attested": True, "purpose": "eligibility"}):
+        n = len(written)
+        out = ingest_case.handler(bad, None)
+        assert out["ingested"] and out["authz_recorded"] is False and len(written) == n, bad
+    # a caller cannot pre-set consent=false-into-true or smuggle extra fields: only the fixed item shape is written
+    assert set(written[-1][1]) == {"case_id", "consent", "authorized_purpose", "recorded_at", "recorded_by"}
+    tenancy.clear_request_claims()

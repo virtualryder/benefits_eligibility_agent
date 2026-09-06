@@ -174,7 +174,7 @@ def _sfn_arn(args):
 
 
 def _ingest(args, application, case_id):
-    payload = json.dumps({"application": application, "case_id": case_id})
+    payload = json.dumps({"application": application, "consent_attested": True, "purpose": "eligibility", "case_id": case_id})
     tmp = ROOT / f".iv_{case_id}.json"
     tmp.write_text(payload, encoding="utf-8")
     outp = str(tmp) + ".out"

@@ -56,10 +56,17 @@ class ComputeStack(cdk.Stack):
             grounding_filters = []
             if gnd.get("grounding_threshold") is not None:
                 grounding_filters.append(bedrock.CfnGuardrail.ContextualGroundingFilterConfigProperty(
-                    type="GROUNDING", threshold=float(gnd["grounding_threshold"])))
+                    type="GROUNDING", threshold=float(gnd["grounding_threshold"]), action="BLOCK"))
+            # L17 (full-portfolio gate attempt 4, 2026-09-06): RELEVANCE scores a terse factual core against
+            # the fixed query unreliably (0.32-0.56 for faithful answers at threshold 0.55; GROUNDING scored
+            # 0.99 on the same answers), so every legitimate notice was intermittently blocked on relevance
+            # alone. GROUNDING (the hallucination guard) stays BLOCKING; RELEVANCE defaults to DETECTIVE
+            # (scored + traced in the invocation log, not blocking). `grounding.relevance_action: BLOCK` in
+            # the manifest re-enables blocking once PQ has a threshold that holds.
             if gnd.get("relevance_threshold") is not None:
                 grounding_filters.append(bedrock.CfnGuardrail.ContextualGroundingFilterConfigProperty(
-                    type="RELEVANCE", threshold=float(gnd["relevance_threshold"])))
+                    type="RELEVANCE", threshold=float(gnd["relevance_threshold"]),
+                    action=(str(gnd.get("relevance_action") or "NONE").upper())))
             self.guardrail = bedrock.CfnGuardrail(
                 self, "Guardrail",
                 name=f"{prefix}-{gcfg['name']}",
@@ -82,8 +89,9 @@ class ComputeStack(cdk.Stack):
             # updated DRAFT but the pinned v1 the drafter enforces stayed stale). Embed a config signature
             # in the description so a policy change replaces the version -> a fresh published version whose
             # attr_version flows into the drafter's GUARDRAIL_VERSION env.
-            _cfg_sig = "pa=%s;pii=%d;gnd=%s;rel=%s" % (
-                pa, len(pii), gnd.get("grounding_threshold"), gnd.get("relevance_threshold"))
+            _cfg_sig = "pa=%s;pii=%d;gnd=%s;rel=%s;relact=%s" % (
+                pa, len(pii), gnd.get("grounding_threshold"), gnd.get("relevance_threshold"),
+                str(gnd.get("relevance_action") or "NONE").upper())
             ver = bedrock.CfnGuardrailVersion(self, "GuardrailVersion",
                                               guardrail_identifier=self.guardrail.attr_guardrail_id,
                                               description="aegis-guardrail cfg " + _cfg_sig)
@@ -237,8 +245,17 @@ class ComputeStack(cdk.Stack):
         ingest_env = ({"POOL_ID": identity.pool.user_pool_id,
                        "CLIENT_ID": approvals_client_id or identity.client.user_pool_client_id,
                        "REVIEWER_GROUP": "benefits_caseworker"}
-                      if (multitenant and identity is not None) else None)
+                      if (multitenant and identity is not None) else {})
+        # L18 (full-portfolio gate attempt 4, 2026-09-06): the AUTHORITATIVE consent / authorized-purpose
+        # record the interceptor's resolver reads (#3) was written by NOTHING in the production path (only
+        # the Cedar proof seeded it), so with -c perimeter=1 every real runtime flow was denied at
+        # assess_eligibility. Ingest - the one door raw content enters, performed by a VERIFIED caseworker
+        # (MT) - now records the caseworker's attestation of the applicant's consent and the case's
+        # authorized purpose, server-side, so later Cedar context comes from that record, never the caller.
+        ingest_env.update({"AUTHZ_TABLE": data.authz_table.table_name,
+                           "AUTHZ_TABLE_TEMPLATE": f"{prefix}-{{tenant}}-authz-context"})
         self.ingest = fn("ingest-application", "ingest_case", env=ingest_env)   # R3-2: the only door for raw content
+        data.authz_table.grant(self.ingest, "dynamodb:PutItem")   # L18: write the consent/purpose record (silo)
         self.intake = fn("intake-application", "intake_application")
         self.mask = fn("mask-pii", "mask_pii")
         self.assess = fn("assess-eligibility", "assess_eligibility")
@@ -459,6 +476,7 @@ class ComputeStack(cdk.Stack):
                   "dynamodb:BatchWriteItem", "dynamodb:ConditionCheckItem", "dynamodb:DescribeTable"]
             AUD = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:TransactWriteItems"]
             _mt(self.ingest, _tbl("case-store"), "dynamodb:PutItem")
+            _mt(self.ingest, _tbl("authz-context"), "dynamodb:PutItem")   # L18: per-tenant consent/purpose record
             _mt(self.intake, _tbl("case-store"), "dynamodb:GetItem")
             _mt(self.mask, _tbl("case-store"), "dynamodb:GetItem")
             _mt(self.core, _tbl("case-store"), "dynamodb:PutItem")
