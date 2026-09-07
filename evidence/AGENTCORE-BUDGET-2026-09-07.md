@@ -1,6 +1,6 @@
 # Per-tenant token + USD budget on the AgentCore path — live gate (task 128)
 
-Env `ben-fp` · us-east-1 · meter table `ben-fp-budgets` · tenants ['sp-a', 'sp-b'] · 346.4 s · **PASS**
+Env `ben-fp` · us-east-1 · meter table `ben-fp-budgets` · tenants ['sp-a', 'sp-b'] · 337.7 s · **PASS**
 
 | Check | Result |
 |---|---|
@@ -31,10 +31,10 @@ Env `ben-fp` · us-east-1 · meter table `ben-fp-budgets` · tenants ['sp-a', 's
 
 ## Numbers
 
-- Run 1 (tenant A, uncapped): meter tokens_in 186233 / tokens_out 9312 / calls 38 / usd_micro 698379 (= $0.698379 at price_version `benefits-2026-09-03-anthropic-platform-UNCONFIRMED-ON-BEDROCK`); model-invocation log for the same session: rows 6, tokens_in 35823, tokens_out 1608.
-- Run 2 (tenant A, cap 200545 = 1.5 x run 1): stopped mid-session with guardrail_action BUDGET; meter used 200917 = 100.2 % of cap; alarms {'ben-fp-budget-sp-a-TokensUsedPct-100': 'OK', 'ben-fp-budget-sp-a-TokensUsedPct-60': 'ALARM', 'ben-fp-budget-sp-a-TokensUsedPct-85': 'ALARM'}.
+- Run 1 (tenant A, uncapped): meter tokens_in 57924 / tokens_out 2615 / calls 12 / usd_micro 212997 (= $0.212997 at price_version `benefits-2026-09-03-anthropic-platform-UNCONFIRMED-ON-BEDROCK`); model-invocation log for the same session: rows 2, tokens_in 10672, tokens_out 388.
+- Run 2 (tenant A, cap 65539 = 1.5 x run 1): stopped mid-session with guardrail_action BUDGET; meter used 65871 = 100.5 % of cap; alarms {'ben-fp-budget-sp-a-TokensUsedPct-100': 'OK', 'ben-fp-budget-sp-a-TokensUsedPct-60': 'ALARM', 'ben-fp-budget-sp-a-TokensUsedPct-85': 'ALARM'}.
 - Tenant B (cap 0): gateway 403 `budget exceeded (sp-b): the tenant's period cap is reached; refused`; workflow states ['Extract', 'GuardExtracted', 'ExtractedOk', 'MaskPii', 'GuardDeidentified', 'DeidentifiedOk', 'AssessEligibility', 'GuardRulesExecuted', 'RulesOk', 'CheckAdverseNotice', 'AdverseNoticeOk', 'DraftNotice', 'DraftOk', 'ManualReview'].
-- USD backstop: budget action {'ActionType': 'APPLY_IAM_POLICY', 'ApprovalModel': 'AUTOMATIC', 'Status': 'STANDBY', 'NotificationType': 'ACTUAL'}; execute attempt {'executed': False, 'error': 'ResourceLockedException: An error occurred (ResourceLockedException) when calling the ExecuteBudgetAction operation: This method is not allowed during [ActionStatus: Standby]', 'note': "ExecuteBudgetAction refused outside a real threshold breach - the action's wiring is proven by describe-budget-action; billing-triggered firing is not exercisable in a test"}; engaged record {'actor': 'arn:aws:sts::111122223333:assumed-role/ben-fp-observability-BudgetBreachServiceRole183A354-E7CIckFS83dy/ben-fp-budget-breach', 'actor_user_id': 'AROA4SN3H3367TFYCHJ6B:ben-fp-budget-breach', 'at': 1788792476, 'engaged': True, 'reason': 'AWS Budgets ben-fp-bedrock-usd-ceiling: USD ceiling threshold reached - automatic containment (AWS Budgets: ben-fp-bedrock-usd-ceiling has exceeded your alert threshold)'}.
+- USD backstop: budget action {'ActionType': 'APPLY_IAM_POLICY', 'ApprovalModel': 'AUTOMATIC', 'Status': 'STANDBY', 'NotificationType': 'ACTUAL'}; execute attempt {'executed': False, 'error': 'ResourceLockedException: An error occurred (ResourceLockedException) when calling the ExecuteBudgetAction operation: This method is not allowed during [ActionStatus: Standby]', 'note': "ExecuteBudgetAction refused outside a real threshold breach - the action's wiring is proven by describe-budget-action; billing-triggered firing is not exercisable in a test"}; engaged record {'actor': 'arn:aws:sts::111122223333:assumed-role/ben-fp-observability-BudgetBreachServiceRole183A354-ddCtgCErlmjP/ben-fp-budget-breach', 'actor_user_id': 'AROA4SN3H3362N6WFKRAL:ben-fp-budget-breach', 'at': 1788819384, 'engaged': True, 'reason': 'AWS Budgets ben-fp-bedrock-usd-ceiling: USD ceiling threshold reached - automatic containment (AWS Budgets: ben-fp-bedrock-usd-ceiling has exceeded your alert threshold)'}.
 
 ## Price table used (pinned, provenance stated)
 

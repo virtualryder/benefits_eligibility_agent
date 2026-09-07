@@ -1,6 +1,6 @@
 # Kill Switch on the AgentCore path — live gate (task 127)
 
-Env `ben-fp` · us-east-1 · parameter `/ben-fp-eligibility/kill-switch` · tenants ['sp-a', 'sp-b'] · 103.9 s · **PASS** · time-to-effect at the gateway: **15.4 s**
+Env `ben-fp` · us-east-1 · parameter `/ben-fp-eligibility/kill-switch` · tenants ['sp-a', 'sp-b'] · 104.2 s · **PASS** · time-to-effect at the gateway: **15.7 s**
 
 | Check | Result |
 |---|---|
@@ -36,12 +36,12 @@ Env `ben-fp` · us-east-1 · parameter `/ben-fp-eligibility/kill-switch` · tena
 
 ## What happened
 
-- Gateway after engage: tools/list 403 / tools/call 403 — `containment engaged (kill switch /ben-fp-eligibility/kill-switch): every agent action is refused` (time-to-effect 15.4 s)
+- Gateway after engage: tools/list 403 / tools/call 403 — `containment engaged (kill switch /ben-fp-eligibility/kill-switch): every agent action is refused` (time-to-effect 15.7 s)
 - Direct tool invoke: {'FunctionError': 'Unhandled', 'errorType': 'KillSwitchEngaged', 'errorMessage': 'kill switch ENGAGED (/ben-fp-eligibility/kill-switch): SEV-1 drill: runaway agent suspected'}; Step Functions: {'status': 'FAILED', 'error': 'KillSwitchEngaged', 'states_entered': ['Extract']}
 - Runtime fresh invocation: refused=True guardrail_action=KILL_SWITCH; in-flight session: stopped=mid-session guardrail_action=KILL_SWITCH
 - SoD: B releases A's engagement → 200; C engages → 200; C releases own → 403; A (engage-only) releases → 403 (IAM); B releases → 200
-- **Base ledger `KILL-SWITCH` chain** (platform scope): seq 0 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-responder/ks-a`; seq 1 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`; seq 2 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 3 kill_switch.disengage DENIED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 4 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`; seq 5 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-observability-BudgetBreachServiceRole183A354-E7CIckFS83dy/ben-fp-budget-breach`; seq 6 kill_switch.disengage COMMITTED by `arn:aws:iam::111122223333:user/dryder`; seq 7 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-responder/ks-a`; seq 8 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`; seq 9 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 10 kill_switch.disengage DENIED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 11 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`
-- Tenant-A denials (DENIED `kill_switch.deny`): 5; WORM copies: 5; tenant-B rows in its own ledger: 4
+- **Base ledger `KILL-SWITCH` chain** (platform scope): seq 0 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-responder/ks-a`; seq 1 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`; seq 2 kill_switch.engage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 3 kill_switch.disengage DENIED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-overprivileged/ks-c`; seq 4 kill_switch.disengage COMMITTED by `arn:aws:sts::111122223333:assumed-role/ben-fp-ks-security-lead/ks-b`
+- Tenant-A denials (DENIED `kill_switch.deny`): 2; WORM copies: 2; tenant-B rows in its own ledger: 2
 
 Roles (throwaway, deleted): {'A': 'arn:aws:iam::111122223333:role/ben-fp-ks-responder', 'B': 'arn:aws:iam::111122223333:role/ben-fp-ks-security-lead', 'C': 'arn:aws:iam::111122223333:role/ben-fp-ks-overprivileged'} → cleanup {'A': 'deleted', 'B': 'deleted', 'C': 'deleted'}
 

@@ -1,4 +1,4 @@
-# Case trace — `OBS-SPB-6429C` (tenant `sp-b`)
+# Case trace — `OBS-SPB-99DD7` (tenant `sp-b`)
 
 | metric | value |
 |---|---|
@@ -7,11 +7,11 @@
 | lambda_calls | 0 |
 | lambda_calls_joined_to_evidence | 0 |
 | masked_before_model_all | True |
-| model_invocations | 5 |
-| model_invocations_joined_to_spans | 5 |
-| model_invocations_tagged_tenant | 5 |
-| model_spans | 10 |
-| sessions | ['aegis-sp-b-a90333fde4fd439a8a36b767ab6aad6c'] |
+| model_invocations | 7 |
+| model_invocations_joined_to_spans | 7 |
+| model_invocations_tagged_tenant | 7 |
+| model_spans | 14 |
+| sessions | ['aegis-sp-b-257995cd946749b0a272fb2a9aae3ad8'] |
 | single_tenant | True |
 | tenants_seen | ['sp-b'] |
 | tool_spans | 12 |
@@ -19,135 +19,148 @@
 
 | time (UTC) | source | kind | what | join keys |
 |---|---|---|---|---|
-| 14:35:25.521 | runtime-span | runtime-invoke | AgentCore.Runtime.Invoke | trace_id=6a9ecbad46c7027a2f span_id=af9106169c20d73f session_id=aegis-sp-b-a90333f |
-| 14:35:26.190 | runtime-span | runtime-http | POST /invocations | trace_id=6a9ecbad46c7027a2f span_id=b89233df683de875 session_id=aegis-sp-b-a90333f |
-| 14:35:26.282 | runtime-span | span | SSM.GetParameter | trace_id=6a9ecbad46c7027a2f span_id=8ddcd4ea5c1ce027 session_id=aegis-sp-b-a90333f |
-| 14:35:26.332 | runtime-span | span | SSM.GetParameter | trace_id=6a9ecbad46c7027a2f span_id=27962c3ba3cca65e session_id=aegis-sp-b-a90333f |
-| 14:35:26.397 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9ecbad46c7027a2f span_id=77d3e9567e421371 session_id=aegis-sp-b-a90333f |
-| 14:35:26.454 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9ecbad46c7027a2f span_id=9f879393b933bcda session_id=aegis-sp-b-a90333f |
-| 14:35:26.552 | runtime-span | span | mcp.session | trace_id=6a9ecbad46c7027a2f span_id=ebf05fca8f8d3d16 session_id=aegis-sp-b-a90333f |
-| 14:35:26.699 | runtime-span | mcp-list | mcp tools/list | trace_id=6a9ecbad46c7027a2f span_id=0acac287134149ac session_id=aegis-sp-b-a90333f |
-| 14:35:26.936 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=02a11ec51cfa2f94 |
-| 14:35:26.947 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=8b3282f672ec7605 |
-| 14:35:26.967 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=595a39b90d5027cd |
-| 14:35:26.973 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791726973,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:26.977 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791726977,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:27.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=238 masked_before_model=True | request_id=6becb40a-e0c2-44ea session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:27.060 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791727060,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:27.068 | runtime-span | agent | invoke_agent Strands Agents model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=33293 out=2073 | trace_id=6a9ecbad46c7027a2f span_id=5a485892c184ea7e session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:27.069 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9ecbad46c7027a2f span_id=7b2af5384380d7d7 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:27.077 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=238 | trace_id=6a9ecbad46c7027a2f span_id=c7ae616a0d6a92e1 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:27.080 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=238 | trace_id=6a9ecbad46c7027a2f span_id=72c6712efb4ce377 session_id=aegis-sp-b-a90333f request_id=6becb40a-e0c2-44ea |
-| 14:35:27.081 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=2411852112d8a16e session_id=aegis-sp-b-a90333f |
-| 14:35:31.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6006 out=401 masked_before_model=True | request_id=efe74c5a-a19d-4b73 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:31.002 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=466fdeada64764a6 session_id=aegis-sp-b-a90333f |
-| 14:35:31.028 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9ecbad46c7027a2f span_id=106d02922613e767 session_id=aegis-sp-b-a90333f |
-| 14:35:31.056 | runtime-span | tool | execute_tool intake-application___intake_application tool=intake-application___intake_application | trace_id=6a9ecbad46c7027a2f span_id=ede978388ebcd035 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:31.057 | runtime-span | tool | execute_tool mask-pii___mask_pii tool=mask-pii___mask_pii | trace_id=6a9ecbad46c7027a2f span_id=676aaa45d4a45a4d session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:31.058 | runtime-span | tool | mcp tools/call intake-application___intake_application tool=intake-application___intake_application | trace_id=6a9ecbad46c7027a2f span_id=c57dc6d4d3039144 session_id=aegis-sp-b-a90333f |
-| 14:35:31.059 | runtime-span | tool | mcp tools/call mask-pii___mask_pii tool=mask-pii___mask_pii | trace_id=6a9ecbad46c7027a2f span_id=1fc536b6c784e0ae session_id=aegis-sp-b-a90333f |
-| 14:35:31.156 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=1e1fe33578f5379d |
-| 14:35:31.165 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=cc7f58236463ddf4 |
-| 14:35:31.228 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=26140ff1b52443b9 |
-| 14:35:31.323 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=bed90d0010383f56 |
-| 14:35:31.326 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731326,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.330 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731330,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.333 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=9001f2e9ee8c22ed |
-| 14:35:31.398 | runtime-span | lambda-segment | Init/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=5e981ecab4572148 |
-| 14:35:31.421 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731421,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.450 | runtime-span | lambda-segment | ben-fp-mask-pii/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=12296e008edcc6f0 |
-| 14:35:31.457 | runtime-span | lambda-segment | ben-fp-mask-pii/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=601621d0b5edc782 |
-| 14:35:31.484 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=cf746c238437f2cd |
-| 14:35:31.488 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731488,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.494 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731494,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.603 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731603,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.632 | runtime-span | lambda-segment | ben-fp-intake-application/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=72e80177aa19ebe3 |
-| 14:35:31.641 | runtime-span | lambda-segment | ben-fp-intake-application/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=6cf19db98846d0e1 |
-| 14:35:31.815 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=7cab3a17bd10dabf |
-| 14:35:31.819 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731819,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.819 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731819,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.924 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=62f37f49ebff657e |
-| 14:35:31.929 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731929,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.929 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791731929,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:31.935 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9ecbad46c7027a2f span_id=272cdc496d2f8a0b session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:31.936 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6006 out=401 | trace_id=6a9ecbad46c7027a2f span_id=087ede23a26bae31 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:31.937 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=466f6f52ce204af5 session_id=aegis-sp-b-a90333f |
-| 14:35:31.937 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6006 out=401 | trace_id=6a9ecbad46c7027a2f span_id=a0bbb2dea3fe353d session_id=aegis-sp-b-a90333f request_id=efe74c5a-a19d-4b73 |
-| 14:35:36.914 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=10b0112b7d7fc0a4 session_id=aegis-sp-b-a90333f |
-| 14:35:36.921 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9ecbad46c7027a2f span_id=0cb72bd64109b254 session_id=aegis-sp-b-a90333f |
-| 14:35:36.929 | runtime-span | tool | execute_tool assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility | trace_id=6a9ecbad46c7027a2f span_id=41af7dc70d594cfa session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:36.930 | runtime-span | tool | mcp tools/call assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility | trace_id=6a9ecbad46c7027a2f span_id=6e844baa722ca56b session_id=aegis-sp-b-a90333f |
-| 14:35:37.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6638 out=573 masked_before_model=True | request_id=90821e50-bb0e-4a3d session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:37.025 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=4e8e39fcd4df377c |
-| 14:35:37.034 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=e052129859809aae |
-| 14:35:37.179 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=2b53d1c74669a6e9 |
-| 14:35:37.182 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791737182,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:37.186 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791737186,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:37.322 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791737322,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:37.336 | runtime-span | lambda-segment | ben-fp-assess-eligibility/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=5963dfebad911b7f |
-| 14:35:37.342 | runtime-span | lambda-segment | ben-fp-assess-eligibility/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=6057810b7366f66b |
-| 14:35:37.363 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=d50cfa0ce3db1c70 |
-| 14:35:37.370 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791737370,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:37.370 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791737370,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:37.376 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9ecbad46c7027a2f span_id=841e6c977b1f56d8 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:37.377 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6638 out=573 | trace_id=6a9ecbad46c7027a2f span_id=20894f3a49662c45 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:37.378 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=44bed3f71b0cff75 session_id=aegis-sp-b-a90333f |
-| 14:35:37.378 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6638 out=573 | trace_id=6a9ecbad46c7027a2f span_id=56d2c0072622f5de session_id=aegis-sp-b-a90333f request_id=90821e50-bb0e-4a3d |
-| 14:35:43.736 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=fa24d13dffda9364 session_id=aegis-sp-b-a90333f |
-| 14:35:43.743 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9ecbad46c7027a2f span_id=b37ad66788e5a19c session_id=aegis-sp-b-a90333f |
-| 14:35:43.778 | runtime-span | tool | execute_tool ben-core___draft_notice tool=ben-core___draft_notice | trace_id=6a9ecbad46c7027a2f span_id=8a03796b37390309 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:43.779 | runtime-span | tool | mcp tools/call ben-core___draft_notice tool=ben-core___draft_notice | trace_id=6a9ecbad46c7027a2f span_id=c03ab496203b0ec8 session_id=aegis-sp-b-a90333f |
-| 14:35:43.880 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=4fd36335909af268 |
-| 14:35:43.888 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=7c1ccc27b76e01e9 |
-| 14:35:44.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7259 out=418 masked_before_model=True | request_id=23aafa66-6aa6-48a6 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:44.065 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=c03d2954e61db3f7 |
-| 14:35:44.070 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791744070,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:44.075 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791744075,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:44.157 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791744157,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:44.184 | runtime-span | lambda-segment | ben-fp-core-tools/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=6d1c1a7646062ea6 |
-| 14:35:44.198 | runtime-span | lambda-segment | ben-fp-core-tools/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=6479162e457fea4d |
-| 14:35:44.217 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=59dd5dba9ba46482 |
-| 14:35:44.224 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791744224,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:44.224 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791744224,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:44.230 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9ecbad46c7027a2f span_id=710008683bb6dd28 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:44.232 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7259 out=418 | trace_id=6a9ecbad46c7027a2f span_id=75654f2641ba8054 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:44.233 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7259 out=418 | trace_id=6a9ecbad46c7027a2f span_id=fde839f165ba7490 session_id=aegis-sp-b-a90333f request_id=23aafa66-6aa6-48a6 |
-| 14:35:44.239 | runtime-span | span | SSM.GetParameter | trace_id=6a9ecbad46c7027a2f span_id=e2b5d552c80f38e1 session_id=aegis-sp-b-a90333f |
-| 14:35:44.283 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=63f4ca653ffb1106 session_id=aegis-sp-b-a90333f |
-| 14:35:49.760 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=e7744e6196413d79 session_id=aegis-sp-b-a90333f |
-| 14:35:49.767 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9ecbad46c7027a2f span_id=f1ca254f03138ee9 session_id=aegis-sp-b-a90333f |
-| 14:35:49.777 | runtime-span | tool | execute_tool write-audit___write_audit tool=write-audit___write_audit | trace_id=6a9ecbad46c7027a2f span_id=08922fc02501b4e8 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:49.777 | runtime-span | tool | execute_tool request-signoff___request_signoff tool=request-signoff___request_signoff | trace_id=6a9ecbad46c7027a2f span_id=741c0879133f7d3b session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:49.778 | runtime-span | tool | mcp tools/call write-audit___write_audit tool=write-audit___write_audit | trace_id=6a9ecbad46c7027a2f span_id=517f6da2ce920151 session_id=aegis-sp-b-a90333f |
-| 14:35:49.779 | runtime-span | tool | mcp tools/call request-signoff___request_signoff tool=request-signoff___request_signoff | trace_id=6a9ecbad46c7027a2f span_id=70ebb07b0accd063 session_id=aegis-sp-b-a90333f |
-| 14:35:49.884 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=5b785da94f27308a |
-| 14:35:49.889 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=f29e3cf65b9bab39 |
-| 14:35:49.892 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=4ebf7a728a6bf1ec |
-| 14:35:49.898 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=860a1158864086ae |
-| 14:35:50.000 | worm | evidence | INTENT benefits-determination seq=0 chain=81e8fa364135… | trace_id=6a9ecbad46c7027a2f session_id=aegis-sp-b-a90333f request_id=b53c0f27-a7e1-43c6 tenant=sp-b |
-| 14:35:50.041 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=8b61e5d81f35fd14 |
-| 14:35:50.045 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791750045,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:50.050 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791750050,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:50.138 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791750138,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:50.168 | runtime-span | lambda-segment | ben-fp-write-audit/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=2ca41105111bdf78 |
-| 14:35:50.179 | runtime-span | lambda-segment | ben-fp-write-audit/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=b91e129fec8b16e7 |
-| 14:35:50.699 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=e7ad7a67d94ab198 |
-| 14:35:50.704 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791750704,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:50.704 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791750704,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8049 out=443 masked_before_model=True | request_id=1b9905ce-a2ad-46e4 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:53.576 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=4f537c13b51ce60a |
-| 14:35:53.580 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791753580,"body":{"isError":false,"log | session_id=aegis-sp-b-a90333f trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.585 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791753585,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.667 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791753667,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.684 | runtime-span | lambda-segment | ben-fp-request-signoff/LambdaService | trace_id=6a9ecbad46c7027a2f span_id=3251da59f2e9cb77 |
-| 14:35:53.689 | runtime-span | lambda-segment | ben-fp-request-signoff/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=b2a4a4633f2d620d |
-| 14:35:53.708 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9ecbad46c7027a2f span_id=b32ee1f33dbbfc24 |
-| 14:35:53.712 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791753712,"body":{"isError":false,"log | trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.712 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-dfwnctblv4","event_timestamp":1788791753712,"body":{"isError":false,"res | trace_id=6a9ecbad46c7027a2f |
-| 14:35:53.718 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9ecbad46c7027a2f span_id=b625bd40e13c341f session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:53.720 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8049 out=443 | trace_id=6a9ecbad46c7027a2f span_id=edc2924a0ff551e3 session_id=aegis-sp-b-a90333f tenant=sp-b case_id=OBS-SPB-6429C |
-| 14:35:53.721 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=b5151d9293fef1f3 session_id=aegis-sp-b-a90333f |
-| 14:35:53.721 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8049 out=443 | trace_id=6a9ecbad46c7027a2f span_id=92c1046655dd2f4b session_id=aegis-sp-b-a90333f request_id=1b9905ce-a2ad-46e4 |
-| 14:36:01.602 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9ecbad46c7027a2f span_id=08d6c7a4609ad214 session_id=aegis-sp-b-a90333f |
-| 14:36:01.609 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9ecbad46c7027a2f span_id=e8c0a1826b3a7171 session_id=aegis-sp-b-a90333f |
-| 14:36:01.614 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9ecbad46c7027a2f span_id=ef0289d83b85afdf session_id=aegis-sp-b-a90333f |
+| 22:03:56.671 | runtime-span | runtime-invoke | AgentCore.Runtime.Invoke | trace_id=6a9f34cc4174883d76 span_id=d2bcb203a71c7b8e session_id=aegis-sp-b-257995c |
+| 22:03:57.802 | runtime-span | runtime-http | POST /invocations | trace_id=6a9f34cc4174883d76 span_id=4213414cdcae1230 session_id=aegis-sp-b-257995c |
+| 22:03:57.884 | runtime-span | span | SSM.GetParameter | trace_id=6a9f34cc4174883d76 span_id=5acf815e62edef0f session_id=aegis-sp-b-257995c |
+| 22:03:57.929 | runtime-span | span | SSM.GetParameter | trace_id=6a9f34cc4174883d76 span_id=ea3ca49ebcaa3235 session_id=aegis-sp-b-257995c |
+| 22:03:57.980 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9f34cc4174883d76 span_id=b5c4d7d19886267b session_id=aegis-sp-b-257995c |
+| 22:03:58.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=139 masked_before_model=True | request_id=8bb92fd6-44a6-4041 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:03:58.027 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9f34cc4174883d76 span_id=2a22d097edc48d3e session_id=aegis-sp-b-257995c |
+| 22:03:58.103 | runtime-span | span | mcp.session | trace_id=6a9f34cc4174883d76 span_id=fcdc1fb684f6bafd session_id=aegis-sp-b-257995c |
+| 22:03:58.249 | runtime-span | mcp-list | mcp tools/list | trace_id=6a9f34cc4174883d76 span_id=04a74576c6618018 session_id=aegis-sp-b-257995c |
+| 22:03:58.457 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=034fbd390418700a |
+| 22:03:58.462 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=31e5ee3af97c1a6a |
+| 22:03:58.480 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=9ddbdb76c9948190 |
+| 22:03:58.483 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818638483,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:03:58.489 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818638489,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:03:58.577 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818638577,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:03:58.585 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=22cd2726dd9ed531 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:03:58.585 | runtime-span | agent | invoke_agent Strands Agents model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=46589 out=2128 | trace_id=6a9f34cc4174883d76 span_id=2590319a9098758a session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:03:58.587 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=139 | trace_id=6a9f34cc4174883d76 span_id=3f399f6a8798337f session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:03:58.589 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=a3f5d79d83af36b9 session_id=aegis-sp-b-257995c |
+| 22:03:58.589 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=139 | trace_id=6a9f34cc4174883d76 span_id=8290eea4eccc37a9 session_id=aegis-sp-b-257995c request_id=8bb92fd6-44a6-4041 |
+| 22:04:02.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5558 out=123 masked_before_model=True | request_id=cc1d01d7-3c9a-42cb session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:02.342 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=a4e75fc55b2dafc0 session_id=aegis-sp-b-257995c |
+| 22:04:02.357 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=44d4c8c8ed733fa6 session_id=aegis-sp-b-257995c |
+| 22:04:02.386 | runtime-span | tool | execute_tool intake-application___intake_application tool=intake-application___intake_application | trace_id=6a9f34cc4174883d76 span_id=a96a1d9c17caf76f session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:02.387 | runtime-span | tool | mcp tools/call intake-application___intake_application tool=intake-application___intake_application | trace_id=6a9f34cc4174883d76 span_id=1eec1aa6742595d9 session_id=aegis-sp-b-257995c |
+| 22:04:02.436 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=25b88093ba6a06d9 |
+| 22:04:02.441 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=b9bf3eb83eb85472 |
+| 22:04:02.617 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=a853e736d08a052b |
+| 22:04:02.622 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818642622,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:02.627 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818642627,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:02.704 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818642704,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:02.732 | runtime-span | lambda-segment | ben-fp-intake-application/LambdaService | trace_id=6a9f34cc4174883d76 span_id=6378943fc5eaacda |
+| 22:04:02.746 | runtime-span | lambda-segment | ben-fp-intake-application/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=f6b8f810f1c0a577 |
+| 22:04:02.927 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=cc98d6048b6c3a0c |
+| 22:04:02.932 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818642932,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:02.933 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818642933,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:02.938 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=70be093a17c2281b session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:02.939 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=cd6484f8245eda14 session_id=aegis-sp-b-257995c |
+| 22:04:02.939 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5558 out=123 | trace_id=6a9f34cc4174883d76 span_id=7adf9197f626fe63 session_id=aegis-sp-b-257995c request_id=cc1d01d7-3c9a-42cb |
+| 22:04:02.939 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5558 out=123 | trace_id=6a9f34cc4174883d76 span_id=eaab4538ed773b24 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:05.815 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=5c99fe72f64ae75c session_id=aegis-sp-b-257995c |
+| 22:04:05.822 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=9acf1625884e9477 session_id=aegis-sp-b-257995c |
+| 22:04:05.831 | runtime-span | tool | mcp tools/call mask-pii___mask_pii tool=mask-pii___mask_pii | trace_id=6a9f34cc4174883d76 span_id=b6cac09ddbb42d4d session_id=aegis-sp-b-257995c |
+| 22:04:05.831 | runtime-span | tool | execute_tool mask-pii___mask_pii tool=mask-pii___mask_pii | trace_id=6a9f34cc4174883d76 span_id=1fd805f4cd439a5c session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:05.936 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=798128c9969ab28a |
+| 22:04:05.941 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=0a1664354734190a |
+| 22:04:06.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5986 out=395 masked_before_model=True | request_id=a4bc420f-976d-4124 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:06.095 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=2a09bd47eac7a3d7 |
+| 22:04:06.099 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818646099,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:06.102 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818646102,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:06.177 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818646177,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:06.206 | runtime-span | lambda-segment | ben-fp-mask-pii/LambdaService | trace_id=6a9f34cc4174883d76 span_id=4af32861a3d8230d |
+| 22:04:06.212 | runtime-span | lambda-segment | ben-fp-mask-pii/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=d52805a7b85cbbdd |
+| 22:04:06.708 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=626ee9e5d2446a17 |
+| 22:04:06.713 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818646713,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:06.714 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818646714,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:06.718 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=3c632e9c29e2959d session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:06.719 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5986 out=395 | trace_id=6a9f34cc4174883d76 span_id=e70df0f030a511bd session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:06.720 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=e1b0b94fb8e79021 session_id=aegis-sp-b-257995c |
+| 22:04:06.720 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5986 out=395 | trace_id=6a9f34cc4174883d76 span_id=e05c310e087caed6 session_id=aegis-sp-b-257995c request_id=a4bc420f-976d-4124 |
+| 22:04:11.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6612 out=564 masked_before_model=True | request_id=8b119b69-44f0-426c session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:11.355 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=95653dcb44b5a03f session_id=aegis-sp-b-257995c |
+| 22:04:11.365 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=5b43a592773c905f session_id=aegis-sp-b-257995c |
+| 22:04:11.374 | runtime-span | tool | execute_tool assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility | trace_id=6a9f34cc4174883d76 span_id=48bdde0b0482ee63 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:11.375 | runtime-span | tool | mcp tools/call assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility | trace_id=6a9f34cc4174883d76 span_id=6a9e54a29285c073 session_id=aegis-sp-b-257995c |
+| 22:04:11.472 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=5e5ede9490a1f008 |
+| 22:04:11.478 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=892fb34f9aecf2b2 |
+| 22:04:11.636 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=d628fe3c7521996a |
+| 22:04:11.641 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818651641,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:11.646 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818651646,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:11.732 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818651732,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:11.752 | runtime-span | lambda-segment | ben-fp-assess-eligibility/LambdaService | trace_id=6a9f34cc4174883d76 span_id=2cf05e4d0a279268 |
+| 22:04:11.763 | runtime-span | lambda-segment | ben-fp-assess-eligibility/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=c88a478fcb9247df |
+| 22:04:11.800 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=34b13b61b1aafee5 |
+| 22:04:11.805 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818651805,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:11.805 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818651805,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:11.810 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=3b34debdd098ac5e session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:11.811 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6612 out=564 | trace_id=6a9f34cc4174883d76 span_id=6d5c6b81c187d7f3 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:11.812 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=9f6526361f3f3b70 session_id=aegis-sp-b-257995c |
+| 22:04:11.812 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6612 out=564 | trace_id=6a9f34cc4174883d76 span_id=bfe22ef8c5638d7d session_id=aegis-sp-b-257995c request_id=8b119b69-44f0-426c |
+| 22:04:17.908 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=a5d6d6c61442bc5a session_id=aegis-sp-b-257995c |
+| 22:04:17.916 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=5fabadd880306f30 session_id=aegis-sp-b-257995c |
+| 22:04:17.939 | runtime-span | tool | execute_tool ben-core___draft_notice tool=ben-core___draft_notice | trace_id=6a9f34cc4174883d76 span_id=8ab57b7dc911ba40 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:17.940 | runtime-span | tool | mcp tools/call ben-core___draft_notice tool=ben-core___draft_notice | trace_id=6a9f34cc4174883d76 span_id=b6cd44a72d6a8901 session_id=aegis-sp-b-257995c |
+| 22:04:18.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7224 out=352 masked_before_model=True | request_id=81210cda-fc0f-4497 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:18.052 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=02797e42c85aaf0c |
+| 22:04:18.058 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=decee6dc74d3d405 |
+| 22:04:18.217 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=752684f62093cfb8 |
+| 22:04:18.221 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818658221,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:18.225 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818658225,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:18.307 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818658307,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:18.325 | runtime-span | lambda-segment | ben-fp-core-tools/LambdaService | trace_id=6a9f34cc4174883d76 span_id=430eed6e25ba36a9 |
+| 22:04:18.330 | runtime-span | lambda-segment | ben-fp-core-tools/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=31e337a876d64d45 |
+| 22:04:18.352 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=3812f7bdee88bb08 |
+| 22:04:18.357 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818658357,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:18.358 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818658358,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:18.363 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=3ac9e7ecd902c594 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:18.364 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7224 out=352 | trace_id=6a9f34cc4174883d76 span_id=a600c8977b7339e7 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:18.365 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7224 out=352 | trace_id=6a9f34cc4174883d76 span_id=e0f4c8f17e926612 session_id=aegis-sp-b-257995c request_id=81210cda-fc0f-4497 |
+| 22:04:18.370 | runtime-span | span | SSM.GetParameter | trace_id=6a9f34cc4174883d76 span_id=cae463ad7c97ed33 session_id=aegis-sp-b-257995c |
+| 22:04:18.404 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=df85b47351442c1e session_id=aegis-sp-b-257995c |
+| 22:04:23.586 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=52dcf1c38d0025f3 session_id=aegis-sp-b-257995c |
+| 22:04:23.593 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=84536eac767462d1 session_id=aegis-sp-b-257995c |
+| 22:04:23.601 | runtime-span | tool | execute_tool write-audit___write_audit tool=write-audit___write_audit | trace_id=6a9f34cc4174883d76 span_id=d6aeb69bfb401eb4 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:23.602 | runtime-span | tool | mcp tools/call write-audit___write_audit tool=write-audit___write_audit | trace_id=6a9f34cc4174883d76 span_id=c4a1f0533bf8de59 session_id=aegis-sp-b-257995c |
+| 22:04:23.723 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=40bc8b4a0d639cca |
+| 22:04:23.728 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=caa2f7d87ab2b167 |
+| 22:04:23.878 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=1a63886b9d4f58a6 |
+| 22:04:23.881 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818663881,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:23.886 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818663886,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:23.971 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818663971,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:23.997 | runtime-span | lambda-segment | ben-fp-write-audit/LambdaService | trace_id=6a9f34cc4174883d76 span_id=0f02866d95600e59 |
+| 22:04:24.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7853 out=111 masked_before_model=True | request_id=b4b10e57-ee91-4c24 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:24.000 | worm | evidence | INTENT benefits-determination seq=0 chain=e50bb44bf282… | trace_id=6a9f34cc4174883d76 session_id=aegis-sp-b-257995c request_id=80bca382-96d6-493c tenant=sp-b |
+| 22:04:24.004 | runtime-span | lambda-segment | ben-fp-write-audit/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=52cc4eda6e3561dd |
+| 22:04:24.512 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=567d3911cf32e3d1 |
+| 22:04:24.518 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818664518,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:24.518 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818664518,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:24.524 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=a5dc81341a5c0260 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:24.525 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7853 out=111 | trace_id=6a9f34cc4174883d76 span_id=727c277cebe5bedf session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:24.526 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=73bea3558501e75b session_id=aegis-sp-b-257995c |
+| 22:04:24.526 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7853 out=111 | trace_id=6a9f34cc4174883d76 span_id=7274fc0d018809d2 session_id=aegis-sp-b-257995c request_id=b4b10e57-ee91-4c24 |
+| 22:04:27.000 | bedrock-model-log | model-invocation | Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8015 out=444 masked_before_model=True | request_id=6494b813-0335-434a session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:27.238 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=509f0bbe3fe93963 session_id=aegis-sp-b-257995c |
+| 22:04:27.246 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=12a152a7211e2801 session_id=aegis-sp-b-257995c |
+| 22:04:27.254 | runtime-span | tool | execute_tool request-signoff___request_signoff tool=request-signoff___request_signoff | trace_id=6a9f34cc4174883d76 span_id=b597d4b441bc112b session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:27.255 | runtime-span | tool | mcp tools/call request-signoff___request_signoff tool=request-signoff___request_signoff | trace_id=6a9f34cc4174883d76 span_id=3f42179792e5d124 session_id=aegis-sp-b-257995c |
+| 22:04:27.357 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaService | trace_id=6a9f34cc4174883d76 span_id=3bee816c89080d46 |
+| 22:04:27.362 | runtime-span | lambda-segment | ben-fp-tenant-interceptor/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=4db1d58f89b522fc |
+| 22:04:27.515 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=02006d81fa3cb8c9 |
+| 22:04:27.519 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818667519,"body":{"isError":false,"log | session_id=aegis-sp-b-257995c trace_id=6a9f34cc4174883d76 |
+| 22:04:27.524 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818667524,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:27.621 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818667621,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:27.653 | runtime-span | lambda-segment | ben-fp-request-signoff/LambdaService | trace_id=6a9f34cc4174883d76 span_id=6eb23e55dfa1ab59 |
+| 22:04:27.657 | runtime-span | lambda-segment | ben-fp-request-signoff/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=d04e4cacc3556713 |
+| 22:04:27.680 | runtime-span | lambda-segment | Overhead/LambdaExecutionEnvironment | trace_id=6a9f34cc4174883d76 span_id=c6d0a8745a5586b0 |
+| 22:04:27.685 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818667685,"body":{"isError":false,"res | trace_id=6a9f34cc4174883d76 |
+| 22:04:27.686 | gateway | request | {"resource_arn":"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp-ben-gw-lpiqg0qny0","event_timestamp":1788818667686,"body":{"isError":false,"log | trace_id=6a9f34cc4174883d76 |
+| 22:04:27.691 | runtime-span | cycle | execute_event_loop_cycle | trace_id=6a9f34cc4174883d76 span_id=d0e6bce6534d3938 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:27.692 | runtime-span | model | chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8015 out=444 | trace_id=6a9f34cc4174883d76 span_id=46525e385d58feb5 session_id=aegis-sp-b-257995c tenant=sp-b case_id=OBS-SPB-99DD7 |
+| 22:04:27.693 | runtime-span | model | chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8015 out=444 | trace_id=6a9f34cc4174883d76 span_id=7cb868a7695c0e61 session_id=aegis-sp-b-257995c request_id=6494b813-0335-434a |
+| 22:04:27.694 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=f4499dbedea560a8 session_id=aegis-sp-b-257995c |
+| 22:04:36.369 | runtime-span | span | DynamoDB.UpdateItem | trace_id=6a9f34cc4174883d76 span_id=7c62d9146841bb44 session_id=aegis-sp-b-257995c |
+| 22:04:36.376 | runtime-span | span | DynamoDB.GetItem | trace_id=6a9f34cc4174883d76 span_id=d8f945d2586c84ba session_id=aegis-sp-b-257995c |
+| 22:04:36.381 | runtime-span | span | CloudWatch.PutMetricData | trace_id=6a9f34cc4174883d76 span_id=8a30fd5ab5f805f6 session_id=aegis-sp-b-257995c |
