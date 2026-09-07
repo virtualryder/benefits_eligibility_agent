@@ -10,7 +10,7 @@ AgentCore Runtime launched):
   3. scripts/pii_canary.py --strict   — Gate-B B4 telemetry-leak canary on the workflow path (tenant A)
 and writes ONE verdict JSON. Each sub-proof's verbatim output is kept beside it.
 
-Usage: python scripts/gate_111.py --env mt4 --tenants pha-a,pha-b --runtime-arn <arn>
+Usage: python scripts/gate_111.py --env mt4 --tenants sp-a,sp-b --runtime-arn <arn>
        --runtime-log-group <group> --out .build/gate111.json"""
 import argparse
 import json
@@ -42,7 +42,7 @@ def run(cmd, out_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", required=True)
-    ap.add_argument("--tenants", default="pha-a,pha-b")
+    ap.add_argument("--tenants", default="sp-a,sp-b")
     ap.add_argument("--region", default="us-east-1")
     ap.add_argument("--runtime-arn", required=True)
     ap.add_argument("--runtime-log-group", required=True)

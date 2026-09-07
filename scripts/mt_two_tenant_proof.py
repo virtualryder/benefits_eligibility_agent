@@ -2,21 +2,21 @@
 """Phase 111 - LIVE two-tenant proof for the hybrid multi-tenant control plane.
 
 Drives the deployed AgentCore gateway as THREE identities and records verbatim results:
-  * cw-a   : benefits_caseworker + tools_granted + tenant_pha-a  -> allowed; mask_pii routes to pha-a's OWN store
-  * cw-b   : benefits_caseworker + tools_granted + tenant_pha-b  -> allowed; routes to pha-b's OWN store
+  * cw-a   : benefits_caseworker + tools_granted + tenant_sp-a  -> allowed; mask_pii routes to sp-a's OWN store
+  * cw-b   : benefits_caseworker + tools_granted + tenant_sp-b  -> allowed; routes to sp-b's OWN store
   * cw-none: benefits_caseworker + tools_granted, NO tenant -> DENIED at the gateway (require_tenant / interceptor)
-Then proves physical isolation: after cw-a's call only pha-a's sanitized store holds the artifact,
-and after cw-b's only pha-b's - never the other tenant's, never the base silo table.
+Then proves physical isolation: after cw-a's call only sp-a's sanitized store holds the artifact,
+and after cw-b's only sp-b's - never the other tenant's, never the base silo table.
 
 governed-core 1.6.0 (cross-repo per-tenant AUDIT routing) adds:
   * gateway write_audit as cw-a / cw-b -> the hash-chained record + WORM copy land ONLY in that
     tenant's ledger (<prefix>-<tenant>-audit-ledger) and vault (<prefix>-<tenant>-worm-<acct>);
   * the WORKFLOW hop (no interceptor): ingest with cw-a's verified token mints the signed tenant
-    pair; an execution started with it writes its INTENT evidence + pending-approval into pha-a's
+    pair; an execution started with it writes its INTENT evidence + pending-approval into sp-a's
     stores only (execution stopped at the sign-off pause); an execution started WITHOUT the pair
     fails at the first state (fail-closed) and writes nothing.
 
-Usage: python scripts/mt_two_tenant_proof.py --env mt --tenants pha-a,pha-b --region us-east-1
+Usage: python scripts/mt_two_tenant_proof.py --env mt --tenants sp-a,sp-b --region us-east-1
 Creates disposable Cognito users (admin-create, permanent password) and authenticates via SRP.
 Synthetic data only. Writes evidence JSON to stdout."""
 import argparse
@@ -137,7 +137,7 @@ def tool_result(call):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", default="mt")
-    ap.add_argument("--tenants", default="pha-a,pha-b")
+    ap.add_argument("--tenants", default="sp-a,sp-b")
     ap.add_argument("--region", default="us-east-1")
     a = ap.parse_args()
     prefix = f"ben-{a.env}"
@@ -294,18 +294,18 @@ def main():
         "cw-none_denied": (not ok_call(rn)) and (rn["tools_list"]["status"] in (401, 403) or not rn["tools_list"]["tools"]
                                                  or rn["mask_pii_call"]["status"] in (401, 403)
                                                  or (isinstance(rn["mask_pii_call"]["body"], dict) and "error" in rn["mask_pii_call"]["body"])),
-        "routing_cw-a_only_to_pha-a": grew(ta, before, mid) and not grew(tb, before, mid) and not grew("base", before, mid),
-        "routing_cw-b_only_to_pha-b": grew(tb, mid, after) and not grew(ta, mid, after) and not grew("base", mid, after),
+        "routing_cw-a_only_to_%s" % ta: grew(ta, before, mid) and not grew(tb, before, mid) and not grew("base", before, mid),
+        "routing_cw-b_only_to_%s" % tb: grew(tb, mid, after) and not grew(ta, mid, after) and not grew("base", mid, after),
     }
     verdict.update({
-        "audit_cw-a_ledger_and_worm_only_pha-a": (wa["tool_result"].get("stored") is True and wa["tool_result"].get("worm") is True
+        "audit_cw-a_ledger_and_worm_only_%s" % ta: (wa["tool_result"].get("stored") is True and wa["tool_result"].get("worm") is True
                                                   and only(ta, a0, a1, "ledger") and only(ta, a0, a1, "worm")),
-        "audit_cw-b_ledger_and_worm_only_pha-b": (wb["tool_result"].get("stored") is True and wb["tool_result"].get("worm") is True
+        "audit_cw-b_ledger_and_worm_only_%s" % tb: (wb["tool_result"].get("stored") is True and wb["tool_result"].get("worm") is True
                                                   and only(tb, a1, a2, "ledger") and only(tb, a1, a2, "worm")),
         "ingest_refuses_without_verified_token": ing_notoken.get("ingested") is False,
         "workflow_reached_signoff_with_binding": "HumanSignoff" in (wf.get("states") or []),
-        "workflow_intent_evidence_only_pha-a": only(ta, w0, w1, "ledger") and only(ta, w0, w1, "worm"),
-        "workflow_pending_approval_only_pha-a": p1.get(ta) is True and p1.get(tb) is False and p1.get("base") is False,
+        "workflow_intent_evidence_only_%s" % ta: only(ta, w0, w1, "ledger") and only(ta, w0, w1, "worm"),
+        "workflow_pending_approval_only_%s" % ta: p1.get(ta) is True and p1.get(tb) is False and p1.get("base") is False,
         "workflow_without_binding_fails_closed": (wf.get("execution_without_binding") or {}).get("status") == "FAILED",
     })
     verdict["PASS"] = all(verdict.values())

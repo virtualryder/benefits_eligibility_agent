@@ -9,7 +9,7 @@ aegis.call lines + Bedrock model-invocation logs, and the verdict checks: every 
 session/trace keys, every model invocation tagged with the tenant, masked_before_model for all of them,
 and the OTHER tenant's ledger empty for the case.
 
-Usage: python scripts/obs_two_tenant_proof.py --env mt3 --tenants pha-a,pha-b --runtime-arn <arn>
+Usage: python scripts/obs_two_tenant_proof.py --env mt3 --tenants sp-a,sp-b --runtime-arn <arn>
        --runtime-log-group /aws/bedrock-agentcore/runtimes/<agent_id>-DEFAULT [--out evidence/x.json]"""
 import argparse
 import importlib.util
@@ -77,7 +77,7 @@ def trace(args_ns, case_id, tenant, since, session_id=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", default="mt3")
-    ap.add_argument("--tenants", default="pha-a,pha-b")
+    ap.add_argument("--tenants", default="sp-a,sp-b")
     ap.add_argument("--region", default="us-east-1")
     ap.add_argument("--runtime-arn", required=True)
     ap.add_argument("--runtime-log-group", required=True)

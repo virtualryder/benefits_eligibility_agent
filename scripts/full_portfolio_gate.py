@@ -13,7 +13,8 @@ What it re-proves on the exact tree (the "not re-run on this tag" list in VALIDA
   E2E   0-unexpected regression      e2e_regression.py
   TD    teardown to zero residue     runtime + cdk destroy + cleanup_retained; model-logging restored
 
-Usage: python scripts/full_portfolio_gate.py --env fp --region us-east-1 [--skip-deploy] [--skip-runtime]
+Usage: python scripts/full_portfolio_gate.py [--repo <pack repo>] --env fp --region us-east-1
+       [--skip-deploy] [--skip-runtime]
        [--skip-teardown] [--teardown-on-fail] [--teardown-only]
 Writes evidence/FULL-PORTFOLIO-GATE-<date>.json (+ the per-proof evidence files the proofs write).
 Runs from the Windows host (Python 3.12 with governed_core + aws_cdk; Git-Bash for the runtime scripts).
@@ -34,8 +35,43 @@ import time
 import boto3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+
+
+# ---- PAR-4 stage 3: WHERE the harness lives is not WHICH pack it gates --------------------------
+# `REPO = os.path.dirname(HERE)` meant this gate could only ever gate the repo it physically sat in.
+# Reading the pack facts from pack.json (stage 2) was therefore only half the job: a second pack
+# still could not be gated without copying the file, which is the fork PAR-4 exists to stop. --repo
+# separates the two. It is read straight from argv because PACK is a module-level constant that has
+# to resolve before argparse runs in main().
+def _early_repo():
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--repo" and i + 1 < len(argv):
+            return os.path.abspath(argv[i + 1])
+        if a.startswith("--repo="):
+            return os.path.abspath(a.split("=", 1)[1])
+    return os.path.dirname(HERE)
+
+
+REPO = _early_repo()
 CDK = os.path.join(REPO, "cdk")
+
+
+# A proof script is resolved PACK-LOCAL FIRST, then from the harness. Pack-local wins because a pack
+# whose proof genuinely differs (PV's e2e_regression and cleanup_retained really are different code,
+# not just different constants) must keep its own; the harness copy is the fallback for the scripts
+# a pack simply does not have. Which copy actually ran is recorded per step in the evidence, so the
+# fork is measured on every run instead of being asserted closed.
+_SCRIPT_SOURCE = {}
+
+
+def script(name):
+    local = os.path.join(REPO, "scripts", name)
+    if os.path.isfile(local):
+        _SCRIPT_SOURCE[name] = "pack"
+        return local
+    _SCRIPT_SOURCE[name] = "harness"
+    return os.path.join(HERE, name)
 # ---- PAR-4: the pack is DATA, the harness is code ----------------------------------------------
 # This gate used to hard-code the agent directory, the tenants, the deployment prefix, the stack
 # list and the runtime name, which meant a second pack could not be gated without copying the file.
@@ -59,9 +95,11 @@ def load_pack(repo):
     d.setdefault("workflow", {})
     d["workflow"].setdefault("signoff_state", "HumanSignoff")
     d.setdefault("runtime", {})
-    # `tenants` is deliberately NOT defaulted: packs use different tenant ids (benefits sp-a/sp-b,
-    # pharmacovigilance pha-a/pha-b), and a silent default would quietly gate the wrong tenants and
-    # still report PASS. Anything that differs per pack must be declared, not inherited.
+    # `tenants` is deliberately NOT defaulted: a silent default would quietly gate the wrong tenants
+    # and still report PASS. Anything that differs per pack must be declared, not inherited.
+    # (An earlier version of this comment claimed pharmacovigilance uses pha-a/pha-b. It does not --
+    # its CDK and its scripts both use sp-a/sp-b. pha-a/pha-b is a benefits-era name that survives
+    # only in benefits' own mt..mt6 cdk.out artifacts and test fixtures; see L35.)
     for required in ("pack", "agent_dir", "prefix_prefix", "tenants"):
         if not d.get(required):
             raise SystemExit("pack.json is missing required field %r" % required)
@@ -228,6 +266,9 @@ def main():
         except Exception:
             pass
     ap = argparse.ArgumentParser()
+    ap.add_argument("--repo", default=None,
+                    help="repo of the pack to gate (default: the repo this script lives in). Read from "
+                         "argv before argparse too, because PACK resolves at import time.")
     ap.add_argument("--env", default="fp")
     ap.add_argument("--region", default="us-east-1")
     ap.add_argument("--skip-deploy", action="store_true")
@@ -405,7 +446,7 @@ def main():
         check("RT2_runtime_ready", st == "READY", "status=%s" % st)
         # R4-6 (fourth review): MMDSv2 must be EXPLICIT and asserted on the deployed runtime, not an
         # undocumented toolkit default - enforce (UpdateAgentRuntime if needed) and record the fact.
-        steps["mmds"] = sh([sys.executable, os.path.join(HERE, "runtime_mmds.py"), "--runtime-id", runtime_id,
+        steps["mmds"] = sh([sys.executable, script("runtime_mmds.py"), "--runtime-id", runtime_id,
                             "--region", region, "--enforce"], cwd=REPO, timeout=900)
         try:
             mm = json.loads(steps["mmds"]["out"][steps["mmds"]["out"].index("{"):])
@@ -418,13 +459,13 @@ def main():
         common = ["--env", env, "--tenants", ",".join(TENANTS), "--region", region,
                   "--runtime-arn", runtime_arn, "--runtime-log-group", runtime_log_group]
         ev = os.path.join(REPO, "evidence")
-        steps["gate_111"] = sh([sys.executable, os.path.join(HERE, "gate_111.py"), *common,
+        steps["gate_111"] = sh([sys.executable, script("gate_111.py"), *common,
                                 "--out", os.path.join(ev, "AGENTCORE-111-GATE-%s" % date)], cwd=REPO, timeout=3600)
         check("G111_consolidated_gate", steps["gate_111"]["rc"] == 0, "rc=%s in %ss" % (steps["gate_111"]["rc"], steps["gate_111"]["secs"]))
-        steps["kill_switch"] = sh([sys.executable, os.path.join(HERE, "kill_switch_proof.py"), *common,
+        steps["kill_switch"] = sh([sys.executable, script("kill_switch_proof.py"), *common,
                                    "--out", os.path.join(ev, "AGENTCORE-KILL-SWITCH-%s" % date)], cwd=REPO, timeout=3600)
         check("KS_kill_switch_proof", steps["kill_switch"]["rc"] == 0, "rc=%s in %ss" % (steps["kill_switch"]["rc"], steps["kill_switch"]["secs"]))
-        steps["budget"] = sh([sys.executable, os.path.join(HERE, "budget_proof.py"), *common,
+        steps["budget"] = sh([sys.executable, script("budget_proof.py"), *common,
                               "--out", os.path.join(ev, "AGENTCORE-BUDGET-%s" % date)], cwd=REPO, timeout=3600)
         check("BUD_budget_proof", steps["budget"]["rc"] == 0, "rc=%s in %ss" % (steps["budget"]["rc"], steps["budget"]["secs"]))
         # runtime model calls were guardrail-assessed (RT-2): the invocation log carries the guardrail trace
@@ -439,7 +480,7 @@ def main():
         except Exception as exc:
             check("RT2_runtime_calls_guardrail_assessed", False, "%s: %s" % (type(exc).__name__, str(exc)[:150]))
         # #168 lineage on one isolated case
-        steps["drive_case"] = sh([sys.executable, os.path.join(HERE, "drive_one_case.py")], cwd=REPO, timeout=1200,
+        steps["drive_case"] = sh([sys.executable, script("drive_one_case.py")], cwd=REPO, timeout=1200,
                                  env={"LINEAGE_PREFIX": prefix, "LINEAGE_TENANT": TENANTS[0], "AWS_REGION": region})
         case = {}
         try:
@@ -456,7 +497,7 @@ def main():
             if PACK["lineage"]["tool_aliases"]:
                 _lin_args += ["--tool-aliases", json.dumps(
                     {k: v for k, v in PACK["lineage"]["tool_aliases"].items() if not k.startswith("//")})]
-            steps["lineage"] = sh([sys.executable, os.path.join(HERE, "lineage_proof.py"), "--case-id", case["case_id"],
+            steps["lineage"] = sh([sys.executable, script("lineage_proof.py"), "--case-id", case["case_id"],
                                    "--tenant", TENANTS[0], "--prefix", prefix, "--region", region,
                                    *_lin_args,
                                    "--capture-log-group", lin.get("CaptureLogGroupName", "/aws/cloudtrail/%s-capture-all" % prefix),
@@ -501,7 +542,7 @@ def main():
                    if lv else "rc=%s (no structured verdict in output) %s"
                    % (steps["lineage"]["rc"], steps["lineage"]["out"][-160:].replace("\n", " | "))))
         # 0-unexpected-errors sweep
-        steps["e2e"] = sh([sys.executable, os.path.join(HERE, "e2e_regression.py"), "--env", env, "--region", region,
+        steps["e2e"] = sh([sys.executable, script("e2e_regression.py"), "--env", env, "--region", region,
                            "--since-minutes", str(int((time.time() * 1000 - t_start) / 60000) + 5),
                            "--runtime-log-group", runtime_log_group, "--out", os.path.join(ev, "FULL-PORTFOLIO-GATE-%s-regression.json" % date)],
                           cwd=REPO, timeout=1800)
@@ -593,7 +634,7 @@ def main():
                     except Exception as exc:
                         notes.append("%s: %s" % (name, type(exc).__name__))
         steps["destroy_remaining"] = notes
-        steps["cleanup"] = sh([sys.executable, os.path.join(HERE, "cleanup_retained.py"), "--prefix", prefix, "--region", region,
+        steps["cleanup"] = sh([sys.executable, script("cleanup_retained.py"), "--prefix", prefix, "--region", region,
                                "--i-know-this-deletes-evidence"], cwd=REPO, timeout=1200)
         try:
             cfg = bedrock.get_model_invocation_logging_configuration().get("loggingConfig")
@@ -627,6 +668,12 @@ def main():
                        "FULL-PORTFOLIO-GATE-%s%s.json" % (date, "-teardown" if a.teardown_only else ""))
     with open(out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"env": env, "prefix": prefix, "region": region, "date": date, "PASS": ok, "fatal": fatal,
+                   # PAR-4: name the pack this run gated and, per proof script, whether the PACK's own
+                   # copy ran or the shared harness copy did. A run whose scripts are all "pack" is a
+                   # run on a fully forked harness; the evidence now says so instead of implying one
+                   # shared gate. `harness_repo` differs from `repo` exactly when --repo was used.
+                   "pack": PACK["pack"], "repo": REPO, "harness_repo": os.path.dirname(HERE),
+                   "proof_script_source": dict(sorted(_SCRIPT_SOURCE.items())),
                    "checks": checks, "steps": steps, "evidence": out}, fh, indent=1, default=str)
     print(json.dumps({"PASS": ok, "checks": checks, "fatal": fatal, "evidence": out}, indent=1, default=str))
     shutil.rmtree(_ASM, ignore_errors=True)   # L27

@@ -15,7 +15,7 @@ Sources (all CloudWatch Logs Insights / DynamoDB / Step Functions; read-only):
 Output: JSON (+ Markdown) — the artefact an auditor is handed. Pure boto3; offline-testable core
 (`build_timeline`, `masked_check`, `join_keys`).
 
-Usage: python scripts/trace_case.py --env mt3 --case-id C-1 --tenant pha-a [--runtime-log-group ...]
+Usage: python scripts/trace_case.py --env mt3 --case-id C-1 --tenant sp-a [--runtime-log-group ...]
        [--since-minutes 120] [--out evidence/trace-C-1.json]"""
 import argparse
 import json

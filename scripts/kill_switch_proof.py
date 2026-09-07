@@ -29,7 +29,7 @@ What it proves (each check is a boolean in the evidence JSON; the gate PASSes on
 Identities: three throwaway IAM roles are created (trusting the caller), assumed, and deleted at the end.
 Everything is torn down by the caller's usual env teardown; the switch is left DISENGAGED.
 
-Usage: python scripts/kill_switch_proof.py --env mt5 --tenants pha-a,pha-b --runtime-arn <arn> \
+Usage: python scripts/kill_switch_proof.py --env mt5 --tenants sp-a,sp-b --runtime-arn <arn> \
            --runtime-log-group /aws/bedrock-agentcore/runtimes/<id>-DEFAULT --out evidence/AGENTCORE-KILL-SWITCH-<date>
 """
 import argparse
@@ -139,7 +139,7 @@ def log_lines(logs, group, needle, since_ms, limit=50):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", required=True)
-    ap.add_argument("--tenants", default="pha-a,pha-b")
+    ap.add_argument("--tenants", default="sp-a,sp-b")
     ap.add_argument("--region", default="us-east-1")
     ap.add_argument("--runtime-arn", required=True)
     ap.add_argument("--runtime-log-group", required=True)
