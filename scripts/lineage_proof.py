@@ -215,13 +215,25 @@ def read_cloudtrail_capture(logs, capture_log_group, prefix, start, end, query_e
     pack buckets, and Step Functions calls."""
     import time as _t
     query_end = query_end or int(_t.time() * 1000)
-    q = (r'fields @timestamp, eventTime, eventSource, eventName, '
-         r'requestParameters.functionName as fn, requestParameters.bucketName as bkt, '
-         r'userIdentity.arn as who, requestParameters.stateMachineArn as sm '
-         r'| filter (eventSource="lambda.amazonaws.com" and eventName like /Invoke/ and fn like /' + prefix + r'/) '
-         r'or (eventSource="s3.amazonaws.com" and (eventName="PutObject" or eventName="CompleteMultipartUpload") and bkt like /' + prefix + r'/) '
-         r'or (eventSource="states.amazonaws.com") '
-         r'| sort @timestamp asc | limit 5000')
+    # ---- L34: eventID is the only safe identity for a CloudTrail event -----------------------------
+    # This reader is built from four `like` predicates, and L33 proved Insights silently drops rows
+    # for those. Attempt 18 showed the lineage failure move to this arm the moment the audit arm was
+    # fixed: 11 audit lines against 10 invokes, `audited_not_invoked:assess_eligibility`.
+    #
+    # The first attempt at this fix made it WORSE - re-reading the window unfiltered and merging on
+    # (eventTime, eventName, fn, bkt) took invokes from 10 to 21, because CloudTrail's eventTime has
+    # one-second granularity (L21c) and several DISTINCT invokes legitimately share a second. Merging
+    # on a non-unique key does not deduplicate, it fabricates. That was L21e's lesson - a change to
+    # one arm of a two-sided comparison is not a fix - walked into twice in one session, and it is
+    # why `eventID` is now selected: CloudTrail guarantees it unique per event, so a merge cannot
+    # invent an invoke and cannot collapse two real ones.
+    _FIELDS = (r'fields @timestamp, eventID, eventTime, eventSource, eventName, '
+               r'requestParameters.functionName as fn, requestParameters.bucketName as bkt, '
+               r'userIdentity.arn as who, requestParameters.stateMachineArn as sm ')
+    _KEEP = (r'| filter (eventSource="lambda.amazonaws.com" and eventName like /Invoke/ and fn like /' + prefix + r'/) '
+             r'or (eventSource="s3.amazonaws.com" and (eventName="PutObject" or eventName="CompleteMultipartUpload") and bkt like /' + prefix + r'/) '
+             r'or (eventSource="states.amazonaws.com") ')
+    q = _FIELDS + _KEEP + r'| sort @timestamp asc | limit 5000'
     rows = _insights(logs, [capture_log_group], q, start, max(end, query_end))
     # L21c (live-found, attempt 7): CloudTrail's eventTime has ONE-SECOND granularity, but the case
     # window is measured in milliseconds. The invoke that STARTS a case is recorded at the enclosing
@@ -234,16 +246,65 @@ def read_cloudtrail_capture(logs, capture_log_group, prefix, start, end, query_e
     # could have stamped for an event inside the real window. Anything further out is still dropped.
     w_start = (start // 1000) * 1000
     w_end = -(-end // 1000) * 1000
-    out = []
+    out, seen = [], set()
     for r in rows:
+        eid = r.get("eventID") or ""
+        if eid and eid in seen:
+            continue          # L34: identity is eventID, never a timestamp tuple
         et = _iso_ms(r.get("eventTime"))
         if et and not (w_start <= et <= w_end):
             continue
-        out.append({"ts": et or _iso_ms(r.get("@timestamp")), "event_source": r.get("eventSource", ""),
+        if eid:
+            seen.add(eid)
+        out.append({"ts": et or _iso_ms(r.get("@timestamp")), "event_id": eid,
+                    "event_source": r.get("eventSource", ""),
                     "event_name": r.get("eventName", ""),
                     "target": r.get("fn") or r.get("bkt") or r.get("sm") or "",
                     "principal": r.get("who", "")})
     return out
+
+
+def verify_cloudtrail_capture(logs, capture_log_group, prefix, start, end, known, query_end=None):
+    """L34: re-read the SAME window with no predicates and merge anything the filtered query missed.
+
+    Called only when the filtered read would otherwise produce an orphan, because the unfiltered scan
+    is expensive - the expensive read happens when the answer would otherwise be an accusation. The
+    merge is keyed on eventID, so a recovered row can never double-count an invoke already counted.
+    """
+    import time as _t
+    query_end = query_end or int(_t.time() * 1000)
+    raw = _insights(logs, [capture_log_group], _cloudtrail_fields() + r'| sort @timestamp asc | limit 10000',
+                    start, max(end, query_end), 10000)
+    w_start = (start // 1000) * 1000
+    w_end = -(-end // 1000) * 1000
+    seen = {r.get("event_id") for r in known if r.get("event_id")}
+    added = []
+    for r in raw:
+        eid = r.get("eventID") or ""
+        if not eid or eid in seen:
+            continue
+        src, name = (r.get("eventSource") or ""), (r.get("eventName") or "")
+        fn, bkt = (r.get("fn") or ""), (r.get("bkt") or "")
+        keep = ((src == "lambda.amazonaws.com" and "Invoke" in name and prefix in fn)
+                or (src == "s3.amazonaws.com" and name in ("PutObject", "CompleteMultipartUpload")
+                    and prefix in bkt)
+                or src == "states.amazonaws.com")
+        if not keep:
+            continue
+        et = _iso_ms(r.get("eventTime"))
+        if et and not (w_start <= et <= w_end):
+            continue
+        seen.add(eid)
+        added.append({"ts": et or _iso_ms(r.get("@timestamp")), "event_id": eid,
+                      "event_source": src, "event_name": name,
+                      "target": fn or bkt or (r.get("sm") or ""), "principal": r.get("who", "")})
+    return known + added, len(added)
+
+
+def _cloudtrail_fields():
+    return (r'fields @timestamp, eventID, eventTime, eventSource, eventName, '
+            r'requestParameters.functionName as fn, requestParameters.bucketName as bkt, '
+            r'userIdentity.arn as who, requestParameters.stateMachineArn as sm ')
 
 
 def main():
@@ -379,6 +440,20 @@ def main():
         settle["polls"] += 1
         aegis, model, gateway, cloudtrail = _read_lagging()
         missing = _unsettled(aegis, cloudtrail)
+    # L34: the settle has run out and the CloudTrail arm is the one that looks short. Before that
+    # becomes an accusation, re-read the SAME window with no predicates - the filtered query is built
+    # from `like` terms and L33 proved those drop rows silently. Only reached when a tool would
+    # otherwise be reported as audited-but-never-invoked, so the expensive scan is rare, and the
+    # merge is keyed on eventID so it cannot fabricate an invoke.
+    if any(m.startswith("audited_not_invoked:") for m in missing):
+        cloudtrail, recovered = verify_cloudtrail_capture(
+            logs, args.capture_log_group, args.prefix, start, end, cloudtrail)
+        settle["cloudtrail_unfiltered_reread"] = {"recovered_events": recovered}
+        if recovered:
+            print("  cloudtrail: filtered query missed %d event(s); recovered by unfiltered "
+                  "re-read (L34)" % recovered)
+            missing = _unsettled(aegis, cloudtrail)
+
     settle["waited_sec"] = round(time.time() - t_settle, 1)
     settle["still_missing"] = missing
     settle["cloudtrail_delivered"] = not missing

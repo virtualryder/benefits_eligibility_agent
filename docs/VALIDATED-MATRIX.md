@@ -5,7 +5,7 @@ document in this repo disagrees with this table, **this table is correct and the
 
 Release `v0.5.2-pilot-rc1` (2026-09-06; Tier-1 hardening + enforcement perimeter on the 2026-09-05 tree; `v0.4.0-pilot-rc1` of 2026-09-03 carried kill switch + budget on the `v0.3.0-pilot-rc1` tree of 2026-09-02) · EP1 Gate-B run 2026-07-27 on `v0.1.2-pilot-rc1` (env `ben-val1`,
 us-east-1) · AgentCore multi-tenant / transparency runs 2026-09-02 (`ben-e2e`, `ben-mt`, `ben-mt2`, `ben-mt3`).
-Current offline suite: **318 tests** on main (authoritative count: `RELEASE-MANIFEST.md`); `v0.3.0-pilot-rc1` stood at 154 <!-- count-gate:historical -->.
+Current offline suite: **323 tests** on main (authoritative count: `RELEASE-MANIFEST.md`); `v0.3.0-pilot-rc1` stood at 154 <!-- count-gate:historical -->.
 
 ---
 
