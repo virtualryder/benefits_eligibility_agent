@@ -12,6 +12,7 @@ Exit 0 = swept clean; 2 = residue remains (fail the validation run)."""
 import argparse
 import json
 import sys
+import time as _t
 
 import boto3
 
@@ -132,9 +133,36 @@ def main():
     except Exception as ex:
         print("agentcore sweep ->", type(ex).__name__, str(ex)[:120])
 
+    # ---- L29: a table that is still DELETING is not residue ------------------------------------
+    # The 2026-09-07 teardown reported clean=False with two "residual" tables that this same run had
+    # just deleted three lines earlier. DeleteTable is ASYNCHRONOUS: the table stays in ListTables
+    # with TableStatus=DELETING for a while after the call returns. Re-listing immediately therefore
+    # reports a false residue - the same failure class as L25, a check misreading a good outcome.
+    # Verified after the fact: both tables were gone with no further action taken.
+    # A table still in DELETING is waited out (bounded); anything else is genuine residue.
+    def _tables_residue(deadline_sec=180):
+        end = _t.time() + deadline_sec
+        while True:
+            names = [t for t in ddb.list_tables()["TableNames"] if t.startswith(p)]
+            if not names:
+                return []
+            pending = []
+            for name in names:
+                try:
+                    if ddb.describe_table(TableName=name)["Table"]["TableStatus"] == "DELETING":
+                        pending.append(name)
+                except ddb.exceptions.ResourceNotFoundException:
+                    pass                      # vanished between the list and the describe
+                except Exception:
+                    pending.append(name)      # cannot tell - treat as pending, then as residue
+            settled = [n for n in names if n not in pending]
+            if settled or _t.time() >= end:
+                return settled if settled else pending
+            _t.sleep(5)
+
     # residual sweep
     residue = {
-        "tables": [t for t in ddb.list_tables()["TableNames"] if t.startswith(p)],
+        "tables": _tables_residue(),
         "lambdas": [f["FunctionName"] for f in s.client("lambda").list_functions()["Functions"]
                     if f["FunctionName"].startswith(p)],
         "stacks": [st["StackName"] for st in s.client("cloudformation").describe_stacks()["Stacks"]

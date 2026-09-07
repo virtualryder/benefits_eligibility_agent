@@ -39,11 +39,11 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 
 | Claim | Status |
 |---|---|
-| Offline suite | **310 tests** (all pass locally except one CI-only gate that is skipped offline) (control-plane + 45 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Offline suite | **313 tests** (all pass locally except one CI-only gate that is skipped offline) (control-plane + 45 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Live clean-account validation | **Done twice** — EP1 2026-07-27 (`ben-val1`) and a full runbook re-walk 2026-07-28 (`ben-val2`), us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
 | Zero public egress | **Measured, not asserted** — 0 NAT gateways · 0 internet gateways · 9 VPC endpoints on the live `ben-val2` VPC |
 | Deploy-from-IaC of the zero-egress SG fix | **Proven** on `ben-val2`. (In EP1 that rule had to be patched onto the live SG by hand, so the IaC version was previously unexercised.) |
-| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 310 offline tests |
+| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 313 offline tests |
 | AgentCore ENFORCE from-zero re-proof | **Done 2026-09-02** (`ben-e2e`) — [`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`](evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md) |
 | Hybrid multi-tenant (2 tenants, cross-tenant deny + per-tenant routing) | **Done 2026-09-02** (`ben-mt`, 5/5) — [`evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md) |
 | Per-tenant audit ledger / WORM vault / approvals routing (gateway + workflow hop) | **Done 2026-09-02** (`ben-mt2`, 12/12, governed-core 1.6.0) — [`evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md) |
@@ -103,7 +103,7 @@ routing, and full per-case transparency through the real AgentCore Runtime — a
 grounding, capture-every-API-call lineage and the governed-core 1.10.1 fault-semantics fixes, **live re-gated from zero on
 `ben-t1` (2026-09-06, private mode, CMK, all 12 checks PASS, torn down)**. Tag **`v0.5.2-pilot-rc1`** was cut from that
 tree (2026-09-06, governed-core 1.10.1); `v0.5.1-pilot-rc1` (2026-09-05) and `v0.3.0-pilot-rc1` (2026-09-02, 111 gate) precede it.
-Suite: **310 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
+Suite: **313 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
 stood at 101; do not re-align). Next, in order: the consolidated 111 / kill-switch / budget / lineage gates re-run
 on this exact tag (last green at governed-core 1.10.0, 2026-09-05), the runtime gate on the IaC execution role (RT-2),
 independent redeploy of the tag,

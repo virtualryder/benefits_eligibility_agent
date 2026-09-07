@@ -69,7 +69,7 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **310 offline tests**;
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **313 offline tests**;
 > tag `v0.5.2-pilot-rc1` was cut from this tree (2026-09-06, after the Tier-1 live re-gate; `v0.5.1-pilot-rc1` of 2026-09-05 preceded it, `v0.3.0-pilot-rc1` of 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
@@ -138,7 +138,7 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 310 tests**
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 313 tests**
 > (control-plane + 45 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
@@ -151,7 +151,7 @@ python -m pip install --require-hashes -r requirements-core.txt   # governed-cor
 python -m pip install -r cdk/requirements.txt pytest pyyaml cryptography
 python lib/verify_core.py            # governance-core integrity lock (CI gate)
 bash tools/install_hooks.sh          # REL-4: pre-commit refuses a lib/ change whose core.lock does not verify
-python -m pytest -q                  # 310 collected on Python 3.12
+python -m pytest -q                  # 313 collected on Python 3.12
 ```
 
 > **Parity note (2026-09-06).** This is the lead pack: every platform control lands and is live-gated here first. Which of them are wired in the other packs is recorded in the platform's generated matrix [`WOGplatform/docs/PACK-PARITY.md`](https://github.com/virtualryder/WOGplatform/blob/main/docs/PACK-PARITY.md) — a claim about "the platform" is a claim about this pack unless that matrix shows the check mark for the pack in question.

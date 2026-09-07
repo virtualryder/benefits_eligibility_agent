@@ -20,12 +20,15 @@ Runs from the Windows host (Python 3.12 with governed_core + aws_cdk; Git-Bash f
 """
 import argparse
 import datetime
+import io
 import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 import boto3
@@ -45,13 +48,80 @@ def ctx(env):
             "-c", "capture_lock_mode=GOVERNANCE", "-c", "capture_retention_days=1", "-c", "perimeter=1"]
 
 
+# ---- L28: a timeout that is actually enforceable ------------------------------------------------
+# Attempt 14 hung. `cdk deploy` parked on a dead HTTPS socket to CloudFormation after the fifth
+# stack (2.4 CPU-seconds over 2h20m, one ESTABLISHED connection that never returned) - the L24
+# scenario the deploy timeout was written for. The timeout DID fire at 1800s. It did not help:
+# the run stayed stuck for another 110 minutes, and only ended when the orphans were killed by hand.
+#
+# Proof of the mechanism, from the live process tree:
+#   python 19192 -> cmd.exe 18340 (GONE - Python killed it at the timeout)
+#                   node/npx 33888 (ALIVE, orphaned) -> cmd.exe 42832 -> node cdk 9396 (ALIVE)
+# subprocess.run(capture_output=True, shell=True) pipes stdout/stderr, and on timeout it kills only
+# its DIRECT child and then re-enters communicate() to drain those pipes. The orphaned grandchildren
+# still hold the pipe write handles, so the drain never reaches EOF and run() blocks forever. Killing
+# 9396/42832/33888 by hand unblocked python instantly and it exited rc=1 - the deadlock was the pipes
+# and nothing else. So L24's "the deploy is now bounded" was FALSE on Windows: the bound existed in
+# the argument list and nowhere in the behaviour.
+#
+# Two changes make it real:
+#   1. Output goes to FILES, not pipes. A file never blocks a reader, so there is no drain to deadlock
+#      on and no 8KB-pipe-buffer stall for a chatty CLI either.
+#   2. On timeout the whole process TREE is killed (taskkill /T /F on Windows), not just the child.
+# The function still raises subprocess.TimeoutExpired, so every existing call site is unchanged.
 def sh(cmd, cwd=None, timeout=3600, env=None):
     t0 = time.time()
     e = dict(os.environ); e.update(env or {})
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=timeout, shell=(os.name == "nt"), env=e)   # npx/aws are .cmd shims on Windows
-    return {"cmd": cmd if isinstance(cmd, str) else " ".join(cmd), "rc": r.returncode,
-            "secs": round(time.time() - t0, 1), "out": (r.stdout or "")[-8000:], "err": (r.stderr or "")[-4000:]}
+    label = cmd if isinstance(cmd, str) else " ".join(cmd)
+
+    def _tail(path, n):
+        try:
+            with io.open(path, "r", encoding="utf-8", errors="replace") as fh:
+                return fh.read()[-n:]
+        except OSError:
+            return ""
+
+    fo = tempfile.NamedTemporaryFile(prefix="fpgate-out-", suffix=".log", delete=False)
+    fe = tempfile.NamedTemporaryFile(prefix="fpgate-err-", suffix=".log", delete=False)
+    op, ep = fo.name, fe.name
+    try:
+        p = subprocess.Popen(cmd, cwd=cwd, stdout=fo, stderr=fe, stdin=subprocess.DEVNULL,
+                             shell=(os.name == "nt"), env=e)   # npx/aws are .cmd shims on Windows
+        try:
+            rc = p.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_tree(p.pid)
+            try:
+                p.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                pass
+            fo.close(); fe.close()
+            raise subprocess.TimeoutExpired(label, timeout, output=_tail(op, 8000), stderr=_tail(ep, 4000))
+    finally:
+        for fh in (fo, fe):
+            try:
+                fh.close()
+            except OSError:
+                pass
+    out, err = _tail(op, 8000), _tail(ep, 4000)
+    for path in (op, ep):
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    return {"cmd": label, "rc": rc, "secs": round(time.time() - t0, 1), "out": out, "err": err}
+
+
+def _kill_tree(pid):
+    """Kill a process AND its descendants. Orphaned grandchildren are what hung attempt 14."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    else:
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except OSError:
+            pass
 
 
 # ---- L27: never share the cloud-assembly directory between concurrent CDK CLIs ------------------
@@ -191,16 +261,29 @@ def main():
                         missing.append("%s=%s" % (name, st))
                 return (not missing), done, missing
 
-            try:
-                steps["deploy"] = sh(cdk_cmd("deploy", "--all", "--require-approval", "never",
-                                             "--outputs-file", "outputs-%s.json" % env, *ctx(env)),
-                                     cwd=CDK, timeout=int(a.deploy_timeout))
-                deploy_rc = steps["deploy"]["rc"]
-                hung = False
-            except subprocess.TimeoutExpired:
-                steps["deploy"] = {"rc": "timeout", "secs": int(a.deploy_timeout),
-                                   "note": "cdk CLI did not exit within the deploy timeout"}
-                deploy_rc, hung = None, True
+            # L28b: a hung CLI now really is bounded (see sh()), so a hang costs `deploy_timeout` and
+            # not the rest of the day. Attempt 14's hang was a dead HTTPS socket to CloudFormation
+            # after the fifth stack - transient, and `cdk deploy --all` is idempotent, so ONE resume
+            # is attempted before the run is failed. The resume is RECORDED: two attempts in the
+            # evidence can never be mistaken for one clean deploy, and a second hang still fails.
+            def _deploy_once(tmo):
+                try:
+                    r = sh(cdk_cmd("deploy", "--all", "--require-approval", "never",
+                                   "--outputs-file", "outputs-%s.json" % env, *ctx(env)),
+                           cwd=CDK, timeout=tmo)
+                    return r, r["rc"], False
+                except subprocess.TimeoutExpired:
+                    return ({"rc": "timeout", "secs": int(tmo),
+                             "note": "cdk CLI did not exit within the deploy timeout; process tree killed"},
+                            None, True)
+
+            steps["deploy"], deploy_rc, hung = _deploy_once(int(a.deploy_timeout))
+            if hung or deploy_rc != 0:
+                ok0, _, missing0 = _stacks_all_complete()
+                if not ok0:
+                    steps["deploy_resumed"] = {"after": "hang" if hung else "rc=%s" % deploy_rc,
+                                               "stacks_incomplete_at_resume": missing0}
+                    steps["deploy_2"], deploy_rc, hung = _deploy_once(int(a.deploy_timeout))
 
             ok, statuses, missing = _stacks_all_complete()
             steps["deploy_stack_states"] = statuses
@@ -210,7 +293,8 @@ def main():
                 steps["deploy_cli_hung"] = True
                 check("deploy", True,
                       "cdk CLI %s but every expected stack is COMPLETE (CloudFormation is the "
-                      "authority; CLI hang recorded)" % ("hung - no exit" if hung else "rc=%s" % deploy_rc))
+                      "authority; CLI hang%s recorded)" % ("hung - no exit" if hung else "rc=%s" % deploy_rc,
+                                                           " + resume" if "deploy_2" in steps else ""))
             else:
                 check("deploy", False, "cdk rc=%s; stacks not complete: %s" % (deploy_rc, "; ".join(missing)[:180]))
                 raise RuntimeError("deploy failed")
