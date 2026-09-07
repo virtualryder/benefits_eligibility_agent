@@ -43,7 +43,17 @@ EXPECTED = [
     (r"BudgetExceeded|budget exceeded|denied:budget|budget_exceeded|AWS Budgets|ResourceLockedException", "task 128: budget refusals provoked by scripts/budget_proof.py (capped tenant; synthetic USD-ceiling breach)"),
 ]
 # warnings that are NOT errors but must be REPORTED (a working fallback hid a misconfiguration once)
-WARN_ONLY = [(r"SSM gateway lookup failed", "runtime fell back to the GATEWAY_URL env (the SSM grant did not cover the deployment's parameter path) - fixed in lib/runtime/_obs_setup.sh 2026-09-02")]
+WARN_ONLY = [(r"SSM gateway lookup failed", "runtime fell back to the GATEWAY_URL env (the SSM grant did not cover the deployment's parameter path) - fixed in lib/runtime/_obs_setup.sh 2026-09-02"),
+             # L22g (attempt 11): a TRANSIENT upstream AWS error the runtime retried through. This is
+             # deliberately a WARNING and not "expected": it is not a governed refusal and must not be
+             # filed alongside the controls, but it is also not a platform defect and should not fail
+             # an otherwise clean run. Downgrading it is only honest because a transient error that was
+             # NOT absorbed still fails the gate elsewhere - the proof that depended on the call would
+             # not have completed - and because warnings are counted and carried in the evidence, so a
+             # run that hit service errors says so rather than looking pristine.
+             (r"An internal error occurred\. Please retry later|ServiceUnavailableException|ThrottlingException|TooManyRequestsException",
+              "transient AWS service error, retried by the runtime - reported, not treated as a control failure; "
+              "if it had not been absorbed the dependent proof would have failed")]
 PATTERNS = ["ERROR", "Traceback", "Task timed out", "Exception", "FAILED", "errorType"]
 
 

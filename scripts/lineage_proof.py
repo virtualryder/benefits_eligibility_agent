@@ -309,7 +309,6 @@ def main():
         except Exception:
             pass
 
-    aegis = tc.read_lambda_calls(logs, lambda_groups, args.case_id, keys, start, end) if lambda_groups else []
     sfn_events = tc.read_sfn(sfn, exec_arns) if exec_arns else []
 
     # ---- L21 SETTLE (corrected twice; the correction matters more than the fix) -------------------
@@ -330,12 +329,24 @@ def main():
     # actually be evaluated - or the deadline passes. An expired deadline is still a FAIL, and the
     # wait is recorded either way, so "we waited and nothing arrived" stays distinguishable from
     # "we did not wait".
-    def _read_delivered():
+    # L21g (live-found, attempt 11): the AUDIT side lags too, and it was read only ONCE.
+    # aegis.call lines reach CloudWatch Logs - and become queryable by Insights - after the tool
+    # returns, so the LAST tool in a case (signoff_register here, its line verified present and
+    # in-window on the 6.5s side of the boundary) had simply not been ingested when the single read
+    # happened. The settle then waited 419 seconds refreshing only CloudTrail and never looked at
+    # the audit side again, so it kept re-evaluating a stale audit set and reported the tool as
+    # invoked-but-never-audited: the alarming direction, from an ingestion race.
+    #
+    # Everything that arrives through CloudWatch Logs is subject to ingestion lag, so EVERY lagging
+    # source is re-read on every poll - audit lines included. Step Functions history is read once
+    # because it comes from a direct API, not log delivery.
+    def _read_lagging():
+        a = tc.read_lambda_calls(logs, lambda_groups, args.case_id, keys, start, end) if lambda_groups else []
         m = tc.read_model_rows(logs, args.model_log_group, args.case_id, session_ids, start, end) if args.model_log_group else []
         g = tc.read_gateway_rows(logs, args.gateway_log_group, session_ids, list(keys.get("mcp_session_id", [])),
                                  list(keys.get("trace_id", [])), start, end) if args.gateway_log_group else []
         ct = read_cloudtrail_capture(logs, args.capture_log_group, args.prefix, start, end)
-        return m, g, ct
+        return a, m, g, ct
 
     tool_names = [t for t in args.tool_names.split(",") if t] or [
         "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
@@ -344,31 +355,36 @@ def main():
     # the multi-tool core-tools Lambda hosts the benefits_core drafter (no lexical overlap in the name)
     aliases = {"coretools": "benefits_core"}
 
-    def _missing_invokes(ct):
-        """Tools with an aegis.call but no CloudTrail invoke yet - exactly what the settle waits on."""
+    def _unsettled(aegis_rows, ct):
+        """Tools whose two records do not yet agree - in EITHER direction.
+
+        Waiting only on audited_not_invoked was half the picture: an invoke whose audit line has not
+        been ingested yet looks exactly like a governed tool running unaudited. Both directions are
+        ingestion races until the deadline; only after it are they findings."""
         probe = {"cloudtrail": ct,
-                 "aegis": [{"tool": a.get("tool"), "ts": a.get("ts"), "case_id": args.case_id} for a in aegis],
+                 "aegis": [{"tool": a.get("tool"), "ts": a.get("ts"), "case_id": args.case_id} for a in aegis_rows],
                  "worm": [], "model_log": [], "sfn": [], "gateway": []}
         v = assess_coverage(probe, tool_names, aliases=aliases)
-        return sorted(o["tool"] for o in v["orphans"] if o.get("type") == "audited_not_invoked")
+        return sorted("%s:%s" % (o.get("type"), o.get("tool")) for o in v["orphans"]
+                      if o.get("type") in ("audited_not_invoked", "invoked_not_audited"))
 
     settle = {"waited_sec": 0, "polls": 1, "max_sec": int(args.settle_max_sec),
               "reason": "CloudTrail -> CloudWatch Logs delivery lags the API call it records",
-              "waits_for": "every tool with an aegis.call to have a matching CloudTrail invoke"}
-    model, gateway, cloudtrail = _read_delivered()
+              "waits_for": "audit lines and CloudTrail invokes to agree in BOTH directions"}
+    aegis, model, gateway, cloudtrail = _read_lagging()
     t_settle = time.time()
-    missing = _missing_invokes(cloudtrail)
+    missing = _unsettled(aegis, cloudtrail)
     while missing and time.time() - t_settle < int(args.settle_max_sec):
         time.sleep(max(1, int(args.settle_poll_sec)))
         settle["polls"] += 1
-        model, gateway, cloudtrail = _read_delivered()
-        missing = _missing_invokes(cloudtrail)
+        aegis, model, gateway, cloudtrail = _read_lagging()
+        missing = _unsettled(aegis, cloudtrail)
     settle["waited_sec"] = round(time.time() - t_settle, 1)
     settle["still_missing"] = missing
     settle["cloudtrail_delivered"] = not missing
     if missing:
-        settle["note"] = ("these tools were audited but no CloudTrail invoke was delivered for them "
-                          "within the settle window - reported as a coverage FAILURE, not waited away")
+        settle["note"] = ("these tool records still disagree after the full settle window - reported "
+                          "as a coverage FAILURE, not waited away")
     print("settle: waited %ss over %s poll(s); delivered=%s; still_missing=%s"
           % (settle["waited_sec"], settle["polls"], settle["cloudtrail_delivered"], missing))
 
