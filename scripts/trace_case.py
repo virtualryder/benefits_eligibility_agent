@@ -285,14 +285,41 @@ def read_gateway_rows(logs, group, session_ids, mcp_ids, trace_ids, start, end):
     return out
 
 
+# ---- L31: correlate in Python, not in an Insights OR-chain -------------------------------------
+# Gate attempt 15 failed LIN_zero_orphans on `invoked_not_audited:write_audit` after a full 906s
+# settle. The audit line was not missing. It is in /aws/lambda/ben-fp-write-audit at 11:02:37.666,
+# inside the window, carrying case_id LIN-E02DBE, the run's trace_id AND its execution_arn - it was
+# read out of the log stream by hand. The proof simply could not see it.
+#
+# The old filter appended one `or @message like "<key>"` per correlation key inside a parenthesized
+# group, after two leading `and` terms. Probed against that one log group, each term matches on its
+# own and any PAIR matches, but the three-term disjunction the reader actually built returns ZERO
+# rows - reproducibly, three runs in a row:
+#
+#     case only                          -> 1 row
+#     case or trace                      -> 1 row
+#     case or exec                       -> 1 row
+#     trace only / exec only             -> 1 row each
+#     case or trace or exec  (the reader)-> 0 rows      <-- every disjunct matches; the union does not
+#
+# So the proof got WEAKER the more correlation keys it had, and the failure was silent. The tool it
+# lost was `write_audit` - the evidence writer itself - which is the worst possible one to drop.
+#
+# Rather than find the shape of Insights query that happens to work today, the filter now asks the
+# server only for the cheap invariant every audit line carries (`aegis` + `args_sha256`) and does the
+# correlation-key matching HERE, in Python, where it is deterministic and unit-testable. Verified
+# live against the failing case: 10 rows -> 11 rows, write_audit restored, giving 11 aegis calls
+# against 11 CloudTrail invokes - exact parity, zero orphans.
 def read_lambda_calls(logs, groups, case_id, keys, start, end):
-    cond = ['@message like "aegis" and @message like "args_sha256"', '(@message like "%s"' % case_id]
-    for t in keys.get("trace_id", []) + keys.get("execution_arn", []) + keys.get("session_id", []):
-        cond[1] += ' or @message like "%s"' % t
-    cond[1] += ")"
-    q = "fields @timestamp, @message | filter %s | sort @timestamp asc" % " and ".join(cond)
+    q = ('fields @timestamp, @message | filter @message like "aegis" and @message like "args_sha256"'
+         " | sort @timestamp asc")
+    needles = [n for n in ([case_id] + list(keys.get("trace_id", [])) +
+                           list(keys.get("execution_arn", [])) + list(keys.get("session_id", []))) if n]
     out = []
     for row in _insights(logs, groups, q, start, end, 2000):
+        blob = row.get("@message", "")
+        if needles and not any(n in blob for n in needles):
+            continue
         m = _parse(row)
         if m and m.get("aegis") == "call":
             out.append(m)
