@@ -317,11 +317,24 @@ def read_lambda_calls(logs, groups, case_id, keys, start, end):
             kw = {"logGroupName": g, "startTime": int(start), "endTime": int(end), "limit": 1000}
             if token:
                 kw["nextToken"] = token
-            try:
-                r = logs.filter_log_events(**kw)
-            except logs.exceptions.ResourceNotFoundException:
-                break
-            except Exception:
+            # L33b: a swallowed throttle is a SILENT TRUNCATION, and a truncated read looks exactly
+            # like a governed tool that never audited itself. Attempt 18 proved that the hard way -
+            # `except Exception: break` here turned throttling during the transparency proof into
+            # `lambda_calls_logged: false` on both tenants and a red G111. Retry the throttles, and
+            # let anything else RAISE: failing loudly beats reporting a clean-looking absence.
+            for attempt in range(6):
+                try:
+                    r = logs.filter_log_events(**kw)
+                    break
+                except logs.exceptions.ResourceNotFoundException:
+                    r = None
+                    break
+                except Exception as exc:
+                    if type(exc).__name__ not in ("ThrottlingException", "LimitExceededException",
+                                                  "TooManyRequestsException", "ClientError") or attempt == 5:
+                        raise
+                    time.sleep(1.5 * (2 ** attempt))
+            if r is None:
                 break
             for ev in r.get("events", []):
                 msg = ev.get("message", "")
