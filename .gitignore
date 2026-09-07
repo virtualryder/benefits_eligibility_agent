@@ -31,7 +31,7 @@ cdk.out/
 cdk/cdk.out-*/
 cdk.out-*/
 
-# Independent-verification run output — produced by the VERIFIER on their account,
+# Independent-verification run output ï¿½ produced by the VERIFIER on their account,
 # attached to their signed result. Never shipped by the author.
 evidence/independent-verification-report.json
 
@@ -40,3 +40,10 @@ cdk/outputs-*.json
 evidence/OPERATOR-CONSOLE-*-LIVE.html
 evidence/*.done
 evidence/*.log
+
+# L40: proof stdout/stderr sidecars. They are progress noise ("settling 150s for spans/logs...")
+# or byte-for-byte duplicates of the .json beside them, they are never redacted because nothing
+# reads them, and `git add -A evidence` swept 258 unredacted account ids into the index from them
+# in one command. The evidence is the .json/.md; these are not evidence.
+evidence/*.stdout
+evidence/*.err

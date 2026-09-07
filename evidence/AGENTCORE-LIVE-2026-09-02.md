@@ -1,6 +1,6 @@
 # AgentCore ENFORCE — live control-plane re-verification, 2026-09-02
 
-Account **864217980669** · us-east-1 · verified by `dryder` via `bedrock-agentcore-control` +
+Account **111122223333** · us-east-1 · verified by `dryder` via `bedrock-agentcore-control` +
 `cloudformation` live reads (not inferred). Synthetic-data environment; no real PII.
 
 ## What this pass proves (and what it does not)

@@ -1,9 +1,9 @@
 {
   "verdict": "PASS",
   "leaks": {},
-  "marker": "CANARY-7B07FF3B3C4F-TELEMETRYPROBE",
+  "marker": "CANARY-2CCAA79D7F09-TELEMETRYPROBE",
   "prefix": "ben-fp",
-  "swept_at": "2026-09-07T14:41:27.559152+00:00",
+  "swept_at": "2026-09-07T22:10:03.272091+00:00",
   "informational_model_path": {
     "hits": {
       "/aws/bedrock/modelinvocations/ben-fp": 0

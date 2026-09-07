@@ -9,7 +9,7 @@ and base vault received **zero** writes for the entire run. This closes the cros
 in `AGENTCORE-MULTITENANT-E2E-2026-09-02.md`.
 
 Deployment: `cdk deploy --all -c env=mt2 -c retention_profile=sandbox-demo -c tenants=pha-a,pha-b`
-(8 stacks, from zero, account 864217980669 / us-east-1; benefits `c29003b`+, governed-core `v1.6.0`
+(8 stacks, from zero, account 111122223333 / us-east-1; benefits `c29003b`+, governed-core `v1.6.0`
 pinned by hash `6dbe4c26…93cd`). Gateway `https://ben-mt2-ben-gw-vrmhkswhoe.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`, enforcement `ENFORCE`.
 Harness: `scripts/mt_two_tenant_proof.py --env mt2 --tenants pha-a,pha-b` (verbatim JSON alongside; ARN account ids redacted to 111122223333 per repo policy).
 
@@ -34,8 +34,8 @@ Harness: `scripts/mt_two_tenant_proof.py --env mt2 --tenants pha-a,pha-b` (verba
 ## Gateway hop — `write-audit___write_audit` as two tenanted identities
 
 - cw-a (groups `benefits_caseworker`, `tenant_pha-a`): `stored:true worm:true` → table
-  `ben-mt2-pha-a-audit-ledger`, bucket `ben-mt2-pha-a-worm-864217980669`, key `MT-E40A087D/e3ca2eb5b696f9759f26fcf8f90d0aec4cf2a47d8fdef42f587df076c8047669.json` (seq 0, prev `GENESIS`).
-- cw-b (`tenant_pha-b`): `stored:true worm:true` → table `ben-mt2-pha-b-audit-ledger`, bucket `ben-mt2-pha-b-worm-864217980669`.
+  `ben-mt2-pha-a-audit-ledger`, bucket `ben-mt2-pha-a-worm-111122223333`, key `MT-E40A087D/e3ca2eb5b696f9759f26fcf8f90d0aec4cf2a47d8fdef42f587df076c8047669.json` (seq 0, prev `GENESIS`).
+- cw-b (`tenant_pha-b`): `stored:true worm:true` → table `ben-mt2-pha-b-audit-ledger`, bucket `ben-mt2-pha-b-worm-111122223333`.
 - Counts: before — ledger a/b/base = 0/0/0 · WORM a/b/base = 0/0/0; after cw-a — ledger a/b/base = 2/0/0 · WORM a/b/base = 1/0/0; after cw-b — ledger a/b/base = 2/2/0 · WORM a/b/base = 1/1/0.
   (Each write is 2 ledger rows: the immutable event + the `HEAD#` chain tip.)
 - cw-none (no tenant): 0 tools listed, `tools/call` denied verbatim (require_tenant / interceptor) — unchanged.
@@ -79,7 +79,7 @@ Harness: `scripts/mt_two_tenant_proof.py --env mt2 --tenants pha-a,pha-b` (verba
 `cdk destroy --all --force -c env=mt2 -c retention_profile=sandbox-demo -c tenants=pha-a,pha-b` — all 8
 stacks `DELETE_COMPLETE` (EXIT=0). Residual, **by design (retained on destroy)**: the three hash-chained
 ledgers `ben-mt2-audit-ledger`, `ben-mt2-pha-a-audit-ledger`, `ben-mt2-pha-b-audit-ledger` (the base one
-holds 0 rows — it was never written) and the Object-Lock vaults `ben-mt2-pha-a-worm-864217980669`,
-`ben-mt2-pha-b-worm-864217980669` (+ the base vault / observability data-events bucket). No Lambda,
+holds 0 rows — it was never written) and the Object-Lock vaults `ben-mt2-pha-a-worm-111122223333`,
+`ben-mt2-pha-b-worm-111122223333` (+ the base vault / observability data-events bucket). No Lambda,
 gateway, state machine or user pool remains (`list-functions`, `list-gateways`, `list-stacks` empty for
 `ben-mt2`). Retained stores are removed with `scripts/cleanup_retained.py` once their retention lapses.

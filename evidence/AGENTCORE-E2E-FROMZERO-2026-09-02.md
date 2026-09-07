@@ -1,6 +1,6 @@
 # AgentCore from-zero end-to-end run — 2026-09-02 (env `e2e`)
 
-Account **864217980669** · us-east-1 · run by `dryder`. Synthetic data only. Deploy → prove → destroy.
+Account **111122223333** · us-east-1 · run by `dryder`. Synthetic data only. Deploy → prove → destroy.
 
 ## From-zero deploy (clean namespace)
 

@@ -46,6 +46,16 @@ PATTERNS = [
     re.compile(r"\b(\d{12})\.dkr\.ecr\."),
     re.compile(r"\baccount\b\s*[:=]\s*['\"]?(\d{12})"),
     re.compile(r"[a-z0-9\-]+-(\d{12})-[a-z0-9\-]+"),   # e.g. codebuild-sources-<acct>-us-east-1
+    # L40: the three shapes above are how MACHINES write an account id. Every evidence file writes
+    # it the way a PERSON does - "Account **111122223333** - us-east-1" in a header, or
+    # "account 111122223333 / us-east-1" in prose - and none of those patterns match that, because
+    # they all require a colon, an ARN, or a trailing hyphenated segment. Seven committed evidence
+    # files carried the live account id in plain prose while this gate reported "clean". A control
+    # that is narrow enough to never false-positive is also narrow enough to never fire.
+    re.compile(r"(?i)\baccount\b[\s:=*_`\-]{0,4}(\d{12})\b"),
+    # ...and at the END of a resource name, where pattern 4 above needs a trailing segment it
+    # does not have: bucket `ben-mt2-pha-a-worm-111122223333`
+    re.compile(r"[a-z0-9]-(\d{12})\b"),
 ]
 
 # Binary/vendored paths where a match is noise.
