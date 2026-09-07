@@ -92,6 +92,8 @@ def main():
     ap.add_argument("--skip-runtime", action="store_true", help="reuse the runtime already launched for this env")
     ap.add_argument("--skip-teardown", action="store_true")
     ap.add_argument("--teardown-on-fail", action="store_true")
+    ap.add_argument("--deploy-timeout", type=int, default=1800,
+                    help="seconds to wait for the cdk CLI before falling back to CloudFormation state (L24)")
     ap.add_argument("--teardown-only", action="store_true",
                     help="no proofs: tear down the env this script left behind (runtime from .bedrock_agentcore.yaml + stacks)")
     a = ap.parse_args()
@@ -120,10 +122,55 @@ def main():
     try:
         # -- 1. deploy from zero (two tenants, model logging, USD ceiling, capture-all, perimeter) --
         if not a.skip_deploy:
-            steps["deploy"] = sh(cdk_cmd("deploy", "--all", "--require-approval", "never",
-                                         "--outputs-file", "outputs-%s.json" % env, *ctx(env)), cwd=CDK, timeout=3600)
-            check("deploy", steps["deploy"]["rc"] == 0, "rc=%s in %ss" % (steps["deploy"]["rc"], steps["deploy"]["secs"]))
-            if steps["deploy"]["rc"] != 0:
+            # L24 (live-found, attempt 8): CLOUDFORMATION, NOT THE CLI, IS THE AUTHORITY ON DEPLOY.
+            # The gate defined "deployed" as "the cdk CLI exited 0". On attempt 8 every stack reached
+            # CREATE_COMPLETE by 00:59:40Z and the CLI then sat at ZERO CPU for 50 minutes without
+            # exiting - the whole gate blocked behind a hung process and would have died on the
+            # 3600s timeout as a FATAL, not a readable failure. Attempt 5 hit the same hang.
+            #
+            # The deploy is now bounded, and on a timeout or a non-zero rc the state of the STACKS
+            # decides: if every expected stack is CREATE/UPDATE_COMPLETE the deploy really did
+            # succeed and the run continues, with the hang RECORDED rather than hidden. If the
+            # stacks are not complete it is a real failure and still fails. This makes the evidence
+            # stronger, not weaker - a CLI exit code was never the thing being claimed.
+            EXPECTED = [prefix + "-" + s for s in
+                        (["data"] + ["%s-data" % t for t in TENANTS] +
+                         ["identity", "lineage", "compute", "workflow", "gateway", "observability"])]
+
+            def _stacks_all_complete():
+                done, missing = {}, []
+                for name in EXPECTED:
+                    try:
+                        st = cf.describe_stacks(StackName=name)["Stacks"][0]["StackStatus"]
+                    except Exception:
+                        st = "ABSENT"
+                    done[name] = st
+                    if st not in ("CREATE_COMPLETE", "UPDATE_COMPLETE"):
+                        missing.append("%s=%s" % (name, st))
+                return (not missing), done, missing
+
+            try:
+                steps["deploy"] = sh(cdk_cmd("deploy", "--all", "--require-approval", "never",
+                                             "--outputs-file", "outputs-%s.json" % env, *ctx(env)),
+                                     cwd=CDK, timeout=int(a.deploy_timeout))
+                deploy_rc = steps["deploy"]["rc"]
+                hung = False
+            except subprocess.TimeoutExpired:
+                steps["deploy"] = {"rc": "timeout", "secs": int(a.deploy_timeout),
+                                   "note": "cdk CLI did not exit within the deploy timeout"}
+                deploy_rc, hung = None, True
+
+            ok, statuses, missing = _stacks_all_complete()
+            steps["deploy_stack_states"] = statuses
+            if deploy_rc == 0 and not hung:
+                check("deploy", True, "rc=0 in %ss" % steps["deploy"]["secs"])
+            elif ok:
+                steps["deploy_cli_hung"] = True
+                check("deploy", True,
+                      "cdk CLI %s but every expected stack is COMPLETE (CloudFormation is the "
+                      "authority; CLI hang recorded)" % ("hung - no exit" if hung else "rc=%s" % deploy_rc))
+            else:
+                check("deploy", False, "cdk rc=%s; stacks not complete: %s" % (deploy_rc, "; ".join(missing)[:180]))
                 raise RuntimeError("deploy failed")
         ident, gw, comp = stack_outputs(cf, prefix + "-identity"), stack_outputs(cf, prefix + "-gateway"), stack_outputs(cf, prefix + "-compute")
         obs, lin, data, wf = (stack_outputs(cf, prefix + "-observability"), stack_outputs(cf, prefix + "-lineage"),
