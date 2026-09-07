@@ -298,8 +298,39 @@ def main():
                                    "--capture-worm-bucket", lin.get("CaptureWormBucket", ""),
                                    "--start-ms", str(case.get("start_ms", 0)), "--end-ms", str(case.get("end_ms", 0))],
                                   cwd=REPO, timeout=1800)
-            check("LIN_zero_orphans", steps["lineage"]["rc"] == 0 and "0 orphan" in steps["lineage"]["out"].lower().replace("orphans: 0", "0 orphan"),
-                  "rc=%s %s" % (steps["lineage"]["rc"], steps["lineage"]["out"][-200:].replace("\n", " | ")))
+            # L25 (live-found, attempt 9): this asserted on a SUBSTRING of the proof's stdout - it
+            # required the literal text "0 orphan"/"orphans: 0". The proof prints structured JSON
+            # ("orphans": []), so a run with rc=0, zero orphans and nothing missing was still marked
+            # FAIL. A gate that greps prose can disagree with the proof it is gating, and here it did.
+            # Assert on the STRUCTURED verdict the proof emits, with rc as the fallback.
+            def _lineage_verdict(out):
+                """The verdict JSON the proof printed: {covered, counts, settle, orphans}.
+
+                raw_decode, not json.loads: the proof prints a trailing "wrote coverage evidence
+                to ..." line after the object, so decoding the whole tail always fails."""
+                dec = json.JSONDecoder()
+                for i, ch in enumerate(out):
+                    if ch != "{":
+                        continue
+                    try:
+                        v, _ = dec.raw_decode(out[i:])
+                    except ValueError:
+                        continue
+                    if isinstance(v, dict) and "covered" in v:
+                        return v
+                return None
+
+            lv = _lineage_verdict(steps["lineage"]["out"])
+            steps["lineage_verdict"] = lv
+            lin_ok = steps["lineage"]["rc"] == 0 and bool(lv) and lv.get("covered") is True and not lv.get("orphans")
+            check("LIN_zero_orphans", lin_ok,
+                  ("rc=%s covered=%s orphans=%d invokes=%s aegis=%s settle=%ss"
+                   % (steps["lineage"]["rc"], (lv or {}).get("covered"), len((lv or {}).get("orphans") or []),
+                      ((lv or {}).get("counts") or {}).get("cloudtrail_lambda_invokes"),
+                      ((lv or {}).get("counts") or {}).get("aegis_calls"),
+                      ((lv or {}).get("settle") or {}).get("waited_sec"))
+                   if lv else "rc=%s (no structured verdict in output) %s"
+                   % (steps["lineage"]["rc"], steps["lineage"]["out"][-160:].replace("\n", " | "))))
         # 0-unexpected-errors sweep
         steps["e2e"] = sh([sys.executable, os.path.join(HERE, "e2e_regression.py"), "--env", env, "--region", region,
                            "--since-minutes", str(int((time.time() * 1000 - t_start) / 60000) + 5),
