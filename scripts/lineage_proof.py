@@ -30,7 +30,19 @@ import time
 CORRELATION_KEYS = ("trace_id", "session_id", "execution_arn", "case_id")
 
 # CloudTrail event names for a Lambda synchronous/async invoke across API versions.
-_LAMBDA_INVOKE_EVENTS = {"Invoke", "InvokeFunction", "Invoke20150331", "InvokeAsync"}
+# L21 (CORRECTED, attempt 7): the #168 capture-all trail records Lambda invocations as DATA events,
+# and a Lambda data event's eventName is "InvokeExecution" - NOT the management-plane "Invoke". The
+# set below listed only the management names, so every governed invoke the trail captured was
+# discarded and EVERY audited tool was reported as an orphan ("audited_not_invoked").
+#
+# Attempt 6 misdiagnosed this as CloudTrail delivery latency and added a settle window. The settle is
+# kept (delivery lag is real and the wait is now recorded), but it was never the fix: attempt 7 waited
+# and still saw zero, because no amount of waiting makes "InvokeExecution" match "Invoke". Proving the
+# platform from zero twice is what separated the two explanations.
+#
+# Data events also put the full function ARN in requestParameters.functionName rather than a bare
+# name; tool_of() canonicalizes and substring-matches, so the ARN still resolves to its tool.
+_LAMBDA_INVOKE_EVENTS = {"Invoke", "InvokeFunction", "Invoke20150331", "InvokeAsync", "InvokeExecution"}
 
 
 def _canon(s):
@@ -51,6 +63,15 @@ def tool_of(function_name, tool_names, prefix="ben-gate-", aliases=None):
     aliases = aliases or {}
     if stem in aliases and aliases[stem] in tool_names:
         return aliases[stem]
+    # L21d (live-found, attempt 7): the exact match above only fires when `prefix` matched the actual
+    # deployment prefix - and callers do not pass one, so it defaulted to a stale "ben-gate-" while
+    # the real stem was "benfpcoretools". The alias silently never applied, and benefits_core (the
+    # ONLY tool that needs an alias, because "core-tools" and "benefits_core" share no lexical stem)
+    # was reported as an orphan on every run. Fall back to containment so the alias resolves under
+    # any deployment prefix; the containment loop below cannot rescue this case by construction.
+    for k, v in aliases.items():
+        if k and k in stem and v in tool_names:
+            return v
     best = None
     for t in tool_names:
         ct = _canon(t)
@@ -202,10 +223,21 @@ def read_cloudtrail_capture(logs, capture_log_group, prefix, start, end, query_e
          r'or (eventSource="states.amazonaws.com") '
          r'| sort @timestamp asc | limit 5000')
     rows = _insights(logs, [capture_log_group], q, start, max(end, query_end))
+    # L21c (live-found, attempt 7): CloudTrail's eventTime has ONE-SECOND granularity, but the case
+    # window is measured in milliseconds. The invoke that STARTS a case is recorded at the enclosing
+    # second - 23:22:41.000 for a case whose window opens at 23:22:41.003 - so `start <= et` dropped
+    # the very first governed invokes by three milliseconds, and intake_application /
+    # ingest_application were reported as audited-but-never-invoked on every run.
+    #
+    # The window is widened to the RESOLUTION OF THE SOURCE, not by an arbitrary fudge: floor the
+    # start to its second and ceil the end to its second, which is exactly the interval CloudTrail
+    # could have stamped for an event inside the real window. Anything further out is still dropped.
+    w_start = (start // 1000) * 1000
+    w_end = -(-end // 1000) * 1000
     out = []
     for r in rows:
         et = _iso_ms(r.get("eventTime"))
-        if et and not (start <= et <= end):
+        if et and not (w_start <= et <= w_end):
             continue
         out.append({"ts": et or _iso_ms(r.get("@timestamp")), "event_source": r.get("eventSource", ""),
                     "event_name": r.get("eventName", ""),
@@ -265,10 +297,24 @@ def main():
     aegis = tc.read_lambda_calls(logs, lambda_groups, args.case_id, keys, start, end) if lambda_groups else []
     sfn_events = tc.read_sfn(sfn, exec_arns) if exec_arns else []
 
-    # L21 SETTLE: the three sources below arrive through LOG DELIVERY, not a direct API read, so
-    # they lag the run. Poll until CloudTrail has delivered at least one governed Lambda invoke for
-    # this window, or the deadline passes. The wait is recorded either way; an expired deadline is
-    # still a FAIL, so a delivery gap is never silently converted into coverage.
+    # ---- L21 SETTLE (corrected twice; the correction matters more than the fix) -------------------
+    # The three sources below arrive through LOG DELIVERY, not a direct API read, so they lag the run
+    # and must be waited for. Two earlier readings of this were wrong, and the record is kept because
+    # each wrong turn is the kind a reviewer should be able to audit:
+    #
+    #   attempt 6  read them ONCE and saw nothing -> "CloudTrail delivery lags"; a settle was added.
+    #   attempt 7  waited 173s, declared delivery complete, and STILL counted 0 governed invokes.
+    #
+    # The settle was real but its READINESS CONDITION was wrong: it waited for "any Lambda invoke in
+    # the window", and the tenant interceptor fires constantly (105 invokes in this run), so the very
+    # first poll almost always looked "delivered" while the GOVERNED TOOLS' invokes had not arrived.
+    # It waited for the wrong evidence.
+    #
+    # The condition is now the claim itself: wait until every tool with an aegis.call audit line has a
+    # matching CloudTrail invoke - i.e. until the coverage assertion this proof exists to make can
+    # actually be evaluated - or the deadline passes. An expired deadline is still a FAIL, and the
+    # wait is recorded either way, so "we waited and nothing arrived" stays distinguishable from
+    # "we did not wait".
     def _read_delivered():
         m = tc.read_model_rows(logs, args.model_log_group, args.case_id, session_ids, start, end) if args.model_log_group else []
         g = tc.read_gateway_rows(logs, args.gateway_log_group, session_ids, list(keys.get("mcp_session_id", [])),
@@ -276,26 +322,40 @@ def main():
         ct = read_cloudtrail_capture(logs, args.capture_log_group, args.prefix, start, end)
         return m, g, ct
 
-    def _has_lambda_invoke(ct):
-        return any(e.get("event_source") == "lambda.amazonaws.com" and e.get("event_name") in _LAMBDA_INVOKE_EVENTS
-                   for e in ct)
+    tool_names = [t for t in args.tool_names.split(",") if t] or [
+        "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
+        "ingest_application", "intake_application", "workflow_guards",
+        "request_signoff", "signoff_register", "approve_signoff", "finalize_signoff", "write_audit"]
+    # the multi-tool core-tools Lambda hosts the benefits_core drafter (no lexical overlap in the name)
+    aliases = {"coretools": "benefits_core"}
+
+    def _missing_invokes(ct):
+        """Tools with an aegis.call but no CloudTrail invoke yet - exactly what the settle waits on."""
+        probe = {"cloudtrail": ct,
+                 "aegis": [{"tool": a.get("tool"), "ts": a.get("ts"), "case_id": args.case_id} for a in aegis],
+                 "worm": [], "model_log": [], "sfn": [], "gateway": []}
+        v = assess_coverage(probe, tool_names, aliases=aliases)
+        return sorted(o["tool"] for o in v["orphans"] if o.get("type") == "audited_not_invoked")
 
     settle = {"waited_sec": 0, "polls": 1, "max_sec": int(args.settle_max_sec),
-              "reason": "CloudTrail -> CloudWatch Logs delivery lags the API call it records"}
+              "reason": "CloudTrail -> CloudWatch Logs delivery lags the API call it records",
+              "waits_for": "every tool with an aegis.call to have a matching CloudTrail invoke"}
     model, gateway, cloudtrail = _read_delivered()
     t_settle = time.time()
-    while (not _has_lambda_invoke(cloudtrail)
-           and time.time() - t_settle < int(args.settle_max_sec)):
+    missing = _missing_invokes(cloudtrail)
+    while missing and time.time() - t_settle < int(args.settle_max_sec):
         time.sleep(max(1, int(args.settle_poll_sec)))
         settle["polls"] += 1
         model, gateway, cloudtrail = _read_delivered()
+        missing = _missing_invokes(cloudtrail)
     settle["waited_sec"] = round(time.time() - t_settle, 1)
-    settle["cloudtrail_delivered"] = _has_lambda_invoke(cloudtrail)
-    if not settle["cloudtrail_delivered"]:
-        settle["note"] = ("no governed Lambda invoke was delivered to the capture log group within the "
-                          "settle window - this is reported as a coverage FAILURE, not waited away")
-    print("settle: waited %ss over %s poll(s); cloudtrail_delivered=%s"
-          % (settle["waited_sec"], settle["polls"], settle["cloudtrail_delivered"]))
+    settle["still_missing"] = missing
+    settle["cloudtrail_delivered"] = not missing
+    if missing:
+        settle["note"] = ("these tools were audited but no CloudTrail invoke was delivered for them "
+                          "within the settle window - reported as a coverage FAILURE, not waited away")
+    print("settle: waited %ss over %s poll(s); delivered=%s; still_missing=%s"
+          % (settle["waited_sec"], settle["polls"], settle["cloudtrail_delivered"], missing))
 
     def _corr(node, extra):
         node = dict(node or {})
@@ -318,13 +378,6 @@ def main():
                  "execution_arn": e.get("execution_arn")} for e in sfn_events],
         "gateway": [_corr(g.get("keys", {}), {"ts": g.get("ts")}) for g in gateway],
     }
-
-    tool_names = [t for t in args.tool_names.split(",") if t] or [
-        "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
-        "ingest_application", "intake_application", "workflow_guards",
-        "request_signoff", "signoff_register", "approve_signoff", "finalize_signoff", "write_audit"]
-    # the multi-tool core-tools Lambda hosts the benefits_core drafter (no lexical overlap in the name)
-    aliases = {"coretools": "benefits_core"}
 
     verdict = assess_coverage(sources, tool_names, aliases=aliases)
     lineage = build_lineage(sources)

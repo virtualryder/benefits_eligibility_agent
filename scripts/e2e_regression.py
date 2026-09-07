@@ -53,6 +53,59 @@ _GATEWAY_WRAPPER = re.compile(r"An error occurred while executing tool:\s*([A-Za
 _CORRELATION_WINDOW_MS = 15000
 
 
+# The AgentCore Runtime's view of the SAME refusal is equally opaque: strands' MCP client logs
+# "tool execution failed" with no reason, and the OTel span export carries the error with no reason
+# either. The reason lives in the gateway log (a Cedar deny) or the tool Lambda's log (kill switch /
+# budget). Correlating on TIME ALONE is weaker than the gateway case, which matches on tool name too,
+# so the bar is deliberately narrower: the correlating row must itself be a governed REFUSAL that was
+# already classified expected, within a tight window. A genuinely broken tool still fails this gate,
+# because its own Lambda log line has no refusal classification and stays UNEXPECTED - the Lambda-side
+# signal is never suppressed by this pass, only the runtime's echo of it.
+# The runtime's error-shaped echoes of a governed refusal. ConditionalCheckFailedException belongs
+# here because this platform's atomicity controls ARE conditional writes: the budget meter's
+# reserve/commit and the exactly-once FINAL# marker both enforce their guarantee by making DynamoDB
+# reject the write, so the exception firing is the control working, not a fault. It is NOT
+# blanket-accepted - like every entry here it still has to correlate with a classified governed
+# refusal, so a conditional-check failure with no drift behind it stays UNEXPECTED and fails the
+# gate, which is what a genuine duplicate-write race would look like.
+_RUNTIME_OPAQUE = re.compile(r"tool execution failed|strands\.tools\.mcp\.mcp_client"
+                             r"|Connection to the MCP server was closed"
+                             r"|ConditionalCheckFailedException")
+_REFUSAL_WHY = ("kill-switch", "budget", "Cedar DENY", "governed refusal", "refused")
+# A SESSION teardown trails the refusal that caused it on a different timescale than the gateway's
+# per-request wrapper: the runtime finishes the turn, records the outcome (L19) and only then tears
+# the MCP client down, which logs "Connection to the MCP server was closed". Measured live at 114s
+# after the Cedar deny that stopped the session, so the gateway's 15s window cannot cover it.
+#
+# The wider window is why the CORRELATION REQUIREMENT matters and is not relaxed: a classified
+# governed refusal must still exist. And the compensating control against masking a genuine gateway
+# outage is outside this file - an outage would leave the tool Lambdas UNINVOKED, which the lineage
+# proof reports as audited_not_invoked orphans and fails on independently.
+_RUNTIME_ECHO_WINDOW_MS = 300000
+
+
+def correlate_runtime_echoes(by_group, prefix, runtime_log_group):
+    """Reclassify runtime-side echoes of a refusal that another log already explains. Mutates rows."""
+    if not runtime_log_group or runtime_log_group not in by_group:
+        return
+    explained = [r for g, rows in by_group.items() if g != runtime_log_group
+                 for r in rows
+                 if r["kind"] == "expected" and any(k in (r.get("why") or "") for k in _REFUSAL_WHY)]
+    if not explained:
+        return
+    for r in by_group[runtime_log_group]:
+        if r["kind"] != "unexpected":
+            continue
+        ex = r.get("excerpt") or ""
+        if not (r.get("_echo") or _RUNTIME_OPAQUE.search(ex) or "Traceback" in ex):
+            continue
+        near = [e for e in explained
+                if abs(int(e.get("ts") or 0) - int(r.get("ts") or 0)) <= _RUNTIME_ECHO_WINDOW_MS]
+        if near:
+            r["kind"] = "expected"
+            r["why"] = ("runtime echo of a classified refusal (%s)" % near[0]["why"])[:200]
+
+
 def correlate_gateway_wrappers(by_group, prefix):
     """Reclassify gateway tool-execution wrappers that a Lambda refusal explains. Mutates rows."""
     # tool name as the gateway spells it ("mask-pii___mask_pii") -> the Lambda log group
@@ -156,17 +209,25 @@ def main():
             # Lambda platform lines that are not errors: "REPORT ... Error" absent; keep only real ones
             if kind == "unexpected" and re.search(r'"severityText":"INFO"|"level": "INFO"|"aegis": "call"', m) and "Traceback" not in m and "exception" not in m.lower():
                 kind, why = "expected", "INFO-level line matched a pattern word (not an error)"
-            rows.append({"ts": e.get("timestamp"), "stream": (e.get("logStreamName") or "")[:60], "kind": kind, "why": why, "excerpt": m[:260].replace("\n", " ")})
+            row = {"ts": e.get("timestamp"), "stream": (e.get("logStreamName") or "")[:60],
+                   "kind": kind, "why": why, "excerpt": m[:260].replace("\n", " ")}
+            # The runtime's OTel span export is a single JSON line whose scope/body/exception fields
+            # sit well past the 260-char excerpt, so the echo signature MUST be read from the full
+            # message here - matching the excerpt silently missed every span-shaped echo.
+            row["_echo"] = bool(_RUNTIME_OPAQUE.search(m))
+            rows.append(row)
         by_group[g] = rows
 
     correlate_gateway_wrappers(by_group, prefix)
+    correlate_runtime_echoes(by_group, prefix, a.runtime_log_group)
 
     unexpected_total = 0
     for g, rows in by_group.items():
         n_unexp = sum(1 for r in rows if r["kind"] == "unexpected")
         unexpected_total += n_unexp
+        keep = [r for r in rows if r["kind"] == "unexpected"][:20] + [r for r in rows if r["kind"] == "warning"][:6] + [r for r in rows if r["kind"] == "expected"][:6]
         rep["log_groups"][g] = {"events": len(rows), "unexpected": n_unexp, "warnings": sum(1 for r in rows if r["kind"] == "warning"),
-                                "rows": [r for r in rows if r["kind"] == "unexpected"][:20] + [r for r in rows if r["kind"] == "warning"][:6] + [r for r in rows if r["kind"] == "expected"][:6]}
+                                "rows": [{k: v for k, v in r.items() if k != "_echo"} for r in keep]}
 
     # Step Functions: every execution's terminal state, classified
     for m in sfn.list_state_machines()["stateMachines"]:

@@ -111,3 +111,56 @@ def test_markdown_renders_pass_and_fail():
     bad["worm"].append({"ts": 210, "key": "A3"})
     vb = lp.assess_coverage(bad, TOOLS)
     assert "Coverage: FAIL" in lp.verdict_markdown(CASE, "sp-a", lp.build_lineage(bad), vb)
+
+
+# -- L21 CORRECTED (attempt 7, 2026-09-06): Lambda DATA events say "InvokeExecution" ----------------
+# The #168 capture-all trail records Lambda invocations as data events, whose eventName is
+# "InvokeExecution", not the management-plane "Invoke". The invoke-event set listed only the
+# management names, so every governed invoke the trail captured was discarded and EVERY audited tool
+# was reported as an orphan. Attempt 6 misread this as CloudTrail delivery latency and added a settle
+# window; attempt 7 waited the full window and still saw zero, because waiting cannot make
+# "InvokeExecution" match "Invoke". This test is the guard that keeps the two explanations apart.
+
+def test_lambda_data_event_invocations_count_as_invokes():
+    """A data-plane InvokeExecution must count, and carry the ARN form of the function name."""
+    arn = "arn:aws:lambda:us-east-1:111122223333:function:ben-x-mask-pii"
+    sources = {
+        "cloudtrail": [{"ts": 1000, "event_source": "lambda.amazonaws.com",
+                        "event_name": "InvokeExecution", "target": arn, "principal": "p"}],
+        "aegis": [{"tool": "mask_pii", "ts": 1000, "case_id": "C1"}],
+        "worm": [], "model_log": [], "sfn": [], "gateway": [],
+    }
+    v = lp.assess_coverage(sources, ["mask_pii"])
+    assert v["counts"]["cloudtrail_lambda_invokes"] == 1, v["counts"]
+    assert v["orphans"] == [], v["orphans"]
+    assert v["covered"] is True
+
+
+def test_an_audited_tool_with_no_invoke_at_all_is_still_an_orphan():
+    """The fix must not blanket-pass: with nothing in CloudTrail the orphan is still reported."""
+    sources = {"cloudtrail": [], "aegis": [{"tool": "mask_pii", "ts": 1000, "case_id": "C1"}],
+               "worm": [], "model_log": [], "sfn": [], "gateway": []}
+    v = lp.assess_coverage(sources, ["mask_pii"])
+    assert any(o["type"] == "audited_not_invoked" for o in v["orphans"])
+    assert v["covered"] is False
+
+
+# -- L21d: the alias must resolve under the REAL deployment prefix (attempt 7) ----------------------
+# tool_of()'s exact-match alias lookup only fired when its `prefix` argument matched the deployment,
+# and no caller passes one - it defaulted to a stale "ben-gate-" while the live stem was
+# "benfpcoretools". benefits_core is the ONLY tool that needs an alias ("core-tools" and
+# "benefits_core" share no lexical stem, so the containment fallback cannot rescue it), so it was
+# reported as an orphan on every live run while the offline fixtures - which used the default prefix
+# - passed.
+
+def test_alias_resolves_regardless_of_deployment_prefix():
+    arn = "arn:aws:lambda:us-east-1:111122223333:function:%s-core-tools"
+    for prefix in ("ben-fp", "ben-gate", "pv-prod", "fa-x"):
+        got = lp.tool_of(arn % prefix, ["benefits_core", "mask_pii"], aliases={"coretools": "benefits_core"})
+        assert got == "benefits_core", (prefix, got)
+
+
+def test_alias_does_not_fire_for_an_unrelated_function():
+    got = lp.tool_of("arn:aws:lambda:us-east-1:111122223333:function:ben-fp-budget-breach",
+                     ["benefits_core", "mask_pii"], aliases={"coretools": "benefits_core"})
+    assert got is None, got
