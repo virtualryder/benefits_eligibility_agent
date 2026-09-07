@@ -2,7 +2,7 @@
 
 *One page: what this is, what is actually proven, how to evaluate it, and what a first pilot looks like.*
 
-**Validated release: [`v0.5.2-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.5.2-pilot-rc1)** (2026-09-06; Tier-1 hardening + enforcement perimeter, live re-gated on `ben-t1`; supersedes `v0.3.0-pilot-rc1` with the kill switch + per-tenant budget)
+**Validated release: [`v0.6.0-pilot-rc1`](https://github.com/virtualryder/benefits_eligibility_agent/releases/tag/v0.6.0-pilot-rc1)** (2026-09-07; the first **full-portfolio gate at 15/15 from zero** — 111 consolidated, kill switch, per-tenant budget, #168 lineage with zero orphans, runtime on the IaC role, e2e, teardown to zero residue; supersedes `v0.5.2-pilot-rc1`, which was offline-green and Tier-1 live but never carried a green full-portfolio gate)
 — cut 2026-09-06 from the tree the Tier-1 live re-gate (`ben-t1`, from zero, private mode + CMK + perimeter) passed
 on (governed-core 1.10.1, hash-pinned); the AgentCore from-zero ENFORCE, hybrid multi-tenant, per-tenant audit routing,
 full-transparency, kill-switch and budget runs validated the 2026-09-02/03 ancestors of this tree (governed-core 1.9.0)
