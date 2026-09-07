@@ -29,34 +29,41 @@ OTHER_CASE = ('{"aegis": "call", "args_sha256": "ffff", "case_id": "OTHER-1", '
 NOT_JSON = "START RequestId: 6b3106ce-1d3e-492c-9ea8-b7ef2e4c4f35 Version: $LATEST"
 
 
+class _NotFound(Exception):
+    pass
+
+
 class _Logs:
-    """Stands in for CloudWatch Insights; records the query it was asked for."""
+    """Stands in for CloudWatch Logs. L33: the reader must use the plain scan, never the query
+    engine - so start_query raises if anything reaches for it."""
+
+    class exceptions:
+        ResourceNotFoundException = _NotFound
 
     def __init__(self, messages):
         self.messages = messages
-        self.queries = []
+        self.scans = []
 
-    def start_query(self, **kw):
-        self.queries.append(kw["queryString"])
-        return {"queryId": "q"}
+    def filter_log_events(self, **kw):
+        self.scans.append(kw)
+        return {"events": [{"message": m} for m in self.messages]}
 
-    def get_query_results(self, queryId):
-        return {"status": "Complete",
-                "results": [[{"field": "@message", "value": m}] for m in self.messages]}
+    def start_query(self, **kw):                      # pragma: no cover - must never be called
+        raise AssertionError("read_lambda_calls must not use CloudWatch Insights (L33)")
 
 
 def _read(messages, keys, case_id=CASE):
     logs = _Logs(messages)
     rows = tc.read_lambda_calls(logs, ["/aws/lambda/ben-fp-write-audit"], case_id, keys, 0, 1)
-    return rows, logs.queries[0]
+    return rows, logs.scans[0]
 
 
-def test_the_query_carries_no_correlation_keys():
-    """The OR-chain is what broke; the server must only be asked for the cheap invariant."""
-    _, q = _read([WRITE_AUDIT], {"trace_id": [TRACE], "execution_arn": [EXEC], "session_id": []})
-    assert "aegis" in q and "args_sha256" in q
-    assert CASE not in q and TRACE not in q and EXEC not in q
-    assert " or " not in q
+def test_the_server_is_asked_only_for_a_window():
+    """L33: no filter language reaches the server at all - just a log group and a time range."""
+    _, scan = _read([WRITE_AUDIT], {"trace_id": [TRACE], "execution_arn": [EXEC], "session_id": []})
+    assert scan["logGroupName"] == "/aws/lambda/ben-fp-write-audit"
+    assert "startTime" in scan and "endTime" in scan
+    assert not any("filter" in k.lower() or "query" in k.lower() for k in scan)
 
 
 def test_write_audit_is_found_with_all_three_keys_present():

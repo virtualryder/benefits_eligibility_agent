@@ -285,46 +285,57 @@ def read_gateway_rows(logs, group, session_ids, mcp_ids, trace_ids, start, end):
     return out
 
 
-# ---- L31: correlate in Python, not in an Insights OR-chain -------------------------------------
-# Gate attempt 15 failed LIN_zero_orphans on `invoked_not_audited:write_audit` after a full 906s
-# settle. The audit line was not missing. It is in /aws/lambda/ben-fp-write-audit at 11:02:37.666,
-# inside the window, carrying case_id LIN-E02DBE, the run's trace_id AND its execution_arn - it was
-# read out of the log stream by hand. The proof simply could not see it.
+# ---- L31/L33: read the audit lines with a plain scan, not a query engine ------------------------
+# L31 (gate attempt 15) removed a three-term `or @message like ...` chain from this reader after
+# proving that each disjunct matched alone while the union returned zero rows. That fix was
+# necessary and INSUFFICIENT, and attempt 17 proved it: with the OR-chain gone, the remaining
+# two-term `@message like "aegis" and @message like "args_sha256"` filter ALSO silently returned
+# nothing for `write_audit`, and the gate failed `LIN_zero_orphans` on the same tool again.
 #
-# The old filter appended one `or @message like "<key>"` per correlation key inside a parenthesized
-# group, after two leading `and` terms. Probed against that one log group, each term matches on its
-# own and any PAIR matches, but the three-term disjunction the reader actually built returns ZERO
-# rows - reproducibly, three runs in a row:
+# The measurement that settled it, against the same log group and the SAME window:
 #
-#     case only                          -> 1 row
-#     case or trace                      -> 1 row
-#     case or exec                       -> 1 row
-#     trace only / exec only             -> 1 row each
-#     case or trace or exec  (the reader)-> 0 rows      <-- every disjunct matches; the union does not
+#     Insights, filter aegis + args_sha256          -> 0 rows
+#     Insights, filter aegis + args_sha256, +120s   -> 0 rows
+#     Insights, NO filter                           -> the line is right there, 13:46:51.712
+#     filter_log_events, exact proof window         -> 11 rows, write_audit included
 #
-# So the proof got WEAKER the more correlation keys it had, and the failure was silent. The tool it
-# lost was `write_audit` - the evidence writer itself - which is the worst possible one to drop.
+# So the window was never wrong and the line was never missing: CloudWatch Logs Insights was
+# dropping rows for `like` filters on `@message`. Chasing which filter shape works today is how L31
+# ended up half-fixed, so this no longer uses the query engine at all. `filter_log_events` is a
+# plain paginated scan of the window - no filter language, no optimizer - and every predicate is
+# applied HERE, in Python, where it is deterministic and unit-testable.
 #
-# Rather than find the shape of Insights query that happens to work today, the filter now asks the
-# server only for the cheap invariant every audit line carries (`aegis` + `args_sha256`) and does the
-# correlation-key matching HERE, in Python, where it is deterministic and unit-testable. Verified
-# live against the failing case: 10 rows -> 11 rows, write_audit restored, giving 11 aegis calls
-# against 11 CloudTrail invokes - exact parity, zero orphans.
+# Verified live against the case that failed attempt 17: 11 audit lines against 11 CloudTrail
+# invokes over the exact proof window - parity, zero orphans.
 def read_lambda_calls(logs, groups, case_id, keys, start, end):
-    q = ('fields @timestamp, @message | filter @message like "aegis" and @message like "args_sha256"'
-         " | sort @timestamp asc")
     needles = [n for n in ([case_id] + list(keys.get("trace_id", [])) +
                            list(keys.get("execution_arn", [])) + list(keys.get("session_id", []))) if n]
     out = []
-    for row in _insights(logs, groups, q, start, end, 2000):
-        blob = row.get("@message", "")
-        if needles and not any(n in blob for n in needles):
-            continue
-        m = _parse(row)
-        if m and m.get("aegis") == "call":
-            out.append(m)
-    return out
-
+    for g in [g for g in groups if g]:
+        token = None
+        while True:
+            kw = {"logGroupName": g, "startTime": int(start), "endTime": int(end), "limit": 1000}
+            if token:
+                kw["nextToken"] = token
+            try:
+                r = logs.filter_log_events(**kw)
+            except logs.exceptions.ResourceNotFoundException:
+                break
+            except Exception:
+                break
+            for ev in r.get("events", []):
+                msg = ev.get("message", "")
+                if '"aegis"' not in msg or "args_sha256" not in msg:
+                    continue
+                if needles and not any(n in msg for n in needles):
+                    continue
+                m = _parse({"@message": msg})
+                if m and m.get("aegis") == "call":
+                    out.append(m)
+            token = r.get("nextToken")
+            if not token:
+                break
+    return sorted(out, key=lambda m: m.get("ts") or 0)
 
 def read_model_rows(logs, group, case_id, session_ids, start, end):
     cond = '@message like "%s"' % case_id
