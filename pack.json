@@ -1,0 +1,33 @@
+{
+  "//": "Pack descriptor (PAR-4). Everything the shared governance harness needs to know about THIS pack.",
+  "//why": "The portfolio gate and the lineage proof were benefits-only scripts with pack facts baked into them, so a second pack could not be gated without forking the harness - and forking the harness is exactly how four copies of the log readers drifted apart. Every pack-specific fact the gate needs now lives here, and the harness itself carries none.",
+
+  "pack": "benefits",
+  "agent_dir": "agents/benefits-eligibility",
+  "prefix_prefix": "ben",
+  "tenants": ["sp-a", "sp-b"],
+
+  "stacks": ["data", "{tenant}-data", "identity", "lineage", "compute", "workflow", "gateway", "observability"],
+
+  "runtime": {
+    "name": "benefits_runtime_agent",
+    "//": "matched as a substring against ECR repositories when reporting toolkit residue"
+  },
+
+  "lineage": {
+    "tool_names": [
+      "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
+      "ingest_application", "intake_application", "workflow_guards",
+      "request_signoff", "signoff_register", "approve_signoff", "finalize_signoff", "write_audit"
+    ],
+    "tool_aliases": {
+      "coretools": "benefits_core",
+      "//": "a Lambda stem with no lexical overlap with the aegis tool it hosts - the multi-tool core-tools function hosts the benefits_core drafter"
+    }
+  },
+
+  "workflow": {
+    "signoff_state": "HumanSignoff",
+    "//": "the state a driven case must reach for LIN_case_driven to pass"
+  }
+}

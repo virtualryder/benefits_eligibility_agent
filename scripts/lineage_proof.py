@@ -322,6 +322,8 @@ def main():
     ap.add_argument("--gateway-log-group", default="")
     ap.add_argument("--lambda-log-prefix", default="")
     ap.add_argument("--capture-worm-bucket", default="", help="write the coverage evidence under Object-Lock")
+    ap.add_argument("--tool-aliases", default="",
+                    help="JSON object mapping a Lambda name stem to the aegis tool it hosts (pack.json)")
     ap.add_argument("--window-min", type=int, default=60)
     # L21: CloudTrail -> CloudWatch Logs delivery lags the recorded API call, and lags most on a
     # freshly created trail. Wait for the capture to arrive rather than reading an empty group.
@@ -409,12 +411,18 @@ def main():
         ct = read_cloudtrail_capture(logs, args.capture_log_group, args.prefix, start, end)
         return a, m, g, ct
 
+    # PAR-4: the governed tool identity is a PACK fact and arrives from pack.json via the gate.
+    # It used to be a benefits list hard-coded here, which is one of the reasons this proof could
+    # not be pointed at a second pack. The fallback stays only so a hand-run keeps working, and it
+    # is a fallback, not a default - the gate always passes the real list.
     tool_names = [t for t in args.tool_names.split(",") if t] or [
         "mask_pii", "assess_eligibility", "redetermine", "detect_overpayment", "benefits_core",
         "ingest_application", "intake_application", "workflow_guards",
         "request_signoff", "signoff_register", "approve_signoff", "finalize_signoff", "write_audit"]
-    # the multi-tool core-tools Lambda hosts the benefits_core drafter (no lexical overlap in the name)
-    aliases = {"coretools": "benefits_core"}
+    # An alias maps a Lambda stem to the aegis tool it hosts where the two share no lexical overlap
+    # (a multi-tool "core-tools" function hosting a named drafter). L21d: this table was once keyed
+    # on a deployment prefix that never matched, so the alias silently never fired.
+    aliases = json.loads(args.tool_aliases) if args.tool_aliases else {"coretools": "benefits_core"}
 
     def _unsettled(aegis_rows, ct):
         """Tools whose two records do not yet agree - in EITHER direction.

@@ -36,10 +36,43 @@ import boto3
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 CDK = os.path.join(REPO, "cdk")
-AGENT = os.path.join(REPO, "agents", "benefits-eligibility")
+# ---- PAR-4: the pack is DATA, the harness is code ----------------------------------------------
+# This gate used to hard-code the agent directory, the tenants, the deployment prefix, the stack
+# list and the runtime name, which meant a second pack could not be gated without copying the file.
+# Copying is how four separate versions of the log readers drifted three fixes apart and produced
+# five false gate failures, so the pack facts now live in pack.json beside the pack and this file
+# carries none of them.
+def load_pack(repo):
+    """Read pack.json. Absent fields fall back to the benefits shape so an old tree still runs."""
+    path = os.path.join(repo, "pack.json")
+    try:
+        with io.open(path, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except FileNotFoundError:
+        raise SystemExit("missing pack.json in %s - the gate is pack-driven (PAR-4); see the "
+                         "benefits pack for the shape" % repo)
+    d.setdefault("stacks", ["data", "{tenant}-data", "identity", "lineage", "compute", "workflow",
+                            "gateway", "observability"])
+    d.setdefault("lineage", {})
+    d["lineage"].setdefault("tool_names", [])
+    d["lineage"].setdefault("tool_aliases", {})
+    d.setdefault("workflow", {})
+    d["workflow"].setdefault("signoff_state", "HumanSignoff")
+    d.setdefault("runtime", {})
+    # `tenants` is deliberately NOT defaulted: packs use different tenant ids (benefits sp-a/sp-b,
+    # pharmacovigilance pha-a/pha-b), and a silent default would quietly gate the wrong tenants and
+    # still report PASS. Anything that differs per pack must be declared, not inherited.
+    for required in ("pack", "agent_dir", "prefix_prefix", "tenants"):
+        if not d.get(required):
+            raise SystemExit("pack.json is missing required field %r" % required)
+    return d
+
+
+PACK = load_pack(REPO)
+AGENT = os.path.join(REPO, *PACK["agent_dir"].split("/"))
 RUNTIME_DIR = os.path.join(REPO, "lib", "runtime")
 GIT_BASH = r"C:\Program Files\Git\bin\bash.exe"
-TENANTS = ("sp-a", "sp-b")
+TENANTS = tuple(PACK["tenants"])
 
 
 def ctx(env):
@@ -208,7 +241,7 @@ def main():
     a = ap.parse_args()
     if a.teardown_only:
         a.skip_deploy = a.skip_runtime = a.teardown_on_fail = True
-    env, region, prefix = a.env, a.region, "ben-%s" % a.env
+    env, region, prefix = a.env, a.region, "%s-%s" % (PACK["prefix_prefix"], a.env)
     date = datetime.date.today().isoformat()
     s = boto3.Session(region_name=region)
     acct = s.client("sts").get_caller_identity()["Account"]
@@ -245,9 +278,12 @@ def main():
             steps["cdk_assembly_dir"] = _ASM                       # L27
             steps["cdk_stale_assemblies_swept"] = _sweep_stale_assemblies()
 
-            EXPECTED = [prefix + "-" + s for s in
-                        (["data"] + ["%s-data" % t for t in TENANTS] +
-                         ["identity", "lineage", "compute", "workflow", "gateway", "observability"])]
+            EXPECTED = []
+            for s in PACK["stacks"]:
+                if "{tenant}" in s:
+                    EXPECTED += [prefix + "-" + s.replace("{tenant}", t) for t in TENANTS]
+                else:
+                    EXPECTED.append(prefix + "-" + s)
 
             def _stacks_all_complete():
                 done, missing = {}, []
@@ -410,12 +446,19 @@ def main():
             case = json.load(open(os.path.join(REPO, ".build", "lineage-case.json"), encoding="utf-8"))
         except Exception:
             pass
-        check("LIN_case_driven", steps["drive_case"]["rc"] == 0 and bool(case.get("case_id")) and "HumanSignoff" in case.get("states", []),
+        check("LIN_case_driven", steps["drive_case"]["rc"] == 0 and bool(case.get("case_id")) and PACK["workflow"]["signoff_state"] in case.get("states", []),
               "case=%s states=%s" % (case.get("case_id"), case.get("states")))
         if case.get("case_id"):
             tenant_data = stack_outputs(cf, "%s-%s-data" % (prefix, TENANTS[0]))
+            _lin_args = []
+            if PACK["lineage"]["tool_names"]:
+                _lin_args += ["--tool-names", ",".join(PACK["lineage"]["tool_names"])]
+            if PACK["lineage"]["tool_aliases"]:
+                _lin_args += ["--tool-aliases", json.dumps(
+                    {k: v for k, v in PACK["lineage"]["tool_aliases"].items() if not k.startswith("//")})]
             steps["lineage"] = sh([sys.executable, os.path.join(HERE, "lineage_proof.py"), "--case-id", case["case_id"],
                                    "--tenant", TENANTS[0], "--prefix", prefix, "--region", region,
+                                   *_lin_args,
                                    "--capture-log-group", lin.get("CaptureLogGroupName", "/aws/cloudtrail/%s-capture-all" % prefix),
                                    "--ledger-table", tenant_data.get("AuditTableName", data.get("AuditTableName", "")),
                                    "--model-log-group", obs.get("ModelInvocationLogGroup", ""),
@@ -573,7 +616,7 @@ def main():
             clean = steps["cleanup"]["rc"] == 0
         # the runtime's own ECR repo / CodeBuild project are toolkit residue outside the prefix - report them
         try:
-            ecr = s.client("ecr"); repos = [r["repositoryName"] for r in ecr.describe_repositories().get("repositories", []) if "benefits_runtime_agent" in r["repositoryName"]]
+            ecr = s.client("ecr"); repos = [r["repositoryName"] for r in ecr.describe_repositories().get("repositories", []) if PACK.get("runtime", {}).get("name", "") in r["repositoryName"]]
             steps["toolkit_residue"] = {"ecr_repos": repos}
         except Exception:
             pass
