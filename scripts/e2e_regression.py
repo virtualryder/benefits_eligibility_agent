@@ -19,6 +19,12 @@ EXPECTED = [
     (r"TenantError", "fail-closed: TenantError raised by a Lambda without a verified tenant binding"),
     (r"JSONPath '\$\.__aegis_tenant' specified for the field", "fail-closed: execution started WITHOUT the signed pair fails at Extract"),
     (r"ingestion identity not verified", "ingest refused without a verified caseworker token"),
+    # L22f (attempt 10): the runtime writes its own PROSE summary of a governed run, and a refused
+    # sign-off appears there as "Sign-off Request - FAILED: Requester identity not verified (P0-5
+    # control: no access token presented)". The word FAILED made the P0-5 identity control read as
+    # an incident. Same family as the ingest-identity entry above: a named control refusing.
+    (r"[Rr]equester identity not verified|identity not verified \(P0-5",
+     "P0-5: sign-off refused because the requester presented no verified access token"),
     (r"de-identification not proven", "assess/draft refused without a signed sanitized_ref"),
     (r"stopped by the harness|mt proof complete", "harness stopped the execution at the sign-off pause"),
     (r"start_execution failed|governed-signoff|StateMachineDoesNotExist", "request_signoff targets the shell-engine sign-off machine (not provisioned by CDK) - a documented control block"),
@@ -71,7 +77,7 @@ _CORRELATION_WINDOW_MS = 15000
 _RUNTIME_OPAQUE = re.compile(r"tool execution failed|strands\.tools\.mcp\.mcp_client"
                              r"|Connection to the MCP server was closed"
                              r"|ConditionalCheckFailedException")
-_REFUSAL_WHY = ("kill-switch", "budget", "Cedar DENY", "governed refusal", "refused")
+_REFUSAL_WHY = ("kill-switch", "budget", "Cedar DENY", "governed refusal", "refused", "P0-5")
 # A SESSION teardown trails the refusal that caused it on a different timescale than the gateway's
 # per-request wrapper: the runtime finishes the turn, records the outcome (L19) and only then tears
 # the MCP client down, which logs "Connection to the MCP server was closed". Measured live at 114s
@@ -88,8 +94,11 @@ def correlate_runtime_echoes(by_group, prefix, runtime_log_group):
     """Reclassify runtime-side echoes of a refusal that another log already explains. Mutates rows."""
     if not runtime_log_group or runtime_log_group not in by_group:
         return
-    explained = [r for g, rows in by_group.items() if g != runtime_log_group
-                 for r in rows
+    # The explaining refusal can live in the runtime's OWN log group too: the runtime narrates the
+    # refusal in prose on one line and the OTel exporter echoes it as a log record and a span within
+    # the same millisecond. Those echoes are still evidence-gated - they need a row already
+    # CLASSIFIED as a governed refusal - and a row never explains itself.
+    explained = [r for g, rows in by_group.items() for r in rows
                  if r["kind"] == "expected" and any(k in (r.get("why") or "") for k in _REFUSAL_WHY)]
     if not explained:
         return
@@ -99,8 +108,8 @@ def correlate_runtime_echoes(by_group, prefix, runtime_log_group):
         ex = r.get("excerpt") or ""
         if not (r.get("_echo") or _RUNTIME_OPAQUE.search(ex) or "Traceback" in ex):
             continue
-        near = [e for e in explained
-                if abs(int(e.get("ts") or 0) - int(r.get("ts") or 0)) <= _RUNTIME_ECHO_WINDOW_MS]
+        near = [e for e in explained if e is not r
+                and abs(int(e.get("ts") or 0) - int(r.get("ts") or 0)) <= _RUNTIME_ECHO_WINDOW_MS]
         if near:
             r["kind"] = "expected"
             r["why"] = ("runtime echo of a classified refusal (%s)" % near[0]["why"])[:200]

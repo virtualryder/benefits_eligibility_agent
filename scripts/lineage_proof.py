@@ -275,6 +275,21 @@ def main():
     end = args.end_ms or int(time.time() * 1000)
     start = args.start_ms or (end - args.window_min * 60 * 1000)
 
+    # ---- L21e SYMMETRIC WINDOW (live-found, attempt 10; caused by the L21c fix itself) ------------
+    # A PARITY assertion has to compare like with like. L21c widened only the CLOUDTRAIL window to
+    # CloudTrail's one-second resolution, and left the aegis/model/gateway reads on the exact
+    # millisecond window. The two sides then covered different intervals: the case-opening
+    # ingest_application invoke at :41.000 was now inside the CloudTrail window while its aegis.call
+    # audit line stayed outside the audit window, so an "audited_not_invoked" orphan simply flipped
+    # into an "invoked_not_audited" one - the scarier direction, a governed tool appearing to run
+    # unaudited, produced by nothing but a window mismatch.
+    #
+    # The window is widened ONCE, here, to the coarsest resolution any source records at (one
+    # second), and every source is read over that same interval. Both sides move together or the
+    # comparison means nothing.
+    start = (start // 1000) * 1000
+    end = -(-end // 1000) * 1000
+
     logs = boto3.client("logs", region_name=args.region)
     ddb = boto3.client("dynamodb", region_name=args.region)
     sfn = boto3.client("stepfunctions", region_name=args.region)

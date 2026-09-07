@@ -164,3 +164,37 @@ def test_alias_does_not_fire_for_an_unrelated_function():
     got = lp.tool_of("arn:aws:lambda:us-east-1:111122223333:function:ben-fp-budget-breach",
                      ["benefits_core", "mask_pii"], aliases={"coretools": "benefits_core"})
     assert got is None, got
+
+
+# -- L21e: the parity window must be SYMMETRIC (attempt 10) -----------------------------------------
+# The L21c fix widened only the CloudTrail side to CloudTrail's one-second resolution and left the
+# audit-line side on the exact millisecond window. The two sides then covered different intervals,
+# and the case-opening invoke flipped from "audited_not_invoked" to "invoked_not_audited" - a
+# governed tool appearing to run UNAUDITED, manufactured purely by a window mismatch. A parity
+# assertion compares like with like or it means nothing.
+
+def test_parity_is_symmetric_not_one_sided():
+    """Same tool, one invoke and one audit line: parity holds and neither orphan type appears."""
+    arn = "arn:aws:lambda:us-east-1:111122223333:function:ben-x-ingest-application"
+    sources = {
+        "cloudtrail": [{"ts": 1000, "event_source": "lambda.amazonaws.com",
+                        "event_name": "InvokeExecution", "target": arn, "principal": "p"}],
+        "aegis": [{"tool": "ingest_application", "ts": 1000, "case_id": "C1"}],
+        "worm": [], "model_log": [], "sfn": [], "gateway": [],
+    }
+    v = lp.assess_coverage(sources, ["ingest_application"])
+    assert v["orphans"] == [], v["orphans"]
+    assert v["covered"] is True
+
+
+def test_an_invoke_with_no_audit_line_is_still_caught():
+    """The fix must not blunt the control: a genuinely unaudited invoke still fails."""
+    arn = "arn:aws:lambda:us-east-1:111122223333:function:ben-x-ingest-application"
+    sources = {
+        "cloudtrail": [{"ts": 1000, "event_source": "lambda.amazonaws.com",
+                        "event_name": "InvokeExecution", "target": arn, "principal": "p"}],
+        "aegis": [], "worm": [], "model_log": [], "sfn": [], "gateway": [],
+    }
+    v = lp.assess_coverage(sources, ["ingest_application"])
+    assert any(o["type"] == "invoked_not_audited" for o in v["orphans"]), v["orphans"]
+    assert v["covered"] is False
