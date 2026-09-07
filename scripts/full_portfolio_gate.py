@@ -319,12 +319,17 @@ def main():
             steps["cdk_assembly_dir"] = _ASM                       # L27
             steps["cdk_stale_assemblies_swept"] = _sweep_stale_assemblies()
 
+            # L38: this loop variable was `s`, which is the boto3 Session bound at the top of
+            # main(). Expanding the pack's stack list therefore rebound the session to the string
+            # "observability", and the next s.client(...) - the runtime-ready poll, ~12 minutes and
+            # a full nine-stack deploy later - died with "'str' object has no attribute 'client'".
+            # Never reuse a single-letter name that already holds a client in this scope.
             EXPECTED = []
-            for s in PACK["stacks"]:
-                if "{tenant}" in s:
-                    EXPECTED += [prefix + "-" + s.replace("{tenant}", t) for t in TENANTS]
+            for stack_tmpl in PACK["stacks"]:
+                if "{tenant}" in stack_tmpl:
+                    EXPECTED += [prefix + "-" + stack_tmpl.replace("{tenant}", t) for t in TENANTS]
                 else:
-                    EXPECTED.append(prefix + "-" + s)
+                    EXPECTED.append(prefix + "-" + stack_tmpl)
 
             def _stacks_all_complete():
                 done, missing = {}, []
