@@ -23,6 +23,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -53,8 +54,46 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
             "secs": round(time.time() - t0, 1), "out": (r.stdout or "")[-8000:], "err": (r.stderr or "")[-4000:]}
 
 
+# ---- L27: never share the cloud-assembly directory between concurrent CDK CLIs ------------------
+# Attempt 13 died 2.7s into `cdk deploy` with:
+#     Other CLIs (PID=14484) are currently reading from cdk.out. Invoke the CLI in sequence, or
+#     use '--output' to synth into different directories.
+# The preceding --teardown-only run had already returned rc=0 and written its sentinel while a
+# grandchild cdk process was still exiting and still holding the DEFAULT cdk.out. The deploy hit
+# that lock, exited 1 in under three seconds, and the gate correctly recorded "deploy failed" - a
+# verdict about the local toolchain, not about the platform. Fourteen checks never ran.
+#
+# Waiting for the lock would be a guess about how long another process takes to die. Giving every
+# gate PROCESS its own assembly directory removes the contention by construction: two gate runs can
+# now overlap without either one seeing the other. Stale directories from killed runs are swept on
+# startup and this run's own directory is removed on exit.
+_ASM = os.path.join(CDK, "cdk.out-%d" % os.getpid())
+
+
+def _sweep_stale_assemblies(max_age_sec=6 * 3600):
+    """Remove cdk.out-<pid> directories left behind by runs that were killed."""
+    swept = []
+    try:
+        for name in os.listdir(CDK):
+            if not name.startswith("cdk.out-"):
+                continue
+            p = os.path.join(CDK, name)
+            if p == _ASM or not os.path.isdir(p):
+                continue
+            try:
+                if time.time() - os.path.getmtime(p) < max_age_sec:
+                    continue          # a concurrent run may legitimately own it
+                shutil.rmtree(p, ignore_errors=True)
+                swept.append(name)
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return swept
+
+
 def cdk_cmd(*args):
-    return ["npx", "--yes", "aws-cdk@2", *args]
+    return ["npx", "--yes", "aws-cdk@2", "--output", _ASM, *args]
 
 
 def bash(script, *args, env=None, timeout=1800):
@@ -133,6 +172,9 @@ def main():
             # succeed and the run continues, with the hang RECORDED rather than hidden. If the
             # stacks are not complete it is a real failure and still fails. This makes the evidence
             # stronger, not weaker - a CLI exit code was never the thing being claimed.
+            steps["cdk_assembly_dir"] = _ASM                       # L27
+            steps["cdk_stale_assemblies_swept"] = _sweep_stale_assemblies()
+
             EXPECTED = [prefix + "-" + s for s in
                         (["data"] + ["%s-data" % t for t in TENANTS] +
                          ["identity", "lineage", "compute", "workflow", "gateway", "observability"])]
@@ -460,6 +502,7 @@ def main():
         json.dump({"env": env, "prefix": prefix, "region": region, "date": date, "PASS": ok, "fatal": fatal,
                    "checks": checks, "steps": steps, "evidence": out}, fh, indent=1, default=str)
     print(json.dumps({"PASS": ok, "checks": checks, "fatal": fatal, "evidence": out}, indent=1, default=str))
+    shutil.rmtree(_ASM, ignore_errors=True)   # L27
     sys.exit(0 if ok else 1)
 
 
