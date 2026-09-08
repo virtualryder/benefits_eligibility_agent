@@ -22,7 +22,12 @@ import io
 import json
 import sys
 
-IGNORED_TOP_LEVEL = {"generated_at"}
+# generated_at is a clock. `version` is the TOOL's own version string, which legitimately changes
+# when the pinned scanner is upgraded - that is a maintenance event, not a secret, and failing on it
+# would be the same cry-wolf defect in a new place. What must NOT change silently is the detection
+# coverage: plugins_used and filters_used are still compared and still fail hard, because quietly
+# dropping a detector would hide every secret it would have found.
+IGNORED_TOP_LEVEL = {"generated_at", "version"}
 
 
 def _findings(doc):
@@ -45,11 +50,16 @@ def main(argv):
     new = _findings(rescanned) - _findings(committed)
     gone = _findings(committed) - _findings(rescanned)
 
+    if committed.get("version") != rescanned.get("version"):
+        print("note: detect-secrets version changed %s -> %s; detection coverage is compared below."
+              % (committed.get("version"), rescanned.get("version")))
+
     for key in sorted(set(committed) | set(rescanned)):
         if key in IGNORED_TOP_LEVEL or key == "results":
             continue
         if committed.get(key) != rescanned.get(key):
-            print("::error::secrets baseline config changed (%s) - re-baseline deliberately" % key)
+            print("::error::secrets baseline DETECTION COVERAGE changed (%s) - a dropped plugin or "
+                  "filter hides every secret it would have found. Re-baseline deliberately." % key)
             return 1
 
     if new:

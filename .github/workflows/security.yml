@@ -117,6 +117,21 @@ jobs:
 
       # The runtime image is what AgentCore actually runs. pip-audit sees requirements.txt; only an
       # image scan sees the base image's OS packages, which is where most CRITICALs live.
+      # A digest pin freezes the OS packages too, so it accrues every advisory published after it
+      # was resolved. Nothing was measuring that, and trivy found 30 fixable HIGH/CRITICAL in a base
+      # pinned two months earlier. This prints the digest the tag resolves to NOW, so a base bump is
+      # a copy-paste from a trusted runner rather than a guess - and it appears in the log of every
+      # run, which is where someone will actually see it.
+      - name: Report the current upstream digest for the pinned base
+        run: |
+          echo "pinned in lib/runtime/Dockerfile:"
+          grep -oE 'sha256:[0-9a-f]{64}' lib/runtime/Dockerfile
+          echo "python:3.12-slim resolves TODAY to:"
+          docker manifest inspect public.ecr.aws/docker/library/python:3.12-slim \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('digest') or '(index - see manifests below)')" || true
+          docker buildx imagetools inspect public.ecr.aws/docker/library/python:3.12-slim \
+            | head -3 || true
+
       - name: Build the runtime image
         run: docker build -t aegis-runtime:ci lib/runtime
 

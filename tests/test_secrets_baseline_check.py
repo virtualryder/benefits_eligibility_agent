@@ -88,3 +88,24 @@ def test_windows_and_posix_paths_compare_equal(tmp_path):
     a = _write(tmp_path, "c.json", _baseline(win))
     b = _write(tmp_path, "r.json", _baseline(nix))
     assert mod.main(["x", a, b]) == 0
+
+
+def test_a_tool_version_bump_alone_does_not_fail(tmp_path, capsys):
+    """CI pins detect-secrets 1.5.0 and wrote a different version string than the machine that
+    produced the baseline. That is a maintenance event, not a secret - failing on it would be the
+    same cry-wolf defect in a new place. Coverage is what must not drift."""
+    a = _write(tmp_path, "c.json", _baseline(FIND))
+    bumped = _baseline(FIND)
+    bumped["version"] = "1.5.50"
+    b = _write(tmp_path, "r.json", bumped)
+    assert mod.main(["x", a, b]) == 0
+    assert "version changed" in capsys.readouterr().out
+
+
+def test_a_dropped_filter_still_fails(tmp_path):
+    """Coverage, unlike the version string, is blocking."""
+    a = _write(tmp_path, "c.json", _baseline(FIND))
+    weakened = _baseline(FIND)
+    weakened["filters_used"] = [{"path": "detect_secrets.filters.heuristic.is_potential_uuid"}]
+    b = _write(tmp_path, "r.json", weakened)
+    assert mod.main(["x", a, b]) == 1
