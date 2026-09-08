@@ -1,23 +1,30 @@
-"""The AgentCore gateway custom resource must survive its own policy-delete propagation lag.
+"""The gateway custom resource must create each Cedar policy exactly once, under its real name.
 
-Live-found 2026-09-08, full-portfolio re-gate of main. ben-fp2-gateway rolled back with
-ConflictException("Policy with the same name already exists"), raised by create_policy inside
-_create_policy_active's retry loop. The sequence:
+Three live failures on 2026-09-08, all on ben-fp2-gateway/AgentCoreAttachment, all while trying to
+earn a tag for main. They are one story:
 
-  1. create_policy(name="ben_authz_...")            -> policyId p1
-  2. p1 reaches CREATE_FAILED, reasons "unrecognized action ..."   (the documented transient:
-     the Cedar engine validates tool ACTIONS against the gateway targets' schemas, and right
-     after the targets report READY the validator can still see an empty tool set)
-  3. delete_policy(p1)                              -> returns immediately
-  4. sleep 20s, retry: create_policy(same name)     -> ConflictException
+  1. The Cedar policy create has a documented transient: right after the gateway targets report
+     READY, the policy validator can still see an empty tool set and rejects a policy that names a
+     tool action with "unrecognized action". The handler rode this out by deleting the failed
+     policy and re-creating it under the SAME name after 20s. delete_policy returns before the name
+     is released, so the re-create was refused with ConflictException. That is not a validation
+     failure, nothing caught it, and it escaped and rolled the stack back.
 
-delete_policy returns before the NAME is released. ConflictException is not a validation
-failure, so nothing in the loop caught it and it escaped to fail the custom resource. The one
-transient the retry exists to survive was the one case it could not survive.
+  2. Fix attempt: delete the holder, then wait on list_policies until the name stops appearing.
+     Rolled back again, same message, from the second create. list_policies is NOT authoritative -
+     the policy had already vanished from the list view and create_policy refused the name anyway.
 
-These tests model the lag explicitly (a deleted name stays visible for N list_policies calls)
-because that lag is the whole defect. A fake that frees the name instantly cannot fail, and a
-test that cannot fail is the thing this repository keeps finding in itself.
+  3. Fix attempt: retry create_policy itself with bounded backoff, since only it knows. Rolled back
+     again: "policy name 'mask_before_assess' is still refused as a duplicate after 170s". AgentCore
+     reserves a deleted policy's name for far longer than a deploy can wait.
+
+The conclusion the third failure forced: a name that might need to be used twice cannot be a name we
+care about. So the race is now waited out BEFORE any real policy is created, using disposable probe
+policies with unique names, and each real policy is created exactly ONCE under the name it must have.
+
+FakeCC therefore reserves deleted names PERMANENTLY. That is the behaviour that was actually
+observed, and it is what makes these tests able to fail: every delete-and-retry design, including
+both of my own, is refused by this double.
 """
 import importlib.util
 import pathlib
@@ -26,6 +33,7 @@ import sys
 import pytest
 
 HANDLER = pathlib.Path(__file__).resolve().parents[1] / "cdk" / "gateway_provider" / "handler.py"
+GW_ARN = "arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-eligibility-gw"
 
 
 def _load():
@@ -39,8 +47,6 @@ def _load():
 @pytest.fixture()
 def handler(monkeypatch):
     mod = _load()
-    # The retry sleeps 20s and 40s between attempts; the name-free wait sleeps 3s per poll.
-    # Real time is not what is under test.
     monkeypatch.setattr(mod.time, "sleep", lambda *_a, **_k: None)
     return mod
 
@@ -54,275 +60,170 @@ class Conflict(Exception):
         self.response = {"Error": {"Code": "ConflictException"}}
 
 
-class Throttled(Exception):
-    def __init__(self):
-        super().__init__("throttled")
-        self.response = {"Error": {"Code": "ThrottlingException"}}
-
-
 class FakeCC:
-    """Minimal AgentCore control-plane double with a DELETE PROPAGATION LAG.
+    """AgentCore control-plane double whose deleted policy NAMES are never released.
 
-    A deleted policy's name stays visible to list_policies -- and still collides in
-    create_policy -- for `linger` further list_policies calls. That is the production
-    behaviour the live rollback demonstrated.
+    `unrecognized_until` is how many create_policy calls happen before the tool set becomes
+    visible; until then any policy naming an action lands in CREATE_FAILED with the transient
+    reason. Policies naming no action are never affected, which is what was observed live: four
+    action-free policies went ACTIVE and the fifth, the first to name an action, did not.
     """
 
-    def __init__(self, statuses=("ACTIVE",), linger=2, create_error=None, ghosts_visible=True):
-        self.statuses = list(statuses)
-        self.linger = linger
-        self.create_error = create_error
-        # ghosts_visible=False is the SECOND live failure of 2026-09-08: the deleted policy has
-        # already vanished from list_policies while create_policy still refuses the name. Any
-        # implementation that asks list_policies whether the name is free is wrong here.
-        self.ghosts_visible = ghosts_visible
-        self.live = {}          # policyId -> name
-        self.ghosts = {}        # name -> remaining list_policies calls
+    def __init__(self, unrecognized_until=0):
+        self.unrecognized_until = unrecognized_until
+        self.live = {}            # policyId -> name
+        self.retired = set()      # names that can never be used again
         self.pid_status = {}
+        self.pid_reasons = {}
         self.creates = 0
-        self.create_calls = 0
-        self.conflicts_raised = 0
-
-    def _names_taken(self):
-        return set(self.live.values()) | set(self.ghosts)
+        self.created_names = []
 
     def create_policy(self, policyEngineId, name, definition, validationMode):
-        self.create_calls += 1
-        if self.create_error is not None:
-            raise self.create_error
-        if name in self._names_taken():
-            self.conflicts_raised += 1
-            self._age_ghosts()   # time passes on this call too, not only on list_policies
+        if name in self.retired or name in self.live.values():
             raise Conflict()
         self.creates += 1
+        self.created_names.append(name)
         pid = "p%d" % self.creates
         self.live[pid] = name
-        self.pid_status[pid] = self.statuses.pop(0) if self.statuses else "ACTIVE"
+        names_action = "AgentCore::Action::" in str(definition)
+        if names_action and self.creates <= self.unrecognized_until:
+            self.pid_status[pid] = "CREATE_FAILED"
+            self.pid_reasons[pid] = ['unrecognized action Action::"assess-eligibility___assess_eligibility"']
+        else:
+            self.pid_status[pid] = "ACTIVE"
+            self.pid_reasons[pid] = []
         return {"policyId": pid}
 
     def get_policy(self, policyEngineId, policyId):
-        st = self.pid_status.get(policyId, "ACTIVE")
-        reasons = ["unrecognized action"] if st == "CREATE_FAILED" else []
-        return {"status": st, "statusReasons": reasons}
+        return {"status": self.pid_status.get(policyId, "ACTIVE"),
+                "statusReasons": self.pid_reasons.get(policyId, [])}
 
     def delete_policy(self, policyEngineId, policyId):
         name = self.live.pop(policyId, None)
-        if name is not None and self.linger > 0:
-            self.ghosts[name] = self.linger
-
-    def _age_ghosts(self):
-        for nm, left in list(self.ghosts.items()):
-            if left - 1 <= 0:
-                del self.ghosts[nm]
-            else:
-                self.ghosts[nm] = left - 1
+        if name is not None:
+            self.retired.add(name)      # the name is gone for good
 
     def list_policies(self, policyEngineId):
-        out = [{"policyId": pid, "name": nm} for pid, nm in self.live.items()]
-        if self.ghosts_visible:
-            out += [{"policyId": "ghost-%s" % nm, "name": nm} for nm in self.ghosts]
-        self._age_ghosts()
-        return {"policies": out}
+        return {"policies": [{"policyId": pid, "name": nm} for pid, nm in self.live.items()]}
 
 
-# --- the lag is real -------------------------------------------------------------------
+MASK = ('forbid(principal, action == AgentCore::Action::"assess-eligibility___assess_eligibility", '
+        'resource == AgentCore::Gateway::"%s") unless { context.input.deidentified == true };' % GW_ARN)
+PERMIT = "permit(principal, action, resource is AgentCore::Gateway) when { true };"
 
-def test_fake_reproduces_the_conflict_without_the_fix(handler):
-    """Guard on the guard: a raw create-delete-create MUST collide in this double.
 
-    If this passes trivially the other tests prove nothing.
+# --- the double reproduces what AgentCore actually did ---------------------------------
+
+def test_a_deleted_policy_name_is_never_reusable(handler):
+    """Guard on the guard. This is the measured behaviour that broke three deploys.
+
+    If this ever stops holding, every test below is proving nothing.
     """
-    cc = FakeCC(linger=3)
-    pid = cc.create_policy("e", "pol", {}, "FAIL_ON_ANY_FINDINGS")["policyId"]
-    cc.delete_policy("e", pid)
-    with pytest.raises(Conflict):
-        cc.create_policy("e", "pol", {}, "FAIL_ON_ANY_FINDINGS")
-
-
-# --- _wait_policy_name_free ------------------------------------------------------------
-
-def test_wait_returns_true_once_the_name_is_released(handler):
-    cc = FakeCC(linger=3)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
-    cc.delete_policy("e", pid)
-    assert handler._wait_policy_name_free(cc, "e", "pol") is True
-    assert "pol" not in cc._names_taken()
-
-
-def test_wait_returns_false_rather_than_hanging_when_the_name_never_frees(handler):
-    cc = FakeCC(linger=10 ** 9)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
-    cc.delete_policy("e", pid)
-    assert handler._wait_policy_name_free(cc, "e", "pol", timeout=0) is False
-
-
-def test_wait_is_not_confused_by_a_different_policy_name(handler):
-    cc = FakeCC(linger=5)
-    cc.create_policy("e", "other", {}, "M")
-    assert handler._wait_policy_name_free(cc, "e", "pol") is True
-
-
-# --- _create_policy_claiming_name ------------------------------------------------------
-
-def test_claiming_name_succeeds_when_nothing_holds_it(handler):
     cc = FakeCC()
-    assert handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M") == "p1"
-
-
-def test_claiming_name_clears_a_lingering_holder_and_succeeds(handler):
-    cc = FakeCC(linger=3)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
+    pid = cc.create_policy("e", "pol", MASK, "M")["policyId"]
     cc.delete_policy("e", pid)
-    got = handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
-    assert got == "p2"
-    assert cc.conflicts_raised >= 1, "the conflict must actually have been hit and recovered"
-    assert cc.creates == 2, "exactly one successful re-create, not a storm of them"
+    assert cc.list_policies("e")["policies"] == [], "list_policies shows it gone..."
+    with pytest.raises(Conflict):
+        cc.create_policy("e", "pol", MASK, "M")   # ...and the name is still refused
 
 
-def test_claiming_name_clears_residue_from_a_previous_run(handler):
-    """Not a ghost: a real, live policy of the same name left by an earlier deploy."""
-    cc = FakeCC(linger=0)
-    cc.create_policy("e", "pol", {}, "M")
-    got = handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
-    assert got == "p2"
-    assert list(cc.live.values()) == ["pol"], "exactly one policy of that name must remain"
+# --- _actions_in -----------------------------------------------------------------------
+
+def test_actions_in_finds_the_tool_actions_a_policy_names(handler):
+    assert handler._actions_in(MASK) == ["assess-eligibility___assess_eligibility"]
 
 
-def test_claiming_name_gives_up_with_a_bounded_budget_rather_than_spinning(handler):
-    """A name that never frees must RAISE after a bounded budget, not loop forever.
+def test_actions_in_is_empty_for_a_policy_that_names_no_action(handler):
+    """These are the four that went ACTIVE live; they are not validated against the tool set."""
+    assert handler._actions_in(PERMIT) == []
 
-    An unbounded retry inside a CloudFormation custom resource is a hung stack, which is worse
-    than a failed one: it cannot be diagnosed from the stack events and it blocks teardown.
+
+# --- _wait_tool_actions_visible --------------------------------------------------------
+
+def test_probe_returns_true_once_the_tool_set_is_visible(handler):
+    cc = FakeCC(unrecognized_until=3)
+    assert handler._wait_tool_actions_visible(cc, "e", GW_ARN, "a___b") is True
+
+
+def test_every_probe_uses_a_fresh_name(handler):
+    """The property the whole design rests on.
+
+    A probe may have to run many times, and a name used twice is a ConflictException. Reusing one
+    is exactly the mistake that rolled the stack back three times.
     """
-    cc = FakeCC(linger=10 ** 9)
-    cc.create_policy("e", "pol", {}, "M")
-    with pytest.raises(RuntimeError, match="still refused as a duplicate after 170s"):
-        handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
-    assert cc.create_calls == 8, "one live create, one initial attempt, then six bounded retries"
+    cc = FakeCC(unrecognized_until=4)
+    handler._wait_tool_actions_visible(cc, "e", GW_ARN, "a___b")
+    assert len(cc.created_names) == len(set(cc.created_names)), "a probe name was reused"
+    assert len(cc.created_names) >= 5, "the probe must actually have retried"
 
 
-def test_a_non_conflict_error_is_not_swallowed(handler):
-    """Only ConflictException means 'the name is taken'. Everything else must surface."""
-    cc = FakeCC(create_error=Throttled())
-    with pytest.raises(Throttled):
-        handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
+def test_probe_names_cannot_collide_with_a_real_policy(handler):
+    cc = FakeCC(unrecognized_until=2)
+    handler._wait_tool_actions_visible(cc, "e", GW_ARN, "a___b")
+    for n in cc.created_names:
+        assert n.startswith("aegis_toolset_probe_"), "probe names must be unmistakably disposable"
 
 
-# --- the whole retry loop, which is what actually broke ---------------------------------
-
-def test_retry_survives_the_transient_that_it_exists_to_survive(handler):
-    """attempt 1 CREATE_FAILED('unrecognized action') -> delete -> attempt 2 must reach ACTIVE.
-
-    This is the exact live sequence. Before the fix it raised ConflictException out of the loop
-    and rolled back ben-fp2-gateway.
-    """
-    cc = FakeCC(statuses=["CREATE_FAILED", "ACTIVE"], linger=3)
-    pid = handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
-    assert cc.pid_status[pid] == "ACTIVE"
-    assert cc.creates == 2, "it must have genuinely re-created, not returned the failed policy"
+def test_probe_gives_up_within_its_budget(handler):
+    """Never visible -> False, so the caller can refuse instead of burning the real names."""
+    cc = FakeCC(unrecognized_until=10 ** 6)
+    assert handler._wait_tool_actions_visible(cc, "e", GW_ARN, "a___b", timeout=0) is False
 
 
-def test_a_real_validation_failure_still_raises_with_the_engine_reasons(handler):
-    """The fix must not turn a genuine Cedar validation error into an infinite retry."""
-    cc = FakeCC(statuses=["CREATE_FAILED"], linger=1)  # frees after one list call; no spin
+def test_probe_does_not_diagnose_failures_that_are_not_the_race(handler):
+    """A different validation error is the real policy's to report, with its own reasons."""
+    cc = FakeCC()
 
     def get_policy(policyEngineId, policyId):
         return {"status": "CREATE_FAILED", "statusReasons": ["undeclared entity type Foo::Bar"]}
 
     cc.get_policy = get_policy
-    with pytest.raises(RuntimeError, match="did not reach ACTIVE"):
-        handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
-    assert cc.creates == 1, "a non-transient failure must not be retried"
+    assert handler._wait_tool_actions_visible(cc, "e", GW_ARN, "a___b") is True
 
 
-def test_the_failure_path_waits_on_the_name_not_the_id(handler, monkeypatch):
-    """Regression guard for the specific omission that caused the rollback.
+# --- _create_policy_active -------------------------------------------------------------
 
-    The delete inside the retry loop must be followed by a wait keyed on the NAME. Asserting the
-    call happens -- rather than only that the happy path passes -- is the L60 rule: a control is
-    only proven when its absence is observable.
+def test_a_real_policy_is_created_exactly_once(handler):
+    """The core regression guard. Two creates under one name is the bug, in every variant."""
+    cc = FakeCC()
+    handler._create_policy_active(cc, "e", "mask_before_assess", MASK, "IGNORE_ALL_FINDINGS")
+    assert cc.created_names == ["mask_before_assess"]
+
+
+def test_a_failed_policy_raises_with_the_engine_reasons_instead_of_retrying(handler):
+    """Once the probe has established the tool set is visible, a failure here is real.
+
+    Retrying it under the same name is impossible, and papering over it is how the true reason
+    stayed out of the stack events for three runs.
     """
-    seen = []
-    real = handler._wait_policy_name_free
-    monkeypatch.setattr(handler, "_wait_policy_name_free",
-                        lambda cc, eng, name, **kw: (seen.append(name), real(cc, eng, name, **kw))[1])
-    cc = FakeCC(statuses=["CREATE_FAILED", "ACTIVE"], linger=3)
-    handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
-    assert "pol" in seen, "the retry deleted a policy without waiting for its NAME to free"
+    cc = FakeCC(unrecognized_until=1)
+    with pytest.raises(RuntimeError, match="unrecognized action"):
+        handler._create_policy_active(cc, "e", "mask_before_assess", MASK, "IGNORE_ALL_FINDINGS")
+    assert cc.creates == 1, "it must NOT have tried a second time under a name it cannot reuse"
 
 
-# --- the SECOND live failure: invisible to list_policies, still refused by create_policy -----
-
-def test_a_name_invisible_to_list_policies_can_still_be_refused_by_create(handler):
-    """Guard on the guard, for failure #2. The double must reproduce the asymmetry.
-
-    2026-09-08, second re-gate attempt: the deleted policy had already vanished from
-    list_policies and create_policy refused the name anyway. If this test stops holding, every
-    assertion below about the authoritative-retry design is vacuous.
-    """
-    cc = FakeCC(linger=3, ghosts_visible=False)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
-    cc.delete_policy("e", pid)
-    assert handler._policy_ids_by_name(cc, "e", "pol") == [], "the list view must look clean"
-    with pytest.raises(Conflict):
-        cc.create_policy("e", "pol", {}, "M")
+def test_the_raised_error_names_the_policy_and_the_status(handler):
+    cc = FakeCC(unrecognized_until=1)
+    with pytest.raises(RuntimeError) as err:
+        handler._create_policy_active(cc, "e", "mask_before_assess", MASK, "IGNORE_ALL_FINDINGS")
+    assert "mask_before_assess" in str(err.value)
+    assert "CREATE_FAILED" in str(err.value)
 
 
-def test_the_advisory_wait_is_fooled_by_an_invisible_holder(handler):
-    """_wait_policy_name_free reports True here and is WRONG. That is why it is advisory.
+# --- the two together, which is the live sequence ---------------------------------------
 
-    Pinning the limitation keeps someone from promoting this function back into a precondition
-    for success, which is exactly the mistake that produced the second rollback.
-    """
-    cc = FakeCC(linger=10 ** 9, ghosts_visible=False)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
-    cc.delete_policy("e", pid)
-    assert handler._wait_policy_name_free(cc, "e", "pol") is True
-    with pytest.raises(Conflict):
-        cc.create_policy("e", "pol", {}, "M")
+def test_probe_then_create_survives_the_transient_that_broke_three_deploys(handler):
+    """Probe absorbs the race on disposable names; the real policy then creates once and sticks."""
+    cc = FakeCC(unrecognized_until=4)
+    assert handler._wait_tool_actions_visible(cc, "e", GW_ARN, "assess-eligibility___assess_eligibility")
+    handler._create_policy_active(cc, "e", "mask_before_assess", MASK, "IGNORE_ALL_FINDINGS")
+    assert "mask_before_assess" in cc.live.values()
+    assert "mask_before_assess" not in cc.retired, "the real name was never burned"
 
 
-def test_claiming_name_succeeds_against_an_invisible_holder(handler):
-    """The real fix: retry the AUTHORITATIVE call, do not ask the list view for permission.
-
-    linger=6 is measured, not arbitrary. The list-based implementation that shipped and rolled the
-    stack back gets about three chances to age the holder out (its conflicting create, its
-    _policy_ids_by_name lookup, its _wait_policy_name_free poll) before its single re-create, so
-    at linger<=4 it survives and this test would prove nothing. Both implementations were run
-    against this double across linger 4..8: 6 is the value where the list-based one fails and the
-    retrying one still passes on BOTH this path and the full-loop path below. At 8 the holder
-    outlives even the bounded budget on this path, which is the give-up case covered separately.
-    """
-    cc = FakeCC(linger=6, ghosts_visible=False)
-    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
-    cc.delete_policy("e", pid)
-    got = handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
-    assert got == "p2"
-    assert cc.conflicts_raised >= 1, "the conflict must have been hit and ridden out"
-
-
-def test_full_retry_loop_survives_an_invisible_holder(handler):
-    """End to end: the exact live sequence, with the list view lying about availability."""
-    cc = FakeCC(statuses=["CREATE_FAILED", "ACTIVE"], linger=6, ghosts_visible=False)
-    pid = handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
-    assert cc.pid_status[pid] == "ACTIVE"
-
-
-def test_retries_stop_at_the_first_non_conflict_error(handler):
-    """A throttle or access-denied during the backoff must surface immediately, not burn 170s."""
-    cc = FakeCC(linger=10 ** 9)
-    cc.create_policy("e", "pol", {}, "M")
-
-    calls = {"n": 0}
-    original = cc.create_policy
-
-    def flaky(policyEngineId, name, definition, validationMode):
-        calls["n"] += 1
-        if calls["n"] >= 3:
-            raise Throttled()
-        return original(policyEngineId, name, definition, validationMode)
-
-    cc.create_policy = flaky
-    with pytest.raises(Throttled):
-        handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
-    assert calls["n"] == 3, "it must stop at the throttle, not keep retrying"
+def test_action_free_policies_never_needed_the_probe(handler):
+    """Matches the live evidence: four action-free policies went ACTIVE before anything failed."""
+    cc = FakeCC(unrecognized_until=10 ** 6)
+    for name in ("amount_cap_overpayment", "budget_before_draft", "caseworker_permit"):
+        handler._create_policy_active(cc, "e", name, PERMIT, "FAIL_ON_ANY_FINDINGS")
+    assert cc.creates == 3

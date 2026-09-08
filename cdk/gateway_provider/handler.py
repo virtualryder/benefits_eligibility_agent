@@ -7,7 +7,9 @@ Executes, as IaC, the exact sequence the proven shell engine performed:
 Delete reverses: policies → targets → gateway → engine → SSM. Update = idempotent re-create of
 policies + re-assert ENFORCE. Fail-loud: any control-plane error fails the stack operation."""
 import json
+import re
 import time
+import uuid
 import urllib.request
 import urllib.parse
 
@@ -67,122 +69,96 @@ def _error_code(exc):
     return getattr(exc, "response", {}).get("Error", {}).get("Code")
 
 
-def _policy_ids_by_name(cc, engine_id, name):
-    """Every policyId in this engine carrying this NAME. Name is what create_policy collides on."""
-    try:
-        return [p["policyId"] for p in cc.list_policies(policyEngineId=engine_id).get("policies", [])
-                if p.get("name") == name]
-    except Exception:
-        return []
+_ACTION_RE = re.compile(r'AgentCore::Action::"([^"]+)"')
 
 
-def _wait_policy_name_free(cc, engine_id, name, timeout=120):
-    """Block until list_policies stops showing this NAME.
+def _actions_in(definition):
+    """Tool actions a Cedar policy names. A policy naming none is not validated against the tool set."""
+    return _ACTION_RE.findall(definition)
 
-    ADVISORY ONLY. Live-observed 2026-09-08: a deleted policy disappears from list_policies while
-    create_policy STILL refuses the name with ConflictException. So a True from this function means
-    "the list view is clean", NOT "the name is free". The only authoritative answer comes from
-    create_policy itself, which is why _create_policy_claiming_name retries THAT call rather than
-    trusting this one. Kept because it is a cheap settle that removes most conflicts before they
-    happen; never used as a precondition for declaring success.
+
+def _wait_tool_actions_visible(cc, engine_id, gw_arn, action, timeout=600):
+    """Block until the policy engine's validator can actually SEE the gateway's tool set.
+
+    Every target reporting READY plus a fixed settle is NOT enough. Live 2026-09-08: four
+    action-free policies went ACTIVE and the fifth - the first one naming a specific tool action -
+    was rejected with "unrecognized action". The tool schema reaches the validator some time after
+    the targets are READY, and nothing in the target status says when.
+
+    The probe is a DISPOSABLE policy with a UNIQUE name, and that is the whole point. AgentCore
+    reserves a deleted policy's name long after the policy is gone - measured that day at over
+    170 seconds, while list_policies already showed the engine as empty - so anything that might
+    need to be created twice must never reuse a name we still want. The probe burns a fresh name
+    per attempt; the real policies are then created exactly once, under the names they must have.
+
+    Returns True when the tool set is visible (or when the probe fails for some OTHER reason, which
+    is not this function's to diagnose - the real policy will report it with its own reasons), and
+    False if the tool set never became visible within the budget.
     """
     deadline = time.time() + timeout
-    while time.time() < deadline:
-        if not _policy_ids_by_name(cc, engine_id, name):
-            return True
-        time.sleep(3)
-    return not _policy_ids_by_name(cc, engine_id, name)
-
-
-def _create_policy_claiming_name(cc, engine_id, name, definition, mode,
-                                 waits=(5, 10, 20, 30, 45, 60)):
-    """create_policy, resolving a name still held by an earlier attempt or an earlier run.
-
-    Two live failures on 2026-09-08, same stack, same message, different causes:
-
-      1. The retry in _create_policy_active deleted a CREATE_FAILED policy and immediately
-         re-created it under the same name. delete_policy returns before the name is released,
-         so the re-create was refused. Fixed by deleting the holder explicitly.
-      2. The fix for (1) trusted list_policies to say when the name was free. It is not
-         authoritative: the policy had vanished from the list view and create_policy refused
-         the name anyway. Same stack rolled back again, from the second create in this function.
-
-    So the holder is deleted best-effort by name, and then the AUTHORITATIVE call - create_policy
-    - is retried with backoff, because it is the only thing that actually knows. The waits are
-    bounded: an unbounded loop inside a CloudFormation custom resource is a hung stack, not a
-    resilient one. A name still contended after all of them raises with the elapsed budget named,
-    so the stack event says how long we waited rather than just that we gave up.
-
-    Only ConflictException means "the name is taken". Throttling, access-denied and everything
-    else propagate untouched on the first attempt and on every retry.
-    """
-    body = {"policyEngineId": engine_id, "name": name,
-            "definition": {"cedar": {"statement": definition}}, "validationMode": mode}
-
-    try:
-        return cc.create_policy(**body)["policyId"]
-    except Exception as exc:
-        if _error_code(exc) != "ConflictException":
-            raise
-
-    for pid in _policy_ids_by_name(cc, engine_id, name):
+    definition = ('forbid(principal, action == AgentCore::Action::"%s", '
+                  'resource == AgentCore::Gateway::"%s");' % (action, gw_arn))
+    attempt = 0
+    while True:
+        attempt += 1
+        name = "aegis_toolset_probe_%d_%s" % (attempt, uuid.uuid4().hex[:8])
         try:
-            cc.delete_policy(policyEngineId=engine_id, policyId=pid)
+            pid = cc.create_policy(policyEngineId=engine_id, name=name,
+                                   definition={"cedar": {"statement": definition}},
+                                   validationMode="FAIL_ON_ANY_FINDINGS")["policyId"]
         except Exception:
-            pass
+            if time.time() > deadline:
+                return False
+            time.sleep(10)
+            continue
 
-    last = None
-    for wait in waits:
-        time.sleep(wait)
-        try:
-            return cc.create_policy(**body)["policyId"]
-        except Exception as exc:
-            if _error_code(exc) != "ConflictException":
-                raise
-            last = exc
-    raise RuntimeError(
-        "policy name %r is still refused as a duplicate after %ds of retries; the previous policy "
-        "of this name has not been released (last error: %s)" % (name, sum(waits), last))
-
-
-def _create_policy_active(cc, engine_id, name, definition, mode, attempts=3):
-    """Create a Cedar policy and wait for ACTIVE. The engine validates tool ACTIONS against the gateway
-    targets' tool schemas; right after the targets report READY the validator can still see an empty
-    tool set ("unrecognized action ...") - a propagation race the 2026-09-05 live gate hit. A
-    CREATE_FAILED whose reasons say "unrecognized action" is deleted and retried after a settle; any other
-    validation failure raises at once WITH the engine's reasons (so the stack event says what was wrong).
-
-    The retry was itself racy until 2026-09-08. delete_policy returns before the NAME is released, so
-    attempt 2 called create_policy under the same name and got ConflictException("Policy with the same
-    name already exists"). That is not a validation failure, nothing caught it, and it escaped this loop
-    and failed the custom resource - rolling back ben-fp2-gateway and killing the full-portfolio re-gate
-    of main. The one transient this retry exists to survive was the one case it could not survive. Both
-    halves are handled now: the delete is waited out BY NAME, and a ConflictException on create is
-    resolved by removing whatever holds the name before trying again."""
-    last_reasons = []
-    for attempt in range(attempts):
-        pid = _create_policy_claiming_name(cc, engine_id, name, definition, mode)
         status, reasons = None, []
-        for _ in range(40):
+        for _ in range(30):
             status, reasons = _policy_status(cc, engine_id, pid)
             if status in ("ACTIVE", "CREATE_FAILED", "FAILED"):
                 break
             time.sleep(4)
-        if status == "ACTIVE":
-            return pid
-        last_reasons = reasons
         try:
             cc.delete_policy(policyEngineId=engine_id, policyId=pid)
         except Exception:
             pass
-        # Wait for the NAME, not the id: the next attempt re-creates under the same name and the
-        # name outlives the id. Skipping this is what produced the 2026-09-08 rollback.
-        _wait_policy_name_free(cc, engine_id, name)
-        transient = any("unrecognized action" in str(r) for r in reasons)
-        if not transient or attempt == attempts - 1:
+
+        if status == "ACTIVE":
+            return True
+        if not any("unrecognized action" in str(r) for r in reasons):
+            return True
+        if time.time() > deadline:
+            return False
+        time.sleep(15)
+
+
+def _create_policy_active(cc, engine_id, name, definition, mode):
+    """Create a Cedar policy and wait for ACTIVE. Creates ONCE, deliberately.
+
+    This used to delete a CREATE_FAILED policy and retry under the same name, to ride out the
+    "unrecognized action" propagation transient. That cannot work: AgentCore reserves the deleted
+    name for longer than a deploy can wait, so the retry was refused with ConflictException and
+    rolled the stack back - twice on 2026-09-08, the second time through a fix that asked
+    list_policies whether the name was free (it is not authoritative; the name was invisible there
+    and still refused).
+
+    The race is now waited out BEFORE any real policy is created, by _wait_tool_actions_visible,
+    using disposable uniquely-named probes. So a validation failure here is a real one and is
+    raised with the engine's reasons, which is what the stack event should have said all along.
+    """
+    pid = cc.create_policy(policyEngineId=engine_id, name=name,
+                           definition={"cedar": {"statement": definition}},
+                           validationMode=mode)["policyId"]
+    status, reasons = None, []
+    for _ in range(40):
+        status, reasons = _policy_status(cc, engine_id, pid)
+        if status in ("ACTIVE", "CREATE_FAILED", "FAILED"):
             break
-        time.sleep(20 * (attempt + 1))
-    raise RuntimeError("policy %s did not reach ACTIVE: %s" % (name, "; ".join(str(r)[:400] for r in last_reasons) or "no reasons"))
+        time.sleep(4)
+    if status == "ACTIVE":
+        return pid
+    raise RuntimeError("policy %s did not reach ACTIVE (status=%s): %s"
+                       % (name, status, "; ".join(str(r)[:400] for r in reasons) or "no reasons"))
 
 
 def _find_engine(cc, name):
@@ -301,7 +277,19 @@ def _create(cc, ssm, p, region, acct):
     if target_ids:
         time.sleep(15)
 
-    for pol in json.loads(p["PoliciesJson"]):
+    policies = json.loads(p["PoliciesJson"])
+
+    # Wait until the validator can SEE the tool set before creating any real policy. Targets READY
+    # plus a settle is not that signal (live 2026-09-08). Probe with the first action any policy
+    # actually names; policies naming none are not validated against the tool set and need no wait.
+    probe_action = next((a for pol in policies for a in _actions_in(pol["definition"])), None)
+    if probe_action and not _wait_tool_actions_visible(cc, engine_id, gw_arn, probe_action):
+        raise RuntimeError(
+            "gateway tool set never became visible to the policy validator: action %r still "
+            "unrecognized after 600s with every target READY. Creating the real policies now would "
+            "fail them under names that cannot be reused." % probe_action)
+
+    for pol in policies:
         definition = pol["definition"].replace("__GATEWAY_ARN__", gw_arn)
         _create_policy_active(cc, engine_id, pol["name"], definition, pol.get("validation_mode", "FAIL_ON_ANY_FINDINGS"))
 
