@@ -69,6 +69,27 @@ def _error_code(exc):
     return getattr(exc, "response", {}).get("Error", {}).get("Code")
 
 
+def _collides(cc, engine_id, wanted):
+    """Names in `wanted` that this engine already holds. Empty for a freshly created engine."""
+    try:
+        have = {q.get("name") for q in cc.list_policies(policyEngineId=engine_id).get("policies", [])}
+    except Exception:
+        return []
+    return sorted(have & set(wanted))
+
+
+def _log(msg, *args):
+    """Progress line into the provider's CloudWatch stream.
+
+    This resource logged NOTHING but its final traceback until 2026-09-08. Four failed live
+    deploys were spent working out which policy was failing and why, because the only signal was
+    "ConflictException" with no name attached and a stack event that said the custom resource
+    failed. A deploy that can only be diagnosed by running it again is not diagnosable; every step
+    that talks to AgentCore says what it is about to do, and names the resource, BEFORE it does it.
+    """
+    print("[agentcore-attach] " + (msg % args if args else msg), flush=True)
+
+
 _ACTION_RE = re.compile(r'AgentCore::Action::"([^"]+)"')
 
 
@@ -99,6 +120,7 @@ def _wait_tool_actions_visible(cc, engine_id, gw_arn, action, timeout=600):
     definition = ('forbid(principal, action == AgentCore::Action::"%s", '
                   'resource == AgentCore::Gateway::"%s");' % (action, gw_arn))
     attempt = 0
+    _log("probing tool-set visibility with action %r (budget %ds)", action, timeout)
     while True:
         attempt += 1
         name = "aegis_toolset_probe_%d_%s" % (attempt, uuid.uuid4().hex[:8])
@@ -124,9 +146,14 @@ def _wait_tool_actions_visible(cc, engine_id, gw_arn, action, timeout=600):
             pass
 
         if status == "ACTIVE":
+            _log("tool set visible after %d probe(s)", attempt)
             return True
         if not any("unrecognized action" in str(r) for r in reasons):
+            _log("probe %d failed for a reason that is not the propagation race (%s); "
+                 "letting the real policy report it", attempt, "; ".join(str(r)[:120] for r in reasons))
             return True
+        _log("probe %d: tool set still not visible (%s)", attempt,
+             "; ".join(str(r)[:120] for r in reasons))
         if time.time() > deadline:
             return False
         time.sleep(15)
@@ -146,6 +173,7 @@ def _create_policy_active(cc, engine_id, name, definition, mode):
     using disposable uniquely-named probes. So a validation failure here is a real one and is
     raised with the engine's reasons, which is what the stack event should have said all along.
     """
+    _log("creating policy %r (mode=%s, actions=%s)", name, mode, _actions_in(definition) or "none")
     pid = cc.create_policy(policyEngineId=engine_id, name=name,
                            definition={"cedar": {"statement": definition}},
                            validationMode=mode)["policyId"]
@@ -156,6 +184,7 @@ def _create_policy_active(cc, engine_id, name, definition, mode):
             break
         time.sleep(4)
     if status == "ACTIVE":
+        _log("policy %r ACTIVE", name)
         return pid
     raise RuntimeError("policy %s did not reach ACTIVE (status=%s): %s"
                        % (name, status, "; ".join(str(r)[:400] for r in reasons) or "no reasons"))
@@ -231,6 +260,14 @@ def _create(cc, ssm, p, region, acct):
     if engine_id is None:
         engine_id = cc.create_policy_engine(name=p["EngineName"],
                                             description=p.get("EngineDesc", ""))["policyEngineId"]
+        _log("created policy engine %r -> %s", p["EngineName"], engine_id)
+    else:
+        # An ADOPTED engine can already hold policies under the names we are about to create. That
+        # is a collision this resource cannot resolve (a deleted policy name is not reusable), so
+        # say so loudly here rather than failing anonymously eleven policies later.
+        existing = [q.get("name") for q in cc.list_policies(policyEngineId=engine_id).get("policies", [])]
+        _log("ADOPTED existing policy engine %r -> %s, holding %d policy/policies: %s",
+             p["EngineName"], engine_id, len(existing), existing or "none")
     engine_arn = f"arn:aws:bedrock-agentcore:{region}:{acct}:policy-engine/{engine_id}"
     try:
         _wait(lambda: cc.get_policy_engine(policyEngineId=engine_id)["status"], "ACTIVE", label="policy engine")
@@ -274,10 +311,25 @@ def _create(cc, ssm, p, region, acct):
     for tid in target_ids:
         _wait(lambda tid=tid: cc.get_gateway_target(gatewayIdentifier=gw_id, targetId=tid)["status"], "READY",
               label="gateway target %s" % tid)
+    _log("gateway %s READY with %d target(s)", gw_id, len(target_ids))
     if target_ids:
         time.sleep(15)
 
     policies = json.loads(p["PoliciesJson"])
+    _log("%d policies to create: %s", len(policies), [q["name"] for q in policies])
+
+    # An adopted engine may already hold a policy under a name we must create. A policy name, once
+    # used, is not reusable - deleting the policy does not release it in any timeframe a deploy can
+    # wait out (measured 2026-09-08: still refused after 170s, with list_policies already reporting
+    # the engine empty). So this is unrecoverable HERE, and the only honest thing is to say so
+    # before creating anything, naming the engine an operator has to remove. Failing at this point
+    # also leaves the engine untouched, so the operator's cleanup is a single delete.
+    taken = _collides(cc, engine_id, [q["name"] for q in policies])
+    if taken:
+        raise RuntimeError(
+            "policy engine %s already holds %d of the %d policy names this deployment must create "
+            "(%s). A policy name is not reusable once taken, so this cannot be resolved here. "
+            "Delete the policy engine and redeploy." % (engine_id, len(taken), len(policies), taken))
 
     # Wait until the validator can SEE the tool set before creating any real policy. Targets READY
     # plus a settle is not that signal (live 2026-09-08). Probe with the first action any policy

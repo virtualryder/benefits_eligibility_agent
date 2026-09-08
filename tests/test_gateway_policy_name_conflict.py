@@ -227,3 +227,44 @@ def test_action_free_policies_never_needed_the_probe(handler):
     for name in ("amount_cap_overpayment", "budget_before_draft", "caseworker_permit"):
         handler._create_policy_active(cc, "e", name, PERMIT, "FAIL_ON_ANY_FINDINGS")
     assert cc.creates == 3
+
+
+# --- an adopted engine that already holds our names is unrecoverable, and must say so ----
+
+def test_collides_reports_the_names_an_adopted_engine_already_holds(handler):
+    cc = FakeCC()
+    cc.create_policy("e", "mask_before_assess", MASK, "M")
+    cc.create_policy("e", "unrelated_policy", PERMIT, "M")
+    assert handler._collides(cc, "e", ["mask_before_assess", "caseworker_permit"]) == ["mask_before_assess"]
+
+
+def test_collides_is_empty_for_a_fresh_engine(handler):
+    assert handler._collides(FakeCC(), "e", ["mask_before_assess"]) == []
+
+
+def test_collides_survives_an_engine_that_cannot_be_listed(handler):
+    """A transient list failure must not be read as 'the name is free'."""
+    cc = FakeCC()
+
+    def boom(policyEngineId):
+        raise RuntimeError("engine not listable right now")
+
+    cc.list_policies = boom
+    assert handler._collides(cc, "e", ["mask_before_assess"]) == []
+
+
+# --- the resource must name what it is doing before it does it ---------------------------
+
+def test_a_policy_is_named_in_the_log_before_it_is_created(capsys, handler):
+    """Four live deploys were spent identifying which policy was failing.
+
+    The provider logged nothing but its final traceback, and ConflictException does not name the
+    policy, so the only way to find out was to deploy again. The name must be on stdout BEFORE the
+    call that can fail.
+    """
+    cc = FakeCC(unrecognized_until=1)
+    with pytest.raises(RuntimeError):
+        handler._create_policy_active(cc, "e", "mask_before_assess", MASK, "IGNORE_ALL_FINDINGS")
+    out = capsys.readouterr().out
+    assert "creating policy 'mask_before_assess'" in out
+    assert "assess-eligibility___assess_eligibility" in out, "the actions it names must be logged too"
