@@ -31,7 +31,12 @@ CLAIMS = {
     "LIN_case_driven": "One real case drives the full workflow through every governed state",
     "LIN_zero_orphans": "Every governed tool invocation in CloudTrail has a matching aegis.call audit line, and vice versa",
     "E2E_zero_unexpected": "No unexpected error in any log group; every refusal is a classified, deliberate one",
-    "teardown_zero_residue": "The environment tears down to zero residue and model-invocation logging is restored",
+    # Runs before 2026-09-08 used the name `teardown_zero_residue`. That name overclaimed: the
+    # check verifies stacks + model-logging config, and the toolkit's ECR repository survives
+    # teardown (L37). Renamed at the source; the old key is still described here because the
+    # evidence files that carry it are records of past runs and must not be rewritten.
+    "teardown_zero_residue": "(pre-2026-09-08 name) Stacks are gone and model-invocation logging is restored - does NOT cover the toolkit ECR repository (L37)",
+    "teardown_zero_stack_residue": "Every CloudFormation stack for this run is gone and model-invocation logging is restored. The AgentCore toolkit's ECR repository is NOT covered - it is measured under steps.toolkit_residue (L37)",
 }
 
 

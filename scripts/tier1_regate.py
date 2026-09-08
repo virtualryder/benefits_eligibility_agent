@@ -241,7 +241,7 @@ def main():
             # only the proof's summary; the failing call cannot be replayed). Tear down by hand with
             # scripts/cleanup_retained.py + the stack deletes when done.
             steps["teardown_skipped_for_diagnosis"] = proofs_failed
-            check("teardown_zero_residue", False, "SKIPPED: environment kept for diagnosis of %s" % proofs_failed)
+            check("teardown_zero_stack_residue", False, "SKIPPED: environment kept for diagnosis of %s" % proofs_failed)
         elif not a.skip_teardown:
             # The capture WORM bucket holds CloudTrail deliveries under a GOVERNANCE lock; CloudFormation
             # cannot delete a non-empty bucket and CDK's auto-delete cannot bypass a lock, so the lineage
@@ -318,8 +318,12 @@ def main():
                 clean = bool(rep.get("clean"))
             except Exception:
                 clean = steps["cleanup"]["rc"] == 0
-            check("teardown_zero_residue", clean and restored,
-                  "destroy_rc=%s cleanup_rc=%s clean=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], steps["cleanup"]["rc"], clean, restored))
+            # #231: named for what it checks. Stacks + model-logging config, not "everything this
+            # run created" - the AgentCore toolkit's ECR repository is not pruned by teardown (L37).
+            check("teardown_zero_stack_residue", clean and restored,
+                  "destroy_rc=%s cleanup_rc=%s stacks_clean=%s model_logging_as_before=%s "
+                  "(toolkit ECR residue is NOT gated - L37)"
+                  % (steps["destroy"]["rc"], steps["cleanup"]["rc"], clean, restored))
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     result = {"gate": "tier1-regate", "env": env, "region": region, "pass": ok, "fatal": fatal, "checks": checks, "steps": steps,

@@ -39,18 +39,18 @@ See [`PILOT-SCOPE.md`](PILOT-SCOPE.md) for the explicit exclusion list.
 
 | Claim | Status |
 |---|---|
-| Offline suite | **406 tests** (all pass locally except one CI-only gate that is skipped offline) (control-plane + 45 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
+| Offline suite | **409 tests** (all pass locally except one CI-only gate that is skipped offline) (control-plane + 45 CDK stack-synthesis assertions) — authoritative count: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md) |
 | Live clean-account validation | **Done twice** — EP1 2026-07-27 (`ben-val1`) and a full runbook re-walk 2026-07-28 (`ben-val2`), us-east-1, all Gate-B switches — [`evidence/EP1-VALIDATION.md`](evidence/EP1-VALIDATION.md) |
 | Zero public egress | **Measured, not asserted** — 0 NAT gateways · 0 internet gateways · 9 VPC endpoints on the live `ben-val2` VPC |
 | Deploy-from-IaC of the zero-egress SG fix | **Proven** on `ben-val2`. (In EP1 that rule had to be patched onto the live SG by hand, so the IaC version was previously unexercised.) |
-| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 406 offline tests |
+| Live governance demo (shell engine, legacy) | 29 checks against a deployed system in Cedar ENFORCE — a **separate** artifact from the 409 offline tests |
 | AgentCore ENFORCE from-zero re-proof | **Done 2026-09-02** (`ben-e2e`) — [`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`](evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md) |
 | Hybrid multi-tenant (2 tenants, cross-tenant deny + per-tenant routing) | **Done 2026-09-02** (`ben-mt`, 5/5) — [`evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-E2E-2026-09-02.md) |
 | Per-tenant audit ledger / WORM vault / approvals routing (gateway + workflow hop) | **Done 2026-09-02** (`ben-mt2`, 12/12, governed-core 1.6.0) — [`evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md`](evidence/AGENTCORE-MULTITENANT-AUDIT-2026-09-02.md) |
 | Full transparency through the real AgentCore Runtime (framework/model-invocation + tool spans, every governed-path API call, model-invocation bodies, WORM record - joined per tenant; not private model chain-of-thought) | **Done 2026-09-02** (`ben-mt3`, 13/13 per tenant, governed-core 1.7.1) — [`evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md`](evidence/AGENTCORE-OBSERVABILITY-2026-09-02.md) |
 | Consolidated 111 gate on the release tag (all of the above on ONE deployment + strict PII canary + 0-unexpected-errors regression sweep) | **PASS 2026-09-02** (`ben-mt4`, tag `v0.3.0-pilot-rc1`) — [`evidence/AGENTCORE-111-GATE-2026-09-02.md`](evidence/AGENTCORE-111-GATE-2026-09-02.md) |
 | Kill Switch on the AgentCore path (interceptor 403 + DENIED WORM record, tool Lambdas + workflow refuse, runtime refuses new + stops in-flight sessions; AWS_IAM function-URL controller, IAM + code separation of duties, IAM-verified actors, base-ledger `KILL-SWITCH` chain) + 0-unexpected-errors sweep | **PASS 2026-09-03** (`ben-mt5`, 29/29, time-to-effect 13.9 s, governed-core 1.8.0) — [`evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md`](evidence/AGENTCORE-KILL-SWITCH-2026-09-03.md) |
-| Per-tenant token + USD budget (reserve-before / commit-after on every model call; meter == model-invocation log; cap refusals at runtime / gateway / drafter incl. mid-session; 60/85/100 % alarms; AWS Budgets ceiling → kill switch) + 0-unexpected-errors sweep | **PASS 2026-09-03** (`ben-mt6`, 24/24, governed-core 1.9.0) — [`evidence/AGENTCORE-BUDGET-2026-09-03.md`](evidence/AGENTCORE-BUDGET-2026-09-03.md) |
+| Per-tenant token + USD budget (reserve-before / commit-after on every model call; meter == model-invocation log; cap refusals at runtime / gateway / drafter incl. mid-session; 60/85/100 % alarms; AWS Budgets ceiling → kill switch as a **slow backstop**, not a real-time cap — billing data refreshes at least daily and Budgets alerts once per period, see README) + 0-unexpected-errors sweep | **PASS 2026-09-03** (`ben-mt6`, 24/24, governed-core 1.9.0) — [`evidence/AGENTCORE-BUDGET-2026-09-03.md`](evidence/AGENTCORE-BUDGET-2026-09-03.md) |
 | Independent deployment by a third party | **Not yet** — all evidence is author-produced. **A verification kit is ready:** [`docs/INDEPENDENT-VERIFICATION.md`](docs/INDEPENDENT-VERIFICATION.md) + `python scripts/independent_verify.py`. This is the highest-value next step — if you are that third party, start there. |
 | Independent security test / pen test | **Not yet** |
 | Enterprise IdP round-trip | **Not yet** (federation exists as IaC; no agency IdP integrated) |
@@ -103,7 +103,7 @@ routing, and full per-case transparency through the real AgentCore Runtime — a
 grounding, capture-every-API-call lineage and the governed-core 1.10.1 fault-semantics fixes, **live re-gated from zero on
 `ben-t1` (2026-09-06, private mode, CMK, all 12 checks PASS, torn down)**. Tag **`v0.5.2-pilot-rc1`** was cut from that
 tree (2026-09-06, governed-core 1.10.1); `v0.5.1-pilot-rc1` (2026-09-05) and `v0.3.0-pilot-rc1` (2026-09-02, 111 gate) precede it.
-Suite: **406 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
+Suite: **409 offline tests** (the older `v0.1.2-pilot-rc1` tag predates the dependency migration and
 stood at 101; do not re-align). Next, in order: the consolidated 111 / kill-switch / budget / lineage gates re-run
 on this exact tag (last green at governed-core 1.10.0, 2026-09-05), the runtime gate on the IaC execution role (RT-2),
 independent redeploy of the tag,

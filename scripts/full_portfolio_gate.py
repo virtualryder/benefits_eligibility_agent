@@ -671,7 +671,7 @@ def main():
     failed = [k for k, v in checks.items() if not v["ok"]] + (["FATAL: " + fatal] if fatal else [])
     if failed and not a.teardown_on_fail:
         steps["teardown_skipped_for_diagnosis"] = failed
-        check("teardown_zero_residue", False, "SKIPPED: environment kept for diagnosis of %s" % failed)
+        check("teardown_zero_stack_residue", False, "SKIPPED: environment kept for diagnosis of %s" % failed)
     elif not a.skip_teardown:
         try:
             if runtime_id:
@@ -769,13 +769,50 @@ def main():
             out = steps["cleanup"]["out"]; rep = json.loads(out[out.rindex('{\n  "prefix"'):]); clean = bool(rep.get("clean"))
         except Exception:
             clean = steps["cleanup"]["rc"] == 0
-        # the runtime's own ECR repo / CodeBuild project are toolkit residue outside the prefix - report them
+        # L37 / #231. The toolkit's ECR repository and CodeBuild project live OUTSIDE the prefix and
+        # teardown does not delete them; the repository grows one image per gate run. This block used
+        # to record only the repository NAMES, beside a check whose name claimed zero residue and
+        # which did not look at them - so the evidence named the residue two lines above a PASS
+        # saying there was none. Two changes: the check is now called what it actually verifies, and
+        # the residue is MEASURED, so a later run is compared against a number rather than
+        # rediscovered by hand.
         try:
-            ecr = s.client("ecr"); repos = [r["repositoryName"] for r in ecr.describe_repositories().get("repositories", []) if PACK.get("runtime", {}).get("name", "") in r["repositoryName"]]
-            steps["toolkit_residue"] = {"ecr_repos": repos}
+            ecr = s.client("ecr")
+            stem = PACK.get("runtime", {}).get("name", "")
+            found = []
+            for r in ecr.describe_repositories().get("repositories", []):
+                if not stem or stem not in r["repositoryName"]:
+                    continue
+                imgs, size = 0, 0
+                try:
+                    for page in ecr.get_paginator("describe_images").paginate(
+                            repositoryName=r["repositoryName"]):
+                        for d in page.get("imageDetails", []):
+                            imgs += 1
+                            size += int(d.get("imageSizeInBytes") or 0)
+                except Exception as exc:      # noqa: BLE001 - reporting only, never gates
+                    found.append({"repository": r["repositoryName"],
+                                  "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])})
+                    continue
+                found.append({"repository": r["repositoryName"], "images": imgs,
+                              "size_mb": round(size / 1048576.0, 1)})
+            steps["toolkit_residue"] = {
+                "gated": False,
+                "note": ("NOT covered by teardown_zero_stack_residue. Teardown deletes stacks; the "
+                         "AgentCore toolkit's ECR repository and CodeBuild project persist and the "
+                         "repository accrues one image per run (L37). Compare images/size_mb against "
+                         "the previous run rather than assuming zero."),
+                "repositories": found,
+            }
         except Exception:
             pass
-        check("teardown_zero_residue", clean and restored, "destroy_rc=%s clean=%s model_logging_as_before=%s" % (steps["destroy"]["rc"], clean, restored))
+        # NAME THE CLAIM. This gate verifies that the CloudFormation stacks are gone and that the
+        # account's model-invocation logging config is back as it was. It does NOT verify that the
+        # account is free of everything this run created - see steps["toolkit_residue"].
+        check("teardown_zero_stack_residue", clean and restored,
+              "destroy_rc=%s stacks_clean=%s model_logging_as_before=%s (toolkit ECR residue is "
+              "reported in steps.toolkit_residue and is NOT gated - L37)"
+              % (steps["destroy"]["rc"], clean, restored))
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     out = os.path.join(REPO, ".build" if a.teardown_only else "evidence",
