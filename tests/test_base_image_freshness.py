@@ -39,7 +39,7 @@ def _resolved_date(text):
 
 def test_the_dockerfile_still_pins_by_digest():
     """The pin itself is the control; losing it is worse than it being stale."""
-    text = io.open(DOCKERFILE, encoding="utf-8").read() if False else open(DOCKERFILE, encoding="utf-8").read()
+    text = open(DOCKERFILE, encoding="utf-8").read()
     assert re.search(r"^FROM\s+\S+@sha256:[0-9a-f]{64}", text, re.M), (
         "the runtime base image must be pinned by digest, not by a mutable tag")
 
