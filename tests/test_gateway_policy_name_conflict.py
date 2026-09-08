@@ -68,10 +68,14 @@ class FakeCC:
     behaviour the live rollback demonstrated.
     """
 
-    def __init__(self, statuses=("ACTIVE",), linger=2, create_error=None):
+    def __init__(self, statuses=("ACTIVE",), linger=2, create_error=None, ghosts_visible=True):
         self.statuses = list(statuses)
         self.linger = linger
         self.create_error = create_error
+        # ghosts_visible=False is the SECOND live failure of 2026-09-08: the deleted policy has
+        # already vanished from list_policies while create_policy still refuses the name. Any
+        # implementation that asks list_policies whether the name is free is wrong here.
+        self.ghosts_visible = ghosts_visible
         self.live = {}          # policyId -> name
         self.ghosts = {}        # name -> remaining list_policies calls
         self.pid_status = {}
@@ -88,6 +92,7 @@ class FakeCC:
             raise self.create_error
         if name in self._names_taken():
             self.conflicts_raised += 1
+            self._age_ghosts()   # time passes on this call too, not only on list_policies
             raise Conflict()
         self.creates += 1
         pid = "p%d" % self.creates
@@ -105,14 +110,18 @@ class FakeCC:
         if name is not None and self.linger > 0:
             self.ghosts[name] = self.linger
 
-    def list_policies(self, policyEngineId):
-        out = [{"policyId": pid, "name": nm} for pid, nm in self.live.items()]
+    def _age_ghosts(self):
         for nm, left in list(self.ghosts.items()):
-            out.append({"policyId": "ghost-%s" % nm, "name": nm})
             if left - 1 <= 0:
                 del self.ghosts[nm]
             else:
                 self.ghosts[nm] = left - 1
+
+    def list_policies(self, policyEngineId):
+        out = [{"policyId": pid, "name": nm} for pid, nm in self.live.items()]
+        if self.ghosts_visible:
+            out += [{"policyId": "ghost-%s" % nm, "name": nm} for nm in self.ghosts]
+        self._age_ghosts()
         return {"policies": out}
 
 
@@ -166,7 +175,8 @@ def test_claiming_name_clears_a_lingering_holder_and_succeeds(handler):
     cc.delete_policy("e", pid)
     got = handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
     assert got == "p2"
-    assert cc.conflicts_raised == 1, "the conflict must actually have been hit and recovered"
+    assert cc.conflicts_raised >= 1, "the conflict must actually have been hit and recovered"
+    assert cc.creates == 2, "exactly one successful re-create, not a storm of them"
 
 
 def test_claiming_name_clears_residue_from_a_previous_run(handler):
@@ -178,17 +188,17 @@ def test_claiming_name_clears_residue_from_a_previous_run(handler):
     assert list(cc.live.values()) == ["pol"], "exactly one policy of that name must remain"
 
 
-def test_claiming_name_refuses_rather_than_spinning_when_the_name_never_frees(handler, monkeypatch):
-    """A name that never frees must RAISE, not loop forever.
+def test_claiming_name_gives_up_with_a_bounded_budget_rather_than_spinning(handler):
+    """A name that never frees must RAISE after a bounded budget, not loop forever.
 
-    The wait is stubbed to report failure immediately rather than burning its real 120s
-    deadline: what is under test is the branch taken when the wait gives up, not the wait.
+    An unbounded retry inside a CloudFormation custom resource is a hung stack, which is worse
+    than a failed one: it cannot be diagnosed from the stack events and it blocks teardown.
     """
-    monkeypatch.setattr(handler, "_wait_policy_name_free", lambda *a, **k: False)
     cc = FakeCC(linger=10 ** 9)
     cc.create_policy("e", "pol", {}, "M")
-    with pytest.raises(RuntimeError, match="still held after an explicit delete"):
+    with pytest.raises(RuntimeError, match="still refused as a duplicate after 170s"):
         handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
+    assert cc.create_calls == 8, "one live create, one initial attempt, then six bounded retries"
 
 
 def test_a_non_conflict_error_is_not_swallowed(handler):
@@ -239,3 +249,80 @@ def test_the_failure_path_waits_on_the_name_not_the_id(handler, monkeypatch):
     cc = FakeCC(statuses=["CREATE_FAILED", "ACTIVE"], linger=3)
     handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
     assert "pol" in seen, "the retry deleted a policy without waiting for its NAME to free"
+
+
+# --- the SECOND live failure: invisible to list_policies, still refused by create_policy -----
+
+def test_a_name_invisible_to_list_policies_can_still_be_refused_by_create(handler):
+    """Guard on the guard, for failure #2. The double must reproduce the asymmetry.
+
+    2026-09-08, second re-gate attempt: the deleted policy had already vanished from
+    list_policies and create_policy refused the name anyway. If this test stops holding, every
+    assertion below about the authoritative-retry design is vacuous.
+    """
+    cc = FakeCC(linger=3, ghosts_visible=False)
+    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
+    cc.delete_policy("e", pid)
+    assert handler._policy_ids_by_name(cc, "e", "pol") == [], "the list view must look clean"
+    with pytest.raises(Conflict):
+        cc.create_policy("e", "pol", {}, "M")
+
+
+def test_the_advisory_wait_is_fooled_by_an_invisible_holder(handler):
+    """_wait_policy_name_free reports True here and is WRONG. That is why it is advisory.
+
+    Pinning the limitation keeps someone from promoting this function back into a precondition
+    for success, which is exactly the mistake that produced the second rollback.
+    """
+    cc = FakeCC(linger=10 ** 9, ghosts_visible=False)
+    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
+    cc.delete_policy("e", pid)
+    assert handler._wait_policy_name_free(cc, "e", "pol") is True
+    with pytest.raises(Conflict):
+        cc.create_policy("e", "pol", {}, "M")
+
+
+def test_claiming_name_succeeds_against_an_invisible_holder(handler):
+    """The real fix: retry the AUTHORITATIVE call, do not ask the list view for permission.
+
+    linger=6 is measured, not arbitrary. The list-based implementation that shipped and rolled the
+    stack back gets about three chances to age the holder out (its conflicting create, its
+    _policy_ids_by_name lookup, its _wait_policy_name_free poll) before its single re-create, so
+    at linger<=4 it survives and this test would prove nothing. Both implementations were run
+    against this double across linger 4..8: 6 is the value where the list-based one fails and the
+    retrying one still passes on BOTH this path and the full-loop path below. At 8 the holder
+    outlives even the bounded budget on this path, which is the give-up case covered separately.
+    """
+    cc = FakeCC(linger=6, ghosts_visible=False)
+    pid = cc.create_policy("e", "pol", {}, "M")["policyId"]
+    cc.delete_policy("e", pid)
+    got = handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
+    assert got == "p2"
+    assert cc.conflicts_raised >= 1, "the conflict must have been hit and ridden out"
+
+
+def test_full_retry_loop_survives_an_invisible_holder(handler):
+    """End to end: the exact live sequence, with the list view lying about availability."""
+    cc = FakeCC(statuses=["CREATE_FAILED", "ACTIVE"], linger=6, ghosts_visible=False)
+    pid = handler._create_policy_active(cc, "e", "pol", "permit(...);", "FAIL_ON_ANY_FINDINGS")
+    assert cc.pid_status[pid] == "ACTIVE"
+
+
+def test_retries_stop_at_the_first_non_conflict_error(handler):
+    """A throttle or access-denied during the backoff must surface immediately, not burn 170s."""
+    cc = FakeCC(linger=10 ** 9)
+    cc.create_policy("e", "pol", {}, "M")
+
+    calls = {"n": 0}
+    original = cc.create_policy
+
+    def flaky(policyEngineId, name, definition, validationMode):
+        calls["n"] += 1
+        if calls["n"] >= 3:
+            raise Throttled()
+        return original(policyEngineId, name, definition, validationMode)
+
+    cc.create_policy = flaky
+    with pytest.raises(Throttled):
+        handler._create_policy_claiming_name(cc, "e", "pol", "permit(...);", "M")
+    assert calls["n"] == 3, "it must stop at the throttle, not keep retrying"

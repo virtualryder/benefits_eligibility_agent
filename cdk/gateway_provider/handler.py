@@ -62,6 +62,11 @@ def _policy_status(cc, engine_id, pid):
     return d.get("status"), d.get("statusReasons") or []
 
 
+def _error_code(exc):
+    """botocore puts the modelled error name in response.Error.Code; anything else has none."""
+    return getattr(exc, "response", {}).get("Error", {}).get("Code")
+
+
 def _policy_ids_by_name(cc, engine_id, name):
     """Every policyId in this engine carrying this NAME. Name is what create_policy collides on."""
     try:
@@ -72,11 +77,14 @@ def _policy_ids_by_name(cc, engine_id, name):
 
 
 def _wait_policy_name_free(cc, engine_id, name, timeout=120):
-    """Block until no policy carries this NAME.
+    """Block until list_policies stops showing this NAME.
 
-    delete_policy returns before the name is released; polling get_policy by ID is not enough
-    because the ID is gone while the name is still taken. Returns False on timeout rather than
-    raising, so the caller decides whether that is fatal.
+    ADVISORY ONLY. Live-observed 2026-09-08: a deleted policy disappears from list_policies while
+    create_policy STILL refuses the name with ConflictException. So a True from this function means
+    "the list view is clean", NOT "the name is free". The only authoritative answer comes from
+    create_policy itself, which is why _create_policy_claiming_name retries THAT call rather than
+    trusting this one. Kept because it is a cheap settle that removes most conflicts before they
+    happen; never used as a precondition for declaring success.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -86,32 +94,55 @@ def _wait_policy_name_free(cc, engine_id, name, timeout=120):
     return not _policy_ids_by_name(cc, engine_id, name)
 
 
-def _create_policy_claiming_name(cc, engine_id, name, definition, mode):
+def _create_policy_claiming_name(cc, engine_id, name, definition, mode,
+                                 waits=(5, 10, 20, 30, 45, 60)):
     """create_policy, resolving a name still held by an earlier attempt or an earlier run.
 
-    A ConflictException here means only that the name is taken. Whatever holds it is either this
-    function's own previous attempt (deleted, not yet propagated) or residue from a prior deploy;
-    in both cases the policy we want is the one we are about to write, so the holder is removed.
-    The second create is NOT wrapped again - if the name is still contended after an explicit
-    delete and a confirmed-free wait, that is a real conflict and must surface, not spin.
+    Two live failures on 2026-09-08, same stack, same message, different causes:
+
+      1. The retry in _create_policy_active deleted a CREATE_FAILED policy and immediately
+         re-created it under the same name. delete_policy returns before the name is released,
+         so the re-create was refused. Fixed by deleting the holder explicitly.
+      2. The fix for (1) trusted list_policies to say when the name was free. It is not
+         authoritative: the policy had vanished from the list view and create_policy refused
+         the name anyway. Same stack rolled back again, from the second create in this function.
+
+    So the holder is deleted best-effort by name, and then the AUTHORITATIVE call - create_policy
+    - is retried with backoff, because it is the only thing that actually knows. The waits are
+    bounded: an unbounded loop inside a CloudFormation custom resource is a hung stack, not a
+    resilient one. A name still contended after all of them raises with the elapsed budget named,
+    so the stack event says how long we waited rather than just that we gave up.
+
+    Only ConflictException means "the name is taken". Throttling, access-denied and everything
+    else propagate untouched on the first attempt and on every retry.
     """
     body = {"policyEngineId": engine_id, "name": name,
             "definition": {"cedar": {"statement": definition}}, "validationMode": mode}
+
     try:
         return cc.create_policy(**body)["policyId"]
     except Exception as exc:
-        code = getattr(exc, "response", {}).get("Error", {}).get("Code")
-        if code != "ConflictException":
+        if _error_code(exc) != "ConflictException":
             raise
-        for pid in _policy_ids_by_name(cc, engine_id, name):
-            try:
-                cc.delete_policy(policyEngineId=engine_id, policyId=pid)
-            except Exception:
-                pass
-        if not _wait_policy_name_free(cc, engine_id, name):
-            raise RuntimeError(
-                "policy name %r is still held after an explicit delete; refusing to retry blindly" % name)
-        return cc.create_policy(**body)["policyId"]
+
+    for pid in _policy_ids_by_name(cc, engine_id, name):
+        try:
+            cc.delete_policy(policyEngineId=engine_id, policyId=pid)
+        except Exception:
+            pass
+
+    last = None
+    for wait in waits:
+        time.sleep(wait)
+        try:
+            return cc.create_policy(**body)["policyId"]
+        except Exception as exc:
+            if _error_code(exc) != "ConflictException":
+                raise
+            last = exc
+    raise RuntimeError(
+        "policy name %r is still refused as a duplicate after %ds of retries; the previous policy "
+        "of this name has not been released (last error: %s)" % (name, sum(waits), last))
 
 
 def _create_policy_active(cc, engine_id, name, definition, mode, attempts=3):
