@@ -49,9 +49,12 @@ jobs:
 
       - name: Secret detection (detect-secrets) - BLOCKING against the reviewed baseline
         run: |
+          cp .secrets.baseline "$RUNNER_TEMP/baseline.committed.json"
           detect-secrets scan --baseline .secrets.baseline
-          git diff --exit-code .secrets.baseline \
-            || { echo "::error::new potential secret(s) not in .secrets.baseline - review, then re-baseline deliberately"; exit 1; }
+          # NOT `git diff --exit-code`: detect-secrets rewrites generated_at with the current time
+          # on every scan, so that comparison always reported "new potential secret(s)" and the
+          # BLOCKING step could never pass, on any tree. Compare the findings instead.
+          python tools/check_secrets_baseline.py "$RUNNER_TEMP/baseline.committed.json" .secrets.baseline
 
   iac-scan:
     name: checkov (synthesized CloudFormation)
