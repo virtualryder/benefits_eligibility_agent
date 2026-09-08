@@ -77,9 +77,19 @@ def verify(manifest, manifest_path=None):
     want_digest = digest_hex(manifest)
     if sig.get("digest_sha256") and sig["digest_sha256"] != want_digest:
         return False, "manifest digest mismatch (content changed since signing)"
+    # L43: the import used to sit INSIDE the same try whose handler names InvalidSignature. When
+    # `cryptography` is absent the import raises, Python then evaluates `except InvalidSignature:`,
+    # and that name - a local, assigned only by the import that just failed - is unbound. The
+    # function raised UnboundLocalError instead of the (False, reason) its own docstring promises,
+    # so a signature verifier's FAIL-CLOSED path was the one path that did not fail closed. CI found
+    # it only because CI never installed cryptography. Import first, and report a missing dependency
+    # as "not verified" rather than as a crash.
     try:
-        from cryptography.hazmat.primitives.serialization import load_pem_public_key
         from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.serialization import load_pem_public_key
+    except Exception as exc:                                  # noqa: BLE001 - fail closed, always
+        return False, "cannot verify: signature library unavailable (%s)" % type(exc).__name__
+    try:
         pub = load_pem_public_key(sig["public_key_pem"].encode("utf-8"))
         signature = base64.b64decode(sig["signature_b64"])
         pub.verify(signature, canonical_bytes(manifest))     # Ed25519: raises on mismatch
