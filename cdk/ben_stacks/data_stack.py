@@ -9,6 +9,19 @@ RETENTION_PROFILES = {
     "sandbox-demo": (s3.ObjectLockMode.GOVERNANCE, cdk.Duration.days(1)),
     "pilot": (s3.ObjectLockMode.GOVERNANCE, cdk.Duration.days(90)),
     "production-reference": (s3.ObjectLockMode.COMPLIANCE, cdk.Duration.days(2555)),  # 7y schedule ref
+    # EV-1 (2026-09-08). Every gate to date ran GOVERNANCE/1d so the environment could be torn down,
+    # and teardown itself calls delete_object with BypassGovernanceRetention=True. So the claim an
+    # auditor actually cares about - "the evidence vault is immutable and your own teardown cannot
+    # bypass it" - had never been tested, because the only COMPLIANCE profile locks for SEVEN YEARS
+    # and AWS is explicit that "the only way to delete an object under the compliance mode before its
+    # retention date expires is to delete the associated AWS account".
+    #
+    # This profile is the same MECHANISM at a disposable duration: COMPLIANCE mode, 1 day. It proves
+    # the mode is really set, that BypassGovernanceRetention is refused against it (that header
+    # applies only to governance mode), and that the deployment's own teardown path fails - then it
+    # releases itself in 24h. It does NOT prove a 7-year schedule; the duration is a parameter, the
+    # immutability is the mechanism. Say it that way when citing the evidence.
+    "compliance-proof": (s3.ObjectLockMode.COMPLIANCE, cdk.Duration.days(1)),
 }
 
 

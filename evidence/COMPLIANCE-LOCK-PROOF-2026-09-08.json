@@ -1,0 +1,36 @@
+{
+ "gate": "EV-1 compliance-lock-proof",
+ "date": "2026-09-08",
+ "bucket": "ben-ev1-data-wormvault2878b4f9-q98k36c8cfdi",
+ "region": "us-east-1",
+ "key": "ev1-compliance-proof/20260908T202259Z.json",
+ "object_lock": {
+  "mode": "COMPLIANCE",
+  "days": 1
+ },
+ "PASS": true,
+ "checks": {
+  "bucket_object_lock_mode_is_COMPLIANCE": {
+   "ok": true,
+   "detail": "mode=COMPLIANCE days=1 enabled=Enabled"
+  },
+  "written_object_is_locked_COMPLIANCE": {
+   "ok": true,
+   "detail": "ObjectLockMode=COMPLIANCE retainUntil=2026-09-09 20:22:55.597000+00:00"
+  },
+  "plain_delete_is_refused": {
+   "ok": true,
+   "detail": "AccessDenied: Access Denied because object protected by object lock."
+  },
+  "teardown_bypass_is_refused": {
+   "ok": true,
+   "detail": "AccessDenied: Access Denied because object protected by object lock."
+  },
+  "object_still_present_after_both_attempts": {
+   "ok": true,
+   "detail": "head_object succeeded"
+  }
+ },
+ "scope_note": "Proves the MECHANISM (COMPLIANCE mode is set, a plain delete is refused, and the deployment's own BypassGovernanceRetention teardown call is refused) at a 1-day retention so the test is disposable. It does NOT prove a 7-year schedule - the duration is a parameter, the immutability is the mechanism.",
+ "aws_reference": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+}
