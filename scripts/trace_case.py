@@ -443,7 +443,7 @@ def main():
             s["_reasoning"] = reasoning[s["spanId"]][:3]
     gw = read_gateway_rows(logs, f"/aws/vendedlogs/bedrock-agentcore/gateway/{prefix}", keys["session_id"], keys["mcp_session_id"], keys["trace_id"], start, end)
     lam_groups = ["/aws/lambda/%s-%s" % (prefix, n) for n in ("ingest-application", "intake-application", "mask-pii", "assess-eligibility",
-                                                             "redetermine", "overpayment", "ben-core", "write-audit", "request-signoff",
+                                                             "redetermine", "overpayment", "core-tools", "write-audit", "request-signoff",
                                                              "signoff-register", "finalize", "workflow-guards", "approve-signoff")]
     existing = {g["logGroupName"] for g in logs.describe_log_groups(logGroupNamePrefix=f"/aws/lambda/{prefix}-").get("logGroups", [])}
     calls = read_lambda_calls(logs, [g for g in lam_groups if g in existing], a.case_id, keys, start, end)

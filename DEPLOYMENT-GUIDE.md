@@ -283,6 +283,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 298 pass locally (+1 CI-only gate = 368 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
+python -m pytest tests/ -q                    # 298 pass locally (+1 CI-only gate = 372 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
 python -m pytest tests/test_cdk_stacks.py -q  # 45 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```

@@ -89,11 +89,24 @@ def assess_coverage(sources, tool_names, aliases=None):
 
     # --- A/B: per-tool parity between CloudTrail Lambda invokes and aegis.call audit lines ----------
     ct_invokes, aegis_calls = {}, {}
+    # L41: `if t:` used to drop an unmappable invoke on the floor. A governed Lambda whose name has
+    # no lexical overlap with the tool it hosts therefore vanished from the parity check entirely -
+    # benefits' `overpayment` (detect_overpayment) and `finalize` (finalize_signoff) both did - and
+    # "zero orphans" quietly meant "zero orphans among the ones that happened to map". Unmapped
+    # invokes are now COUNTED and returned, so a run cannot hide them. They are reported rather than
+    # failed, because plenty of infrastructure Lambdas (tenant-interceptor, kill-switch-engage,
+    # budget-breach) are legitimately not governed tools; the assertion that every GOVERNED stem
+    # maps is static, in each pack's tests/test_lineage_tool_mapping.py.
+    unmapped = {}
     for e in sources.get("cloudtrail", []):
         if e.get("event_source") == "lambda.amazonaws.com" and e.get("event_name") in _LAMBDA_INVOKE_EVENTS:
-            t = tool_of(e.get("target", ""), tool_names, aliases=aliases)
+            target = e.get("target", "")
+            t = tool_of(target, tool_names, aliases=aliases)
             if t:
                 ct_invokes[t] = ct_invokes.get(t, 0) + 1
+            else:
+                fn = (target or "").split(":function:")[-1]
+                unmapped[fn] = unmapped.get(fn, 0) + 1
     for a in sources.get("aegis", []):
         t = a.get("tool")
         if t:
@@ -126,6 +139,10 @@ def assess_coverage(sources, tool_names, aliases=None):
         "gateway_requests": len(sources.get("gateway", [])),
     }
     return {"covered": not orphans, "orphans": orphans, "counts": counts,
+            # L41: an invoke the mapper could not name is reported, never dropped. Empty is the
+            # expected state; anything here is either an infrastructure Lambda (fine) or a governed
+            # tool the pack forgot to declare (not fine, and now visible instead of silent).
+            "unmapped_lambda_invokes": dict(sorted(unmapped.items())),
             "per_tool": {t: {"cloudtrail_invokes": ct_invokes.get(t, 0), "aegis_calls": aegis_calls.get(t, 0)}
                          for t in sorted(set(ct_invokes) | set(aegis_calls))}}
 
