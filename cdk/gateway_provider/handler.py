@@ -62,16 +62,75 @@ def _policy_status(cc, engine_id, pid):
     return d.get("status"), d.get("statusReasons") or []
 
 
+def _policy_ids_by_name(cc, engine_id, name):
+    """Every policyId in this engine carrying this NAME. Name is what create_policy collides on."""
+    try:
+        return [p["policyId"] for p in cc.list_policies(policyEngineId=engine_id).get("policies", [])
+                if p.get("name") == name]
+    except Exception:
+        return []
+
+
+def _wait_policy_name_free(cc, engine_id, name, timeout=120):
+    """Block until no policy carries this NAME.
+
+    delete_policy returns before the name is released; polling get_policy by ID is not enough
+    because the ID is gone while the name is still taken. Returns False on timeout rather than
+    raising, so the caller decides whether that is fatal.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _policy_ids_by_name(cc, engine_id, name):
+            return True
+        time.sleep(3)
+    return not _policy_ids_by_name(cc, engine_id, name)
+
+
+def _create_policy_claiming_name(cc, engine_id, name, definition, mode):
+    """create_policy, resolving a name still held by an earlier attempt or an earlier run.
+
+    A ConflictException here means only that the name is taken. Whatever holds it is either this
+    function's own previous attempt (deleted, not yet propagated) or residue from a prior deploy;
+    in both cases the policy we want is the one we are about to write, so the holder is removed.
+    The second create is NOT wrapped again - if the name is still contended after an explicit
+    delete and a confirmed-free wait, that is a real conflict and must surface, not spin.
+    """
+    body = {"policyEngineId": engine_id, "name": name,
+            "definition": {"cedar": {"statement": definition}}, "validationMode": mode}
+    try:
+        return cc.create_policy(**body)["policyId"]
+    except Exception as exc:
+        code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+        if code != "ConflictException":
+            raise
+        for pid in _policy_ids_by_name(cc, engine_id, name):
+            try:
+                cc.delete_policy(policyEngineId=engine_id, policyId=pid)
+            except Exception:
+                pass
+        if not _wait_policy_name_free(cc, engine_id, name):
+            raise RuntimeError(
+                "policy name %r is still held after an explicit delete; refusing to retry blindly" % name)
+        return cc.create_policy(**body)["policyId"]
+
+
 def _create_policy_active(cc, engine_id, name, definition, mode, attempts=3):
     """Create a Cedar policy and wait for ACTIVE. The engine validates tool ACTIONS against the gateway
     targets' tool schemas; right after the targets report READY the validator can still see an empty
     tool set ("unrecognized action ...") - a propagation race the 2026-09-05 live gate hit. A
     CREATE_FAILED whose reasons say "unrecognized action" is deleted and retried after a settle; any other
-    validation failure raises at once WITH the engine's reasons (so the stack event says what was wrong)."""
+    validation failure raises at once WITH the engine's reasons (so the stack event says what was wrong).
+
+    The retry was itself racy until 2026-09-08. delete_policy returns before the NAME is released, so
+    attempt 2 called create_policy under the same name and got ConflictException("Policy with the same
+    name already exists"). That is not a validation failure, nothing caught it, and it escaped this loop
+    and failed the custom resource - rolling back ben-fp2-gateway and killing the full-portfolio re-gate
+    of main. The one transient this retry exists to survive was the one case it could not survive. Both
+    halves are handled now: the delete is waited out BY NAME, and a ConflictException on create is
+    resolved by removing whatever holds the name before trying again."""
     last_reasons = []
     for attempt in range(attempts):
-        pid = cc.create_policy(policyEngineId=engine_id, name=name,
-                               definition={"cedar": {"statement": definition}}, validationMode=mode)["policyId"]
+        pid = _create_policy_claiming_name(cc, engine_id, name, definition, mode)
         status, reasons = None, []
         for _ in range(40):
             status, reasons = _policy_status(cc, engine_id, pid)
@@ -85,6 +144,9 @@ def _create_policy_active(cc, engine_id, name, definition, mode, attempts=3):
             cc.delete_policy(policyEngineId=engine_id, policyId=pid)
         except Exception:
             pass
+        # Wait for the NAME, not the id: the next attempt re-creates under the same name and the
+        # name outlives the id. Skipping this is what produced the 2026-09-08 rollback.
+        _wait_policy_name_free(cc, engine_id, name)
         transient = any("unrecognized action" in str(r) for r in reasons)
         if not transient or attempt == attempts - 1:
             break
