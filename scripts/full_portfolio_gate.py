@@ -156,8 +156,15 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
     fe = tempfile.NamedTemporaryFile(prefix="fpgate-err-", suffix=".log", delete=False)
     op, ep = fo.name, fe.name
     try:
+        # L42: start_new_session puts the child in its OWN process group on POSIX. Without it the
+        # child stays in the CALLER's group, so _kill_tree's killpg(getpgid(child)) targets the
+        # caller's own group and SIGKILLs the gate - or, under pytest, the test runner. That is why
+        # CI's unit-test step ran 46 minutes and died without reaching lint: the timeout test killed
+        # the process running it, and the grandchildren it was supposed to reap survived anyway.
+        # Windows keeps shell=True for the npx/aws .cmd shims and reaps the tree with taskkill /T.
         p = subprocess.Popen(cmd, cwd=cwd, stdout=fo, stderr=fe, stdin=subprocess.DEVNULL,
-                             shell=(os.name == "nt"), env=e)   # npx/aws are .cmd shims on Windows
+                             shell=(os.name == "nt"), env=e,
+                             start_new_session=(os.name != "nt"))
         try:
             rc = p.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -189,8 +196,21 @@ def _kill_tree(pid):
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
     else:
+        # Guard the invariant rather than trust it: killing our OWN group would take the gate (or
+        # the test runner) with it, which is exactly the L42 defect. If the child somehow is not in
+        # a group of its own, fall back to killing just the child.
         try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
+            pgid = os.getpgid(pid)
+        except OSError:
+            return
+        if pgid == os.getpgid(0):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+            return
+        try:
+            os.killpg(pgid, signal.SIGKILL)
         except OSError:
             pass
 

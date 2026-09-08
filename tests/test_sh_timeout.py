@@ -57,3 +57,50 @@ def test_sh_timeout_kills_the_whole_process_tree():
         out = subprocess.run(["pgrep", "-f", "sleep 300"], capture_output=True, text=True).stdout
         survivors = [l for l in out.splitlines() if l.strip()]
     assert not survivors, "process tree survived the timeout kill: %r" % survivors
+
+
+# ---- L42: the timeout must not kill the process running it ---------------------------------------
+# The three tests above pass on Windows and FAILED on Linux, which is where CI runs. sh() opened the
+# child without start_new_session, so it inherited the CALLER's process group, and _kill_tree's
+# killpg(getpgid(child)) therefore SIGKILLed the caller's group - the gate, or under pytest the test
+# runner itself - while the grandchildren it was meant to reap survived. Reproduced on Linux before
+# fixing: caller pgid 1603 == child pgid 1603, the process died mid-kill, two `sleep 300` survived.
+# With the fix: child pgid 1672 != caller pgid 1670, caller exits normally, survivors none.
+
+@pytest.mark.skipif(_WIN, reason="POSIX process groups; Windows reaps the tree with taskkill /T")
+def test_the_child_gets_its_own_process_group():
+    """The invariant the whole-tree kill depends on. Cheap, and it fails loudly if it regresses."""
+    import signal
+    p = subprocess.Popen(["sleep", "30"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    try:
+        assert os.getpgid(p.pid) != os.getpgid(0), (
+            "the child shares the caller's process group, so killpg would kill the caller")
+        assert os.getpgid(p.pid) == p.pid, "the child should lead its own group"
+    finally:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except OSError:
+            pass
+        p.wait(timeout=10)
+
+
+@pytest.mark.skipif(_WIN, reason="POSIX only")
+def test_sh_opens_children_in_a_new_session_on_posix():
+    """Pin it at the call site too - a future edit that drops the flag must fail here."""
+    import inspect
+    src = inspect.getsource(g.sh)
+    assert "start_new_session" in src, "sh() must isolate the child's process group on POSIX (L42)"
+
+
+@pytest.mark.skipif(_WIN, reason="POSIX only")
+def test_kill_tree_refuses_to_kill_its_own_group(monkeypatch):
+    """Belt and braces: if the child ever IS in our group, kill the child, never the group."""
+    import signal
+    killed = {}
+    monkeypatch.setattr(g.os, "getpgid", lambda pid: 4242)          # child and caller in one group
+    monkeypatch.setattr(g.os, "killpg", lambda *a: killed.setdefault("killpg", a))
+    monkeypatch.setattr(g.os, "kill", lambda *a: killed.setdefault("kill", a))
+    g._kill_tree(1234)
+    assert "killpg" not in killed, "killed its own process group - that is the L42 defect"
+    assert killed.get("kill") == (1234, signal.SIGKILL)
