@@ -118,7 +118,11 @@ jobs:
         run: docker build -t aegis-runtime:ci lib/runtime
 
       - name: Scan the runtime image - BLOCKING on HIGH/CRITICAL
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pinned to the COMMIT the v0.36.0 tag resolves to, not the tag: a tag can be moved, a
+        # third-party action runs with repo credentials, and the previous pin (@0.28.0) did not
+        # exist at all - this action's tags are v-prefixed - so the container scan had been
+        # failing at "Set up job" with "unable to find version" and had never scanned an image.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: aegis-runtime:ci
           format: table
