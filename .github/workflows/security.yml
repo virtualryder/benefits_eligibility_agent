@@ -67,6 +67,12 @@ jobs:
         with:
           node-version: "22"
 
+      # The CDK app imports governed_core; without the pinned core `cdk synth` dies with
+      # ModuleNotFoundError and the IaC gate never scans a single template. It failed that way
+      # silently-enough that "checkov configured" read as "IaC scanned".
+      - name: Install the PINNED governance core (hash-verified)
+        run: python -m pip install --require-hashes -r requirements-core.txt
+
       - name: Install CDK + checkov (pinned)
         run: |
           python -m pip install --quiet -r cdk/requirements.txt "checkov==3.2.489"
