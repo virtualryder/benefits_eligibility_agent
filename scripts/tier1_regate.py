@@ -47,7 +47,7 @@ def sh(cmd, cwd=None, timeout=3600):
     t0 = time.time()
     # CDK prints UTF-8 (smart quotes, arrows); on Windows the locale codec is cp1252 -> decode error mid-gate.
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=timeout, shell=(os.name == "nt"))
+                       timeout=timeout, shell=(os.name == "nt"))  # nosec B602 - shell is Windows-only, for the npx/aws .cmd shims that CreateProcess cannot exec directly. The argv is built from constants in this file plus the pack descriptor; no caller-supplied string is interpolated. These are operator-run gate harnesses, not deployed code.
     return {"cmd": " ".join(cmd) if isinstance(cmd, list) else cmd, "rc": r.returncode,
             "secs": round(time.time() - t0, 1), "out": (r.stdout or "")[-6000:], "err": (r.stderr or "")[-4000:]}
 

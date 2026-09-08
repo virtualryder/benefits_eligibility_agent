@@ -47,7 +47,7 @@ EXPECTED_TAG_FILE = ROOT / "RELEASE"
 
 def run(cmd, cwd=None, timeout=3600, capture=True):
     """Run a command; return (rc, stdout+stderr). UTF-8 decoded (Windows-safe)."""
-    p = subprocess.run(cmd, cwd=cwd or str(ROOT), shell=isinstance(cmd, str),
+    p = subprocess.run(cmd, cwd=cwd or str(ROOT), shell=isinstance(cmd, str),  # nosec B602 - shell is Windows-only, for the npx/aws .cmd shims that CreateProcess cannot exec directly. The argv is built from constants in this file plus the pack descriptor; no caller-supplied string is interpolated. These are operator-run gate harnesses, not deployed code.
                        capture_output=capture, text=True, encoding="utf-8",
                        errors="replace", timeout=timeout)
     out = ((p.stdout or "") + (p.stderr or "")).strip() if capture else ""

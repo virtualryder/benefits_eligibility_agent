@@ -163,7 +163,7 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
         # the process running it, and the grandchildren it was supposed to reap survived anyway.
         # Windows keeps shell=True for the npx/aws .cmd shims and reaps the tree with taskkill /T.
         p = subprocess.Popen(cmd, cwd=cwd, stdout=fo, stderr=fe, stdin=subprocess.DEVNULL,
-                             shell=(os.name == "nt"), env=e,
+                             shell=(os.name == "nt"), env=e,  # nosec B602 - shell is Windows-only, for the npx/aws .cmd shims that CreateProcess cannot exec directly. The argv is built from constants in this file plus the pack descriptor; no caller-supplied string is interpolated. These are operator-run gate harnesses, not deployed code.
                              start_new_session=(os.name != "nt"))
         try:
             rc = p.wait(timeout=timeout)
