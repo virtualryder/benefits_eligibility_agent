@@ -366,6 +366,76 @@ class _TeardownOnly(Exception):
     """--teardown-only: skip straight from the runtime-state read to the teardown block."""
 
 
+def agentcore_residue(session, prefix, region):
+    """AgentCore resources carrying this prefix: gateways, policy engines, agent runtimes.
+
+    These live OUTSIDE CloudFormation. A gateway created by a custom resource survives its stack
+    being rolled back or deleted - observed four times on 2026-09-08, each time a READY gateway with
+    a live MCP URL whose IAM role belonged to a stack that no longer existed. teardown_zero_stack_
+    residue asks CloudFormation and the model-logging config and therefore passed over every one of
+    them, which is the L37/L56a shape: a check named for a guarantee it does not make.
+
+    It matters in both directions. Left behind, an orphaned gateway is a live endpoint and a cost.
+    Left behind, an orphaned POLICY ENGINE is worse than cost: the next deploy adopts it by name and
+    inherits its policies, and a policy name is not reusable once taken (measured that day: still
+    refused 170s after deletion, with list_policies already reporting the engine empty). That is the
+    most likely cause of the run-4 collision this function exists to make visible.
+
+    Returns a dict of lists; empty lists mean clean. Errors are reported as strings rather than
+    swallowed, because "we could not look" must never read as "there was nothing there".
+    """
+    cc = session.client("bedrock-agentcore-control", region_name=region)
+    # The engine name is the gateway name with separators normalised, so match on both spellings.
+    stems = {prefix, prefix.replace("-", "_")}
+
+    def _matches(name):
+        return any(str(name).startswith(stem) for stem in stems)
+
+    found = {}
+    for key, call, items, name_of, id_of in (
+            ("gateways", cc.list_gateways, "items", "name", "gatewayId"),
+            ("policy_engines", cc.list_policy_engines, "policyEngines", "name", "policyEngineId"),
+            ("agent_runtimes", cc.list_agent_runtimes, "agentRuntimes", "agentRuntimeName", "agentRuntimeId")):
+        try:
+            found[key] = [{"name": r.get(name_of), "id": r.get(id_of)}
+                          for r in call().get(items, []) if _matches(r.get(name_of))]
+        except Exception as exc:                      # noqa: BLE001 - reported, never swallowed
+            found[key] = "ERROR %s: %s" % (type(exc).__name__, str(exc)[:150])
+    return found
+
+
+def agentcore_residue_is_clean(found):
+    """True only when every category was readable AND empty. A read error is NOT clean."""
+    return all(isinstance(v, list) and not v for v in found.values())
+
+
+def wait_stacks_gone(cf, prefix, timeout=1800, delay=15):
+    """Block until no stack with this prefix is present or still deleting.
+
+    teardown_zero_stack_residue reported stacks_clean=False on all four teardowns of 2026-09-08 and
+    was wrong every time: it judged while CloudFormation was still in DELETE_IN_PROGRESS, and the
+    stacks were gone moments later. A check that reports failure because it asked too early is not
+    a check, it is noise that trains people to ignore it.
+
+    Returns (clean, note). A timeout returns False with the stacks that were still present, which is
+    a real failure and must stay one.
+    """
+    deadline = time.time() + timeout
+    live = []
+    while True:
+        try:
+            live = sorted(st["StackName"] for st in cf.describe_stacks()["Stacks"]
+                          if st["StackName"].startswith(prefix + "-")
+                          and st["StackStatus"] != "DELETE_COMPLETE")
+        except Exception as exc:                      # noqa: BLE001
+            return False, "could not list stacks: %s: %s" % (type(exc).__name__, str(exc)[:150])
+        if not live:
+            return True, "no stacks with prefix %s-" % prefix
+        if time.time() > deadline:
+            return False, "still present after %ds: %s" % (timeout, live)
+        time.sleep(delay)
+
+
 def main():
     # the gate log is a redirected file on Windows (cp1252): the toolkit prints box-drawing characters, and a
     # print() of a check detail must never take the whole gate down (attempt 1, 2026-09-06)
@@ -427,6 +497,20 @@ def main():
             # stronger, not weaker - a CLI exit code was never the thing being claimed.
             steps["cdk_assembly_dir"] = _ASM                       # L27
             steps["cdk_stale_assemblies_swept"] = _sweep_stale_assemblies()
+
+            # PREFLIGHT (2026-09-08, after four failed re-gates). "From zero" was an assumption:
+            # nothing verified that the account held no AgentCore residue before deploying. An
+            # orphaned POLICY ENGINE is adopted by name on the next deploy, and its policy names
+            # cannot be re-created - which fails the gateway stack eleven policies later with a
+            # ConflictException that names nothing. Assert the precondition instead of assuming it,
+            # and fail here, where the message can say what to delete.
+            pre_residue = agentcore_residue(s, prefix, region)
+            steps["preflight_agentcore_residue"] = pre_residue
+            check("preflight_no_agentcore_residue", agentcore_residue_is_clean(pre_residue),
+                  "%s (a leftover policy engine is adopted by name and its policy names cannot be "
+                  "re-created; delete these before deploying)" % pre_residue)
+            if not agentcore_residue_is_clean(pre_residue):
+                raise RuntimeError("refusing to deploy over AgentCore residue: %s" % pre_residue)
 
             # L38: this loop variable was `s`, which is the boto3 Session bound at the top of
             # main(). Expanding the pack's stack list therefore rebound the session to the string
@@ -764,11 +848,18 @@ def main():
             except Exception as exc:
                 steps["model_logging_restored"] = "%s: %s" % (type(exc).__name__, str(exc)[:150])
         restored = (cfg == pre_cfg) if (pre_cfg and not a.teardown_only) else (not cfg or "modelinvocations/%s" % prefix not in json.dumps(cfg))
+        # Wait for CloudFormation to finish before asking whether it finished. This check reported
+        # stacks_clean=False on all four teardowns of 2026-09-08 and was wrong every time - the
+        # stacks were mid-DELETE and gone moments later.
+        stacks_gone, stacks_note = wait_stacks_gone(cf, prefix)
+        steps["teardown_stack_settle"] = stacks_note
+
         clean = False
         try:
             out = steps["cleanup"]["out"]; rep = json.loads(out[out.rindex('{\n  "prefix"'):]); clean = bool(rep.get("clean"))
         except Exception:
             clean = steps["cleanup"]["rc"] == 0
+        clean = clean and stacks_gone
         # L37 / #231. The toolkit's ECR repository and CodeBuild project live OUTSIDE the prefix and
         # teardown does not delete them; the repository grows one image per gate run. This block used
         # to record only the repository NAMES, beside a check whose name claimed zero residue and
@@ -810,9 +901,19 @@ def main():
         # account's model-invocation logging config is back as it was. It does NOT verify that the
         # account is free of everything this run created - see steps["toolkit_residue"].
         check("teardown_zero_stack_residue", clean and restored,
-              "destroy_rc=%s stacks_clean=%s model_logging_as_before=%s (toolkit ECR residue is "
+              "destroy_rc=%s stacks_clean=%s (%s) model_logging_as_before=%s (toolkit ECR residue is "
               "reported in steps.toolkit_residue and is NOT gated - L37)"
-              % (steps["destroy"]["rc"], clean, restored))
+              % (steps["destroy"]["rc"], clean, stacks_note, restored))
+
+        # Separate check, not folded into the one above, because it is a separate guarantee and
+        # collapsing two guarantees into one name is how teardown_zero_stack_residue came to be
+        # read as "the account is clean" when it only ever asked CloudFormation.
+        post_residue = agentcore_residue(s, prefix, region)
+        steps["teardown_agentcore_residue"] = post_residue
+        check("teardown_zero_agentcore_residue", agentcore_residue_is_clean(post_residue),
+              "%s (gateways, policy engines and runtimes live outside CloudFormation and survive "
+              "stack deletion - four orphaned READY gateways were removed by hand on 2026-09-08)"
+              % post_residue)
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     out = os.path.join(REPO, ".build" if a.teardown_only else "evidence",
