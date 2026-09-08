@@ -51,7 +51,7 @@
 | Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. |
 | Commit SHA | the commit carrying tag `v0.1.2-pilot-rc1` (`git rev-list -n1 v0.1.2-pilot-rc1`) |
 | Test count at the tag | **101** offline tests <!-- count-gate:historical --> at the moment `v0.1.2-pilot-rc1` was cut — a record of that tag, not a claim about the current tree |
-| Test count on current main | **409 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
+| Test count on current main | **413 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |
