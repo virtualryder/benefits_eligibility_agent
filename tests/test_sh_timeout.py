@@ -45,17 +45,31 @@ def test_sh_timeout_raises_promptly_when_a_grandchild_holds_the_handles():
     assert elapsed < 45, "sh() did not return promptly after its timeout: %.1fs" % elapsed
 
 
+def _probe_pids():
+    """PIDs of the processes this test's command creates. Machine-global by image/pattern, so it
+    is snapshotted BEFORE and AFTER and only the DIFFERENCE is judged."""
+    if _WIN:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq PING.EXE", "/FO", "CSV", "/NH"],
+                             capture_output=True, text=True).stdout
+        return {l.split('","')[1] for l in out.splitlines() if l.startswith('"')}
+    out = subprocess.run(["pgrep", "-f", "sleep 300"], capture_output=True, text=True).stdout
+    return {l.strip() for l in out.splitlines() if l.strip()}
+
+
 def test_sh_timeout_kills_the_whole_process_tree():
+    # This assertion used to read machine-global state - "is ANY ping.exe running?" - so a stray
+    # probe left by an earlier run, or by anything else on the box, failed it. On 2026-09-08 it
+    # did exactly that: two PING.EXE from this test's own previous invocation failed the next run,
+    # which reads as a regression and is not one. Judge only the processes THIS call created.
+    before = _probe_pids()
     with pytest.raises(subprocess.TimeoutExpired):
         g.sh(_ORPHAN_CMD, timeout=5)
     time.sleep(2)
-    if _WIN:
-        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq PING.EXE"],
-                             capture_output=True, text=True).stdout.upper()
-        survivors = [l for l in out.splitlines() if "PING.EXE" in l]
-    else:
-        out = subprocess.run(["pgrep", "-f", "sleep 300"], capture_output=True, text=True).stdout
-        survivors = [l for l in out.splitlines() if l.strip()]
+    survivors = sorted(_probe_pids() - before)
+    if survivors:  # never leave the box dirtier than we found it, whatever the verdict
+        for pid in survivors:
+            subprocess.run(["taskkill", "/F", "/PID", pid] if _WIN else ["kill", "-9", pid],
+                           capture_output=True)
     assert not survivors, "process tree survived the timeout kill: %r" % survivors
 
 

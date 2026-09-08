@@ -165,6 +165,8 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
         p = subprocess.Popen(cmd, cwd=cwd, stdout=fo, stderr=fe, stdin=subprocess.DEVNULL,
                              shell=(os.name == "nt"), env=e,  # nosec B602 - shell is Windows-only, for the npx/aws .cmd shims that CreateProcess cannot exec directly. The argv is built from constants in this file plus the pack descriptor; no caller-supplied string is interpolated. These are operator-run gate harnesses, not deployed code.
                              start_new_session=(os.name != "nt"))
+        if os.name == "nt":
+            _win_assign_job(p.pid)
         try:
             rc = p.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -190,9 +192,96 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
     return {"cmd": label, "rc": rc, "secs": round(time.time() - t0, 1), "out": out, "err": err}
 
 
+# ---- L42b: Windows needs a Job Object, not just taskkill /T --------------------------------------
+# `taskkill /T` walks PARENT-CHILD links. A grandchild started with `start /b`, or any child whose
+# parent has already exited, is no longer IN that tree and survives the kill. That is the same shape
+# as attempt 14's hang - an orphaned grandchild holding inherited handles - and the timeout test
+# caught it live on 2026-09-08: two PING.EXE processes outlived a kill that reported success.
+# A Job Object is Windows' equivalent of a POSIX process group: every descendant a process creates
+# after it is assigned belongs to the job too, and terminating the job terminates all of them
+# regardless of whether the intermediate parents are still alive.
+_WIN_JOBS = {}
+
+
+def _win_assign_job(pid):
+    """Put `pid` (and everything it spawns from now on) in a kill-on-close Job Object."""
+    import ctypes
+    from ctypes import wintypes
+
+    class IO_COUNTERS(ctypes.Structure):
+        _fields_ = [("ReadOperationCount", ctypes.c_ulonglong),
+                    ("WriteOperationCount", ctypes.c_ulonglong),
+                    ("OtherOperationCount", ctypes.c_ulonglong),
+                    ("ReadTransferCount", ctypes.c_ulonglong),
+                    ("WriteTransferCount", ctypes.c_ulonglong),
+                    ("OtherTransferCount", ctypes.c_ulonglong)]
+
+    class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", wintypes.LARGE_INTEGER),
+                    ("PerJobUserTimeLimit", wintypes.LARGE_INTEGER),
+                    ("LimitFlags", wintypes.DWORD),
+                    ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t),
+                    ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.POINTER(ctypes.c_ulong)),
+                    ("PriorityClass", wintypes.DWORD),
+                    ("SchedulingClass", wintypes.DWORD)]
+
+    class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
+                    ("IoInfo", IO_COUNTERS),
+                    ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
+    JobObjectExtendedLimitInformation = 9
+    PROCESS_SET_QUOTA, PROCESS_TERMINATE = 0x0100, 0x0001
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    job = k32.CreateJobObjectW(None, None)
+    if not job:
+        return None
+    info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not k32.SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+                                       ctypes.byref(info), ctypes.sizeof(info)):
+        k32.CloseHandle(job)
+        return None
+    hproc = k32.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, pid)
+    if not hproc:
+        k32.CloseHandle(job)
+        return None
+    ok = k32.AssignProcessToJobObject(job, hproc)
+    k32.CloseHandle(hproc)
+    if not ok:
+        # A process already in another job that forbids breakaway cannot be reassigned. Fall back
+        # to taskkill alone rather than pretending the tree is contained.
+        k32.CloseHandle(job)
+        return None
+    _WIN_JOBS[pid] = job
+    return job
+
+
+def _win_kill_job(pid):
+    """Terminate the whole job, detached grandchildren included. Returns True if a job was used."""
+    import ctypes
+    job = _WIN_JOBS.pop(pid, None)
+    if not job:
+        return False
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.TerminateJobObject(job, 1)
+    k32.CloseHandle(job)
+    return True
+
+
 def _kill_tree(pid):
     """Kill a process AND its descendants. Orphaned grandchildren are what hung attempt 14."""
     if os.name == "nt":
+        # Job Object first (reaches detached grandchildren), taskkill /T second as a belt-and-braces
+        # for the narrow window between Popen and the assignment.
+        _win_kill_job(pid)
         subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
     else:
