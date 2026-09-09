@@ -779,16 +779,30 @@ def main():
         # step swallows its own failure, so it returned 0 having created nothing. Verify the
         # ARTIFACTS instead - and verify the gateway target is on THIS gateway, not merely present.
         def conn_artifacts():
-            found = {"sor_lambda": False, "verify_lambda": False, "sor_rejects_anonymous": None,
-                     "credential_provider": False, "gateway_target": False, "sor_url": ""}
+            # UNMEASURED IS None, NOT False. The first version of this function initialised every
+            # field to False and returned early when connector-state.env was missing, so it never
+            # probed AWS at all - and its all-False dict was indistinguishable from a genuine "none
+            # of this exists". On the 2026-09-09 ben-fp4 run I read those defaults as findings and
+            # reported that the connector had created nothing, while an OAuth-protected API
+            # Gateway, the verify_source Lambda, an IAM role and a credential provider holding an
+            # M2M client secret were all live. Worse, the teardown guard keyed on one of those
+            # unmeasured Falses and skipped the connector teardown entirely, so the gate declared
+            # zero residue over a live credential. None forces that distinction to be visible.
+            found = {"sor_lambda": None, "verify_lambda": None, "sor_rejects_anonymous": None,
+                     "credential_provider": None, "gateway_target": None, "sor_url": "",
+                     "state_file": False}
+            notes = []
             cst = {}
             try:
                 for ln in open(os.path.join(AGENT, "connector-state.env"), encoding="utf-8"):
                     if "=" in ln:
                         k, v = ln.strip().split("=", 1)
                         cst[k] = v
+                found["state_file"] = True
             except OSError:
-                return found, "connector-state.env absent - deploy wrote no state"
+                # A missing state file means the deploy did not finish. It does NOT mean the deploy
+                # created nothing, so we keep probing - that is the whole point.
+                notes.append("connector-state.env absent (deploy did not complete) - probing AWS anyway")
             found["sor_url"] = cst.get("SOR_URL", "")
             lam = s.client("lambda")
             for key, fn in (("sor_lambda", "%s-sor-api" % PACK["prefix_prefix"]),
@@ -796,8 +810,13 @@ def main():
                 try:
                     lam.get_function(FunctionName=fn)
                     found[key] = True
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # Only ResourceNotFound proves absence. Any other error means we could not
+                    # look, and must not be recorded as "not there" - see the None note above.
+                    if type(exc).__name__ in ("ResourceNotFoundException", "NoSuchEntityException"):
+                        found[key] = False
+                    else:
+                        notes.append("%s probe failed: %s" % (key, type(exc).__name__))
             # The system of record must genuinely refuse an unauthenticated caller. If this comes
             # back 200 the "OAuth2-protected" claim is false and the whole proof is theatre.
             if found["sor_url"]:
@@ -818,17 +837,24 @@ def main():
                 # rather than to any gateway that happens to carry the name.
                 gid = (gw.get("GatewayArn", "") or "").rsplit("/", 1)[-1]
                 if not gid:
-                    return found, "no GatewayArn in outputs - cannot verify the target"
-                tgts = cc.list_gateway_targets(gatewayIdentifier=gid).get("items", [])
-                found["gateway_target"] = any(x.get("name") == "verify-source" for x in tgts)
+                    notes.append("no GatewayArn in outputs - could not verify the target")
+                else:
+                    tgts = cc.list_gateway_targets(gatewayIdentifier=gid).get("items", [])
+                    found["gateway_target"] = any(x.get("name") == "verify-source" for x in tgts)
             except Exception as exc:
-                return found, "%s: %s" % (type(exc).__name__, str(exc)[:120])
-            return found, ""
+                notes.append("agentcore probe failed: %s: %s" % (type(exc).__name__, str(exc)[:100]))
+            return found, "; ".join(notes)
 
         art, art_err = conn_artifacts()
         steps["conn_artifacts"] = art
-        conn_ok = (art["sor_lambda"] and art["verify_lambda"] and art["credential_provider"]
-                   and art["gateway_target"] and art["sor_rejects_anonymous"] in (401, 403))
+        # `is True` on purpose: None (unmeasured) must never satisfy this, and a truthy-but-wrong
+        # value must never sneak through. conn_ok is the claim "the connector demonstrably stood up".
+        conn_ok = (art["sor_lambda"] is True and art["verify_lambda"] is True
+                   and art["credential_provider"] is True and art["gateway_target"] is True
+                   and art["sor_rejects_anonymous"] in (401, 403))
+        # NOTE: teardown does NOT key on any of these values. It keys on whether the deploy step
+        # ran at all (see the guard in section 4), because "did it create anything" is precisely
+        # the question this function can fail to answer.
         check("CONN_deploy", conn_ok,
               "rc=%s in %ss artifacts=%s %s" % (steps["conn_deploy"]["rc"],
                                                 steps["conn_deploy"]["secs"], art, art_err))
@@ -863,7 +889,17 @@ def main():
         # will not after the identity stack goes.
         # "already absent" is a pass for idempotency, so this check is only EVIDENCE of a real
         # teardown when something was really created. Otherwise it is vacuous, as it was on ben-fp3.
-        if steps.get("conn_artifacts", {}).get("verify_lambda") or a.teardown_only:
+        #
+        # BUT the guard must never be the reason cleanup is skipped. It used to read
+        # `conn_artifacts["verify_lambda"]`, which on the 2026-09-09 ben-fp4 run was an UNMEASURED
+        # False - the probe had returned early without querying AWS. The connector teardown was
+        # therefore skipped over eight live resources, including an OAuth-protected API Gateway and
+        # a credential provider holding an M2M client secret, and the gate still reported zero
+        # residue because teardown_zero_agentcore_residue only inspects gateways, policy engines
+        # and runtimes. Cleanup now runs whenever the deploy was ATTEMPTED: destroy_connector.sh is
+        # idempotent, so running it needlessly costs seconds, while skipping it once leaks a
+        # credential. Asymmetric risk gets an asymmetric default.
+        if steps.get("conn_deploy") is not None or a.teardown_only:
             steps["conn_destroy"] = bash(os.path.join(REPO, "lib", "connector", "destroy_connector.sh"),
                                          AGENT, timeout=900)
             check("CONN_teardown_zero_residue",
@@ -1027,6 +1063,55 @@ def main():
               "%s (gateways, policy engines and runtimes live outside CloudFormation and survive "
               "stack deletion - four orphaned READY gateways were removed by hand on 2026-09-08)"
               % post_residue)
+
+        # CONN-1, 2026-09-09: the two checks above BOTH passed on ben-fp4 while an OAuth-protected
+        # API Gateway, the verify_source Lambda, the connector IAM role and an AgentCore credential
+        # provider holding an M2M client secret were all still live in the account. Neither check
+        # was wrong; between them they simply had no opinion. teardown_zero_stack_residue asks
+        # CloudFormation, which never owned these, and teardown_zero_agentcore_residue enumerates
+        # gateways, policy engines and runtimes - not credential providers. The connector's own
+        # teardown verdict cannot substitute either, since it is exactly the thing under suspicion.
+        # So this asks AWS directly, independently of destroy_connector.sh's self-report.
+        def connector_residue():
+            left, unchecked = [], []
+            pp = PACK["prefix_prefix"]
+            probes = (
+                ("lambda", "%s-sor-api" % pp, lambda: s.client("lambda").get_function(
+                    FunctionName="%s-sor-api" % pp)),
+                ("lambda", "%s-verify-source" % pp, lambda: s.client("lambda").get_function(
+                    FunctionName="%s-verify-source" % pp)),
+                ("iam role", "%s-connector-exec" % pp, lambda: s.client("iam").get_role(
+                    RoleName="%s-connector-exec" % pp)),
+            )
+            for kind, name, probe in probes:
+                try:
+                    probe()
+                    left.append("%s %s" % (kind, name))
+                except Exception as exc:
+                    if type(exc).__name__ not in ("ResourceNotFoundException", "NoSuchEntityException"):
+                        unchecked.append("%s %s (%s)" % (kind, name, type(exc).__name__))
+            try:
+                apis = s.client("apigatewayv2").get_apis().get("Items", [])
+                left += ["http api %s" % x.get("ApiId") for x in apis
+                         if x.get("Name") == "%s-sor-api" % pp]
+            except Exception as exc:
+                unchecked.append("http api (%s)" % type(exc).__name__)
+            try:
+                cps = s.client("bedrock-agentcore-control").list_oauth2_credential_providers()
+                left += ["credential provider %s" % p.get("name")
+                         for p in cps.get("credentialProviders", [])
+                         if p.get("name") == "%s-sor-oauth" % pp]
+            except Exception as exc:
+                unchecked.append("credential provider (%s)" % type(exc).__name__)
+            return left, unchecked
+
+        conn_left, conn_unchecked = connector_residue()
+        steps["teardown_connector_residue"] = {"left": conn_left, "unchecked": conn_unchecked}
+        # Unchecked fails too. "I could not look" is the state that produced this whole finding.
+        check("teardown_zero_connector_residue", not conn_left and not conn_unchecked,
+              "left=%s unchecked=%s (asks AWS directly; the connector's own CLEAN verdict is not "
+              "evidence here - on 2026-09-09 it printed CLEAN over live resources because its aws "
+              "CLI probes were failing into 2>/dev/null)" % (conn_left, conn_unchecked))
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     out = os.path.join(REPO, ".build" if a.teardown_only else "evidence",

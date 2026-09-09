@@ -100,6 +100,48 @@ Tranche A is the pre-pilot work. Tranche B needs a live deployment. Tranche C ne
 availability, error rate, latency, due-process backlog, spend and perimeter bypass — and that the
 alarm set cannot drift from its runbook without failing CI.
 
+**Will not (CONN-1 specifically):** see section 5 — the governed system-of-record connector is
+**unproven** and may not be cited in any partner document.
+
 **Will not:** any claim about operating this in production. There is still no DR exercise, no real
 on-call rotation, no SLO *agreement* with anyone, and no evidence from a system carrying real load.
 An SLO alarm is not an SLO; it is a threshold we chose. Say it that way.
+
+## 5. CONN-1 (governed system-of-record connector) — OPEN, NOT PROVEN
+
+**Status as of 2026-09-09: unproven. It may not be cited in any partner document.**
+
+The `ben-fp4` live run put 14 platform checks through from zero — deploy across nine stacks, runtime
+READY, G111, kill switch, budget, guardrail 19/19, `LIN_zero_orphans` 11/11, E2E with zero
+unexpected errors — and `CONN_deploy` **failed**, correctly.
+
+Root cause: `deploy_connector.sh` referenced `$GW_ID`, but `spine-state.env` has only ever carried
+`GW_ARN` and `GW_URL`. Under `set -u` that is a fatal unbound variable, so the deploy aborted at the
+gateway-target step on every run it has ever had. `CONN_governed_sor_proof` has **never completed on
+any commit** — the earlier `ben-fp3` "PASS" was the check passing, not the connector.
+
+Three further defects surfaced in the same run, all now fixed and recorded as **L70**:
+
+- `conn_artifacts()` returned unmeasured `False`s without querying AWS, so "I never looked" was
+  indistinguishable from "nothing exists". It now probes regardless and records `None` for
+  unmeasured, and `conn_ok` tests `is True`.
+- The teardown guard keyed on one of those unmeasured `False`s and **skipped cleanup over eight live
+  resources**, including a credential provider holding an M2M client secret. It now fires whenever
+  the deploy was attempted.
+- `destroy_connector.sh` reported `absent` for live resources and printed `CONNECTOR TEARDOWN:
+  CLEAN`, because every probe is an `aws` CLI call ending in `2>/dev/null` and `aws` was not on
+  PATH. It now refuses to run without the CLI and prints `UNVERIFIED`.
+
+A new `teardown_zero_connector_residue` check asks AWS directly for the connector's lambdas, IAM
+role, http api and credential provider, and **counts "could not check" as a failure** — the two
+existing residue checks had no opinion on any of these, which is how the gate certified a clean
+account over a live secret.
+
+**Required before CONN-1 may be claimed:** one more from-zero live run in which `CONN_deploy`,
+`CONN_governed_sor_proof` and both residue checks pass on their own. Until that exists,
+`connect_system_of_record` stays stubbed in the manifest and the connector appears in no brief,
+deck, or architecture legend.
+
+And when it does pass, two sentences stay adjacent, as they always have: the system of record is a
+**real** OAuth2 API with RS256/JWKS signature verification, and it is **ours**. Proving the governed
+path reaches it is not the same as proving a customer's system has been governed.

@@ -27,6 +27,21 @@ AGENT="$(cd "$AGENT_DIR" && pwd)"; BUILD="$AGENT/.build"; mkdir -p "$BUILD"
 source "$BUILD/agent.env"
 [ -f "$AGENT/spine-state.env" ] && source "$AGENT/spine-state.env"
 REGION="${REGION:-us-east-1}"; P="$PREFIX"
+
+# Same GW_ID defect as deploy_connector.sh: spine-state carries GW_ARN, never GW_ID, so the
+# gateway-target removal silently reported "absent" on every run. See the block in deploy.
+GW_ID="${GW_ID:-${GW_ARN:-}}"; GW_ID="${GW_ID##*/}"
+
+# THIS SCRIPT CERTIFIES ZERO RESIDUE, so it must never mistake "I could not look" for "nothing is
+# there". On 2026-09-09 it was run in a shell where the aws CLI was not on PATH. Every CLI probe
+# returned empty, every resource was logged "absent", and it printed CONNECTOR TEARDOWN: CLEAN
+# while an OAuth-protected API Gateway, the verify_source Lambda and the connector IAM role were
+# all still live - and it did so because each probe hides its own stderr with 2>/dev/null. Only the
+# boto3 steps (credential provider, workload identity) actually worked, which is what exposed it.
+# A teardown that cannot fail is worse than no teardown: it is a false all-clear on a credential.
+command -v aws >/dev/null 2>&1 || {
+  echo "[connector-destroy] FATAL: aws CLI not on PATH - cannot verify or remove connector resources"
+  echo "CONNECTOR TEARDOWN: UNVERIFIED"; exit 1; }
 LIBRT="$LIB/runtime"; PY="$LIBRT/.venv/Scripts/python.exe"; [ -f "$PY" ] || PY="$LIBRT/.venv/bin/python"
 [ -f "$PY" ] || PY="python"
 log(){ echo "[connector-destroy] $*"; }
@@ -63,9 +78,15 @@ for FN in "$SOR_FN" "$VERIFY_FN"; do
 done
 
 # ---- 4. AgentCore Identity: credential provider (holds the M2M client secret) + workload identity ----
-"$PY" - "$PROVIDER" "$WI" "$REGION" <<'PYEOF'
+# These two steps run through boto3, not the aws CLI, and their outcome must reach the counters:
+# on 2026-09-09 they removed a credential provider and a workload identity while SUMMARY still
+# said removed=0, because the heredoc only printed and never touched $gone or $left. A summary
+# that under-reports its own removals is one edit away from over-reporting its own cleanliness.
+# Exit code carries the verdict: 0 = nothing left behind, 1 = something could not be removed.
+if "$PY" - "$PROVIDER" "$WI" "$REGION" <<'PYEOF'
 import sys, boto3
 provider, wi, region = sys.argv[1:4]
+left = 0
 c = boto3.client("bedrock-agentcore-control", region_name=region)
 try:
     names = [p.get("name") for p in c.list_oauth2_credential_providers().get("credentialProviders", [])]
@@ -76,6 +97,7 @@ try:
         print("[connector-destroy] absent   credential provider %s" % provider)
 except Exception as exc:
     print("[connector-destroy] LEFT     credential provider %s <- %s" % (provider, str(exc)[:120]))
+    left += 1
 try:
     c.delete_workload_identity(name=wi)
     print("[connector-destroy] removed workload identity %s" % wi)
@@ -85,7 +107,10 @@ except Exception as exc:
         print("[connector-destroy] absent   workload identity %s" % wi)
     else:
         print("[connector-destroy] LEFT     workload identity %s <- %s" % (wi, msg[:120]))
+        left += 1
+sys.exit(1 if left else 0)
 PYEOF
+then :; else left=$((left+1)); log "LEFT     one or more AgentCore Identity objects (see above)"; fi
 
 # ---- 5. IAM role (inline policy first) ----
 if aws iam get-role --role-name "$CONN_ROLE" >/dev/null 2>&1; then

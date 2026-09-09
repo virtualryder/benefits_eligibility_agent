@@ -22,8 +22,24 @@ AGENT="$(cd "$AGENT_DIR" && pwd)"; LIBRT="$LIB/runtime"
 BUILD="$AGENT/.build"; mkdir -p "$BUILD"
 ( unset MSYS_NO_PATHCONV; python "$LIB/engine/render.py" "$AGENT/manifest.yaml" "$BUILD" >/dev/null )
 source "$BUILD/agent.env"                                # PREFIX
-source "$AGENT/spine-state.env"                          # REGION, ACCOUNT, POOL_ID, GW_ID
+source "$AGENT/spine-state.env"                          # REGION, ACCOUNT, POOL_ID, GW_ARN, GW_URL
 REGION="${REGION:-us-east-1}"; ACC="${ACCOUNT:?}"; P="$PREFIX"
+
+# CONN-1 ROOT CAUSE, found on the 2026-09-09 ben-fp4 live run.
+# This script referenced $GW_ID at step 9, but spine-state.env has only ever carried GW_ARN and
+# GW_URL - never GW_ID. Under `set -u` an unbound variable is fatal, so bash aborted the instant it
+# reached the gateway-target call: the run died right after "verify_source Lambda ready" with EIGHT
+# of nine resources live, no connector-state.env written, and no error text a reader could act on.
+# The comment on the line above used to claim spine-state supplied GW_ID. It never did, on any
+# commit - which is why CONN_governed_sor_proof had never once run to completion.
+# The gateway id is the last path segment of the ARN; `##*/` is a no-op on a bare id.
+GW_ID="${GW_ID:-${GW_ARN:-}}"; GW_ID="${GW_ID##*/}"
+[ -n "$GW_ID" ] || err "neither GW_ID nor GW_ARN in $AGENT/spine-state.env - cannot attach the gateway target"
+
+# Every step below uses the aws CLI. If it is not on PATH each call fails, `2>/dev/null` hides the
+# reason, and an empty result reads as "already exists" or "absent" - the exact defect that made
+# destroy_connector.sh certify CONNECTOR TEARDOWN: CLEAN over live resources on 2026-09-09.
+command -v aws >/dev/null 2>&1 || { echo "[connector] FATAL: aws CLI not on PATH - refusing to run"; exit 1; }
 PY="$LIBRT/.venv/Scripts/python.exe"; [ -f "$PY" ] || PY="$LIBRT/.venv/bin/python"
 log(){ echo "[connector] $*"; }
 WORK="$SELF/.work"; rm -rf "$WORK"; mkdir -p "$WORK"; cd "$WORK"
