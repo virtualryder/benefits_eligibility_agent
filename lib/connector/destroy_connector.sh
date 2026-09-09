@@ -68,6 +68,23 @@ if [ -n "${GW_ID:-}" ]; then
   else skip "gateway target verify-source"; fi
 else skip "gateway target (no GW_ID in spine-state)"; fi
 
+# ---- 1b. Remove the inline policy deploy put on the GATEWAY'S OWN role ----
+# deploy_connector.sh grants the gateway execution role lambda:InvokeFunction so it can call the
+# tool Lambda. That role belongs to CloudFormation, and CFN cannot delete a role that still carries
+# an inline policy it does not know about - so leaving this behind would fail `cdk destroy` and
+# strand the whole identity stack. This runs before cdk destroy precisely so that cannot happen.
+if [ -n "${GW_ID:-}" ]; then
+  GW_ROLE_ARN="$(aws bedrock-agentcore-control get-gateway --gateway-identifier "$GW_ID" --region "$REGION" --query roleArn --output text 2>/dev/null | tr -d '\r')"
+  if [ -n "$GW_ROLE_ARN" ] && [ "$GW_ROLE_ARN" != "None" ]; then
+    GW_ROLE_NAME="${GW_ROLE_ARN##*/}"
+    if aws iam get-role-policy --role-name "$GW_ROLE_NAME" --policy-name "${P}-gw-invoke-verify" >/dev/null 2>&1; then
+      aws iam delete-role-policy --role-name "$GW_ROLE_NAME" --policy-name "${P}-gw-invoke-verify" >/dev/null 2>&1 \
+        && ok "inline policy ${P}-gw-invoke-verify on $GW_ROLE_NAME" \
+        || fail "inline policy ${P}-gw-invoke-verify on $GW_ROLE_NAME" "delete failed"
+    else skip "inline policy ${P}-gw-invoke-verify on $GW_ROLE_NAME"; fi
+  else skip "gateway role policy (gateway $GW_ID not readable)"; fi
+else skip "gateway role policy (no GW_ID/GW_ARN in spine-state)"; fi
+
 # ---- 2. API Gateway HTTP API ----
 API_ID="$(aws apigatewayv2 get-apis --region "$REGION" --query "Items[?Name=='$SOR_FN'].ApiId | [0]" --output text 2>/dev/null | tr -d '\r')"
 if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then

@@ -1,0 +1,4988 @@
+{
+ "env": "fp6",
+ "prefix": "ben-fp6",
+ "tenants": [
+  "sp-a",
+  "sp-b"
+ ],
+ "started_at": 1788994965,
+ "git": {
+  "describe": "v0.7.0-pilot-rc1-5-g0487a23",
+  "sha": "0487a234165a638a5b48e662acb818153ab66ab9",
+  "dirty": false
+ },
+ "steps": {
+  "mt": {
+   "cmd": "C:\\Users\\daryd\\AppData\\Local\\Programs\\Python\\Python312\\python.exe C:\\Users\\daryd\\Projects-DR\\benefits_eligibility_agent\\scripts\\mt_two_tenant_proof.py --env fp6 --tenants sp-a,sp-b --region us-east-1",
+   "exit": 0,
+   "seconds": 81.4,
+   "json": {
+    "env": "fp6",
+    "prefix": "ben-fp6",
+    "tenants": [
+     "sp-a",
+     "sp-b"
+    ],
+    "gateway_url": "https://ben-fp6-ben-gw-zpi6a0xku6.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+    "enforcement": "ENFORCE",
+    "policy_engine": "ben_fp6_ben_authz-x4io00neqd",
+    "steps": [
+     {
+      "step": "users",
+      "created": {
+       "cw-a": [
+        "benefits_caseworker",
+        "tools_granted",
+        "tenant_sp-a"
+       ],
+       "cw-b": [
+        "benefits_caseworker",
+        "tools_granted",
+        "tenant_sp-b"
+       ],
+       "cw-none": [
+        "benefits_caseworker",
+        "tools_granted"
+       ]
+      }
+     },
+     {
+      "step": "store_counts_before",
+      "counts": {
+       "sp-a": 0,
+       "sp-b": 0,
+       "base": 0
+      }
+     },
+     {
+      "identity": "cw-a",
+      "groups": [
+       "benefits_caseworker",
+       "tools_granted",
+       "tenant_sp-a"
+      ],
+      "expect_allowed": true,
+      "initialize": {
+       "status": 200,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+         "protocolVersion": "2025-03-26",
+         "capabilities": {
+          "tools": {
+           "listChanged": false
+          },
+          "prompts": {
+           "listChanged": false
+          },
+          "resources": {
+           "listChanged": false
+          }
+         },
+         "serverInfo": {
+          "version": "1.0.0",
+          "name": "ben-fp6-ben-gw"
+         }
+        }
+       }
+      },
+      "tools_list": {
+       "status": 200,
+       "tools": [
+        "assess-eligibility___assess_eligibility",
+        "ben-core___draft_notice",
+        "intake-application___intake_application",
+        "mask-pii___mask_pii",
+        "overpayment___detect_overpayment",
+        "redetermine___redetermine",
+        "request-signoff___request_signoff",
+        "write-audit___write_audit"
+       ],
+       "error": null
+      },
+      "mask_pii_call": {
+       "status": 200,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+         "isError": false,
+         "content": [
+          {
+           "type": "text",
+           "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"a21358d8200840c2a1e78ab60f320c9e\",\"sanitized_sha256\":\"91d08f750ed689f1036cdaf021e28fd5ce75274dd1c79c7d0b8b72c3f79a0d15\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788994987,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"410bc25c5a90da262a30a13d5786b7760c39ddce386837882fcb834728ffb520\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:IP_ADDRESS]\"}"
+          }
+         ]
+        }
+       }
+      }
+     },
+     {
+      "step": "store_counts_after_cw-a",
+      "counts": {
+       "sp-a": 1,
+       "sp-b": 0,
+       "base": 0
+      }
+     },
+     {
+      "identity": "cw-b",
+      "groups": [
+       "benefits_caseworker",
+       "tools_granted",
+       "tenant_sp-b"
+      ],
+      "expect_allowed": true,
+      "initialize": {
+       "status": 200,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+         "protocolVersion": "2025-03-26",
+         "capabilities": {
+          "tools": {
+           "listChanged": false
+          },
+          "prompts": {
+           "listChanged": false
+          },
+          "resources": {
+           "listChanged": false
+          }
+         },
+         "serverInfo": {
+          "version": "1.0.0",
+          "name": "ben-fp6-ben-gw"
+         }
+        }
+       }
+      },
+      "tools_list": {
+       "status": 200,
+       "tools": [
+        "assess-eligibility___assess_eligibility",
+        "ben-core___draft_notice",
+        "intake-application___intake_application",
+        "mask-pii___mask_pii",
+        "overpayment___detect_overpayment",
+        "redetermine___redetermine",
+        "request-signoff___request_signoff",
+        "write-audit___write_audit"
+       ],
+       "error": null
+      },
+      "mask_pii_call": {
+       "status": 200,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+         "isError": false,
+         "content": [
+          {
+           "type": "text",
+           "text": "{\"deidentified\":true,\"entities_masked\":4,\"comprehend_entities\":4,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"dcc3cc045b1f4cfdba3392926f86a653\",\"sanitized_sha256\":\"e2fe9355828da6fab8b09f97b1c05992498cc865f465b98822e464ff5559829a\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":4,\"ts\":1788994991,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"d9f9b4431b5f23628b3c40e6ccb424fad84d7cba0c164b09f75a6dc1a071b982\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. 298da286-4ada-4f4e-a980-4ec7d65e7249\"}"
+          }
+         ]
+        }
+       }
+      }
+     },
+     {
+      "step": "store_counts_after_cw-b",
+      "counts": {
+       "sp-a": 1,
+       "sp-b": 1,
+       "base": 0
+      }
+     },
+     {
+      "identity": "cw-none",
+      "groups": [
+       "benefits_caseworker",
+       "tools_granted"
+      ],
+      "expect_allowed": false,
+      "initialize": {
+       "status": 200,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+         "protocolVersion": "2025-03-26",
+         "capabilities": {
+          "tools": {
+           "listChanged": false
+          },
+          "prompts": {
+           "listChanged": false
+          },
+          "resources": {
+           "listChanged": false
+          }
+         },
+         "serverInfo": {
+          "version": "1.0.0",
+          "name": "ben-fp6-ben-gw"
+         }
+        }
+       }
+      },
+      "tools_list": {
+       "status": 200,
+       "tools": [],
+       "error": null
+      },
+      "mask_pii_call": {
+       "status": 403,
+       "body": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "error": {
+         "code": -32000,
+         "message": "multi-tenant: identity carries no tenant (custom:tenant); refused"
+        }
+       }
+      }
+     },
+     {
+      "step": "audit_gateway",
+      "before": {
+       "ledger": {
+        "sp-a": 0,
+        "sp-b": 0,
+        "base": 0
+       },
+       "worm": {
+        "sp-a": 0,
+        "sp-b": 0,
+        "base": 0
+       }
+      },
+      "cw-a": {
+       "identity": "cw-a",
+       "call": {
+        "status": 200,
+        "body": {
+         "jsonrpc": "2.0",
+         "id": 3,
+         "result": {
+          "isError": false,
+          "content": [
+           {
+            "type": "text",
+            "text": "{\"stored\":true,\"worm\":true,\"chain_hash\":\"e05e542883d1a53e819a8b533f30570ccb5df92a9cbff843bcbfa825f3851ab6\",\"prev_hash\":\"GENESIS\",\"seq\":0,\"phase\":\"INTENT\",\"audit_id\":\"89bbe08d74d15457fa38fab5a028c20075e230c22415f3d307be6887cdd15b6e\",\"entry_hash\":\"d11f56b5d5cdad19f8b97d3b6118fbe18bdba2703d6c8141258d0554c0598edd\",\"case_id\":\"MT-93F463B1\",\"policy_version\":\"cedar-534be1c676bb\",\"rule_version\":\"manifest-f9304ea72e8d\",\"table\":\"ben-fp6-sp-a-audit-ledger\",\"bucket\":\"ben-fp6-sp-a-worm-111122223333\",\"key\":\"MT-93F463B1/89bbe08d74d15457fa38fab5a028c20075e230c22415f3d307be6887cdd15b6e.json\"}"
+           }
+          ]
+         }
+        }
+       },
+       "tool_result": {
+        "stored": true,
+        "worm": true,
+        "chain_hash": "e05e542883d1a53e819a8b533f30570ccb5df92a9cbff843bcbfa825f3851ab6",
+        "prev_hash": "GENESIS",
+        "seq": 0,
+        "phase": "INTENT",
+        "audit_id": "89bbe08d74d15457fa38fab5a028c20075e230c22415f3d307be6887cdd15b6e",
+        "entry_hash": "d11f56b5d5cdad19f8b97d3b6118fbe18bdba2703d6c8141258d0554c0598edd",
+        "case_id": "MT-93F463B1",
+        "policy_version": "cedar-534be1c676bb",
+        "rule_version": "manifest-f9304ea72e8d",
+        "table": "ben-fp6-sp-a-audit-ledger",
+        "bucket": "ben-fp6-sp-a-worm-111122223333",
+        "key": "MT-93F463B1/89bbe08d74d15457fa38fab5a028c20075e230c22415f3d307be6887cdd15b6e.json"
+       }
+      },
+      "after_cw-a": {
+       "ledger": {
+        "sp-a": 2,
+        "sp-b": 0,
+        "base": 0
+       },
+       "worm": {
+        "sp-a": 1,
+        "sp-b": 0,
+        "base": 0
+       }
+      },
+      "cw-b": {
+       "identity": "cw-b",
+       "call": {
+        "status": 200,
+        "body": {
+         "jsonrpc": "2.0",
+         "id": 3,
+         "result": {
+          "isError": false,
+          "content": [
+           {
+            "type": "text",
+            "text": "{\"stored\":true,\"worm\":true,\"chain_hash\":\"e2e7d490ccc00623738048398ba72e2497ee17073e3bd27f570403c6446ee70e\",\"prev_hash\":\"GENESIS\",\"seq\":0,\"phase\":\"INTENT\",\"audit_id\":\"b21d7c85c685351cc1509ea5409cf09bea2dbf0570bd69ca1fa56c349808407c\",\"entry_hash\":\"f56009895b746c51ea592c20fc59ec43c0996a7468e81cf7da2a7b93ad9f3ef6\",\"case_id\":\"MT-C893BA78\",\"policy_version\":\"cedar-534be1c676bb\",\"rule_version\":\"manifest-f9304ea72e8d\",\"table\":\"ben-fp6-sp-b-audit-ledger\",\"bucket\":\"ben-fp6-sp-b-worm-111122223333\",\"key\":\"MT-C893BA78/b21d7c85c685351cc1509ea5409cf09bea2dbf0570bd69ca1fa56c349808407c.json\"}"
+           }
+          ]
+         }
+        }
+       },
+       "tool_result": {
+        "stored": true,
+        "worm": true,
+        "chain_hash": "e2e7d490ccc00623738048398ba72e2497ee17073e3bd27f570403c6446ee70e",
+        "prev_hash": "GENESIS",
+        "seq": 0,
+        "phase": "INTENT",
+        "audit_id": "b21d7c85c685351cc1509ea5409cf09bea2dbf0570bd69ca1fa56c349808407c",
+        "entry_hash": "f56009895b746c51ea592c20fc59ec43c0996a7468e81cf7da2a7b93ad9f3ef6",
+        "case_id": "MT-C893BA78",
+        "policy_version": "cedar-534be1c676bb",
+        "rule_version": "manifest-f9304ea72e8d",
+        "table": "ben-fp6-sp-b-audit-ledger",
+        "bucket": "ben-fp6-sp-b-worm-111122223333",
+        "key": "MT-C893BA78/b21d7c85c685351cc1509ea5409cf09bea2dbf0570bd69ca1fa56c349808407c.json"
+       }
+      },
+      "after_cw-b": {
+       "ledger": {
+        "sp-a": 2,
+        "sp-b": 2,
+        "base": 0
+       },
+       "worm": {
+        "sp-a": 1,
+        "sp-b": 1,
+        "base": 0
+       }
+      }
+     },
+     {
+      "step": "audit_workflow",
+      "ingest": {
+       "ingested": true,
+       "case_ref": "case-a3f7558170f24122a6323e212e73e28a",
+       "case_id": "MT-WF-729D84",
+       "chars": 146,
+       "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+       "authz_recorded": true,
+       "authz_table": "ben-fp6-sp-a-authz-context",
+       "authorized_purpose": "eligibility"
+      },
+      "ingest_minted_binding": true,
+      "ingest_without_token": {
+       "ingested": false,
+       "error": "multi-tenant: ingestion identity not verified: no access token presented"
+      },
+      "pending_before": {
+       "sp-a": false,
+       "sp-b": false,
+       "base": false
+      },
+      "execution": "arn:aws:states:us-east-1:111122223333:execution:ben-fp6-determination-workflow:mtproof-mt-wf-729d84",
+      "status": "RUNNING",
+      "states": [
+       "Extract",
+       "GuardExtracted",
+       "MaskPii",
+       "GuardDeidentified",
+       "AssessEligibility",
+       "GuardRulesExecuted",
+       "CheckAdverseNotice",
+       "DraftNotice",
+       "AuditIntent",
+       "HumanSignoff"
+      ],
+      "execution_without_binding": {
+       "status": "FAILED",
+       "error": "States.Runtime",
+       "cause": "An error occurred while executing the state 'Extract' (entered at the event id #2). The JSONPath '$.__aegis_tenant' specified for the field '__aegis_tenant.$' could not be found in the input '{\"case_id\": \"MT-WF-729D84-NB\", \"requester\": \"cw-a\", \"case_ref\": \"case-a3f7558170f24122a6323e212e73e28a\", \"re"
+      },
+      "pending_after": {
+       "sp-a": true,
+       "sp-b": false,
+       "base": false
+      },
+      "audit_before": {
+       "ledger": {
+        "sp-a": 2,
+        "sp-b": 2,
+        "base": 0
+       },
+       "worm": {
+        "sp-a": 1,
+        "sp-b": 1,
+        "base": 0
+       }
+      },
+      "audit_after": {
+       "ledger": {
+        "sp-a": 4,
+        "sp-b": 2,
+        "base": 0
+       },
+       "worm": {
+        "sp-a": 2,
+        "sp-b": 1,
+        "base": 0
+       }
+      }
+     }
+    ],
+    "verdict": {
+     "cw-a_allowed": true,
+     "cw-b_allowed": true,
+     "cw-none_denied": true,
+     "routing_cw-a_only_to_sp-a": true,
+     "routing_cw-b_only_to_sp-b": true,
+     "audit_cw-a_ledger_and_worm_only_sp-a": true,
+     "audit_cw-b_ledger_and_worm_only_sp-b": true,
+     "ingest_refuses_without_verified_token": true,
+     "workflow_reached_signoff_with_binding": true,
+     "workflow_intent_evidence_only_sp-a": true,
+     "workflow_pending_approval_only_sp-a": true,
+     "workflow_without_binding_fails_closed": true,
+     "PASS": true
+    }
+   }
+  },
+  "obs": {
+   "cmd": "C:\\Users\\daryd\\AppData\\Local\\Programs\\Python\\Python312\\python.exe C:\\Users\\daryd\\Projects-DR\\benefits_eligibility_agent\\scripts\\obs_two_tenant_proof.py --env fp6 --tenants sp-a,sp-b --region us-east-1 --runtime-arn arn:aws:bedrock-agentcore:us-east-1:111122223333:runtime/benefits_runtime_agent-we2xmT5bHN --runtime-log-group /aws/bedrock-agentcore/runtimes/benefits_runtime_agent-we2xmT5bHN-DEFAULT --out C:\\Users\\daryd\\Projects-DR\\benefits_eligibility_agent\\evidence\\AGENTCORE-111-GATE-2026-09-09-fp6-obs.json",
+   "exit": 0,
+   "seconds": 273.6,
+   "json": {
+    "env": "fp6",
+    "prefix": "ben-fp6",
+    "tenants": [
+     "sp-a",
+     "sp-b"
+    ],
+    "runtime_arn": "arn:aws:bedrock-agentcore:us-east-1:111122223333:runtime/benefits_runtime_agent-we2xmT5bHN",
+    "runtime_log_group": "/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-we2xmT5bHN-DEFAULT",
+    "observability_outputs": {
+     "ModelInvocationLargeDataBucket": "ben-fp6-observability-modelinvocationlargedata6a39-1vlyrdxcx2l8",
+     "ModelInvocationLogGroup": "/aws/bedrock/modelinvocations/ben-fp6",
+     "BudgetDenyPolicyArn": "arn:aws:iam::111122223333:policy/ben-fp6-budget-deny-bedrock",
+     "BudgetBreachFunction": "ben-fp6-budget-breach",
+     "EvidenceTrailArn": "arn:aws:cloudtrail:us-east-1:111122223333:trail/ben-fp6-worm-data-events",
+     "SeverityP2Topic": "arn:aws:sns:us-east-1:111122223333:ben-fp6-ops-p2",
+     "DashboardName": "ben-fp6-operations",
+     "BedrockPerimeterBypassAlarm": "ben-fp6-bedrock-perimeter-bypass",
+     "GatewayRequestLogGroup": "/aws/vendedlogs/bedrock-agentcore/gateway/ben-fp6",
+     "UsdCeilingActionId": "8f49e5a4-8a5f-4b45-baa1-2e410a0f39df",
+     "SeverityP1Topic": "arn:aws:sns:us-east-1:111122223333:ben-fp6-ops-p1",
+     "SeverityP3Topic": "arn:aws:sns:us-east-1:111122223333:ben-fp6-ops-p3",
+     "UsdCeilingBudgetName": "ben-fp6-bedrock-usd-ceiling",
+     "AlarmTopicArn": "arn:aws:sns:us-east-1:111122223333:ben-fp6-ops-alarms"
+    },
+    "steps": [
+     {
+      "step": "runtime_invocation",
+      "identity": "cw-a",
+      "case_id": "OBS-SPA-BD89D",
+      "ingest": {
+       "ingested": true,
+       "case_ref": "case-def3ac33f70b48e6bf02f548c15bd74e",
+       "case_id": "OBS-SPA-BD89D",
+       "chars": 146,
+       "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+       "authz_recorded": true,
+       "authz_table": "ben-fp6-sp-a-authz-context",
+       "authorized_purpose": "eligibility"
+      },
+      "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+      "runtime_status": 200,
+      "runtime_seconds": 41.5,
+      "runtime_response": "{\"result\": \"---\\n\\n## Summary\\n\\n**Case ID:** OBS-SPA-BD89D  \\n**Requester:** cw-a\\n\\n### Workflow Completed:\\n\\n1. \\u2705 **Intake Application** - Successfully extracted decision fields from case reference:\\n   - Household size: 3\\n   - Monthly income: $1,800\\n   - Liquid resources: $400\\n   - Categorical eligibility: No\\n\\n2. \\u2705 **PII Masking** - Successfully de-identified application (4 PII entities masked)\\n\\n3. \\u2705 **Eligibility Assessment** - **ELIGIBLE**\\n   - Processing clock: STANDARD (30 days)\\n   - Income at 79.1% of FPL (within 130% limit of $2,960)\\n   - Assessed using 2026 HHS Poverty Guidelines\\n\\n4. \\u26a0\\ufe0f **Draft Notice** - Blocked by policy (requires human sign-off gate)\\n\\n5. \\u2705 **Audit Record** - INTENT phase recorded in tamper-evident ledger\\n   - Audit ID: e3cc1019727777ea02a982734c7006a1f3f1295c324b7b87d59350a9d8ab1dcb\\n   - WORM backup stored\\n\\n6. \\u274c **Sign-off Request** - Failed: requester identity not verified (no access token presented)\\n\\n### Sign-off Status: **PENDING - IDENTITY VERIFICATION REQUIRED**\\n\\nThe determination has been assessed as **ELIGIBLE** and an INTENT audit record has been logged. However, the sign-off request failed because the gateway requires a verified access token for the human caseworker identity. The draft notice and final commitment are correctly blocked pending proper authentication and a qualified caseworker's approval (separation of duties control).\\n\", \"tools_available\": [\"assess-eligibility___a",
+      "runtime_request_id": "7960fd1d-7677-4a47-8056-a8c32ae77bc4"
+     },
+     {
+      "step": "runtime_invocation",
+      "identity": "cw-b",
+      "case_id": "OBS-SPB-7628A",
+      "ingest": {
+       "ingested": true,
+       "case_ref": "case-c6c53e5ac6454276a67d7868896a5c67",
+       "case_id": "OBS-SPB-7628A",
+       "chars": 146,
+       "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+       "authz_recorded": true,
+       "authz_table": "ben-fp6-sp-b-authz-context",
+       "authorized_purpose": "eligibility"
+      },
+      "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+      "runtime_status": 200,
+      "runtime_seconds": 40.5,
+      "runtime_response": "{\"result\": \"---\\n\\n## Summary\\n\\nI successfully processed the intake for case **OBS-SPB-7628A** through the governed workflow:\\n\\n### Completed Steps:\\n1. \\u2705 **intake_application** - Extracted decision fields from case_ref case-c6c53e5ac6454276a67d7868896a5c67:\\n   - Household size: 3\\n   - Monthly income: $1,800\\n   - Liquid resources: $400\\n   - Categorical eligibility: false\\n\\n2. \\u2705 **mask_pii** - De-identified the application (4 PII entities masked, sanitized_ref generated)\\n\\n3. \\u2705 **assess_eligibility** - Determination completed:\\n   - **Result: ELIGIBLE**\\n   - Processing clock: STANDARD (30 days)\\n   - Income at 79.1% of FPL (within 130% FPL limit of $2,960)\\n   - Assessed by: rules:FPL/SNAP-gross(2026 authoritative)\\n\\n4. \\u274c **draft_notice** - BLOCKED by policy: \\\"finalize_determination must go through the human sign-off gate\\\"\\n\\n5. \\u2705 **write_audit** - INTENT audit record stored successfully:\\n   - Audit ID: dc619ffa39c618ccec7bf3854e8ebb8e4dc7c9da7d8599cecdda399d93b65be9\\n   - Tamper-evident chain established (WORM storage)\\n\\n6. \\u274c **request_signoff** - BLOCKED: \\\"requester identity not verified: no access token presented\\\"\\n\\n### Sign-off Status:\\n**PENDING HUMAN AUTHORIZATION** - The governance controls blocked both the notice draft and sign-off request because:\\n- The system requires a verified access token (not just a \\\"requester\\\" field)\\n- Separation of duties requires a qualified caseworker to approve via the human sign-off gate\\n-",
+      "runtime_request_id": "ef654048-8a57-4070-b368-ee0f3be9dbe4"
+     }
+    ],
+    "traces": {
+     "sp-a": {
+      "case_id": "OBS-SPA-BD89D",
+      "tenant": "sp-a",
+      "generated_at": 1788995306,
+      "timeline": [
+       {
+        "ts": 1788995056700,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "ingest_application -> ingested=True",
+        "keys": {
+         "trace_id": "6aa1e5f005630c3729f4156b617d148d",
+         "request_id": "71913595-c175-4952-8476-f805b2240b02",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "access_token",
+          "application",
+          "case_id",
+          "consent_attested",
+          "purpose"
+         ],
+         "args_sha256": "6caa864ee2cd8bc626e52bd39e2b6f75fabced742b9075ae45beb562bc80f88d",
+         "duration_ms": 288
+        }
+       },
+       {
+        "ts": 1788995057185,
+        "source": "runtime-span",
+        "kind": "runtime-invoke",
+        "summary": "AgentCore.Runtime.Invoke",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "167aebf6da585ed1",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 40956,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995057854,
+        "source": "runtime-span",
+        "kind": "runtime-http",
+        "summary": "POST /invocations",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f57970be985e6abd",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 40267,
+         "reasoning": [
+          "{\"aegis\": \"invocation\", \"case_id\": \"OBS-SPA-BD89D\", \"correlation_source\": \"case_id+requester:caller,tenant+subject:jwt\", \"requester\": \"cw-a\", \"session.id\": \"aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d\", \"subject\": \"34283418-a051-709e-55ae-2b9943fb74fd\", \"tenant\": \"sp-a\"}"
+         ]
+        }
+       },
+       {
+        "ts": 1788995057944,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "63703e56741e6619",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 41,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995057992,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "59535110b8cd2855",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 54,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=138 masked_before_model=True",
+        "keys": {
+         "request_id": "928cc3aa-e733-4b42-9a6e-3021e08c831a",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "I'll process this intake following the governed workflow. Let me execute each step in sequence.\n\n**Step 1: Extract decision fields from the application** "
+        }
+       },
+       {
+        "ts": 1788995058070,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "58fd87414b5cf5fb",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 56,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058127,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "ca8de7890a99c2ef",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 4,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058223,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "mcp.session",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "c75f36571d1475db",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 39895,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058364,
+        "source": "runtime-span",
+        "kind": "mcp-list",
+        "summary": "mcp tools/list",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "cf6936256619bb71",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 363,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058595,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6b3f5cd43ece42b2"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058599,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f28fde480851a4d5"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058620,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "527e11050ea21115"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058623,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995058623,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995058628,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995058628,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995058721,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995058721,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995058730,
+        "source": "runtime-span",
+        "kind": "agent",
+        "summary": "invoke_agent Strands Agents model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=46526 out=2068",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "827ad5f0dcbbeada",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 39387,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058732,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f9ddb2f39d84b0ce",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 4086,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058741,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=138",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "55f4d0fbef1169f4",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 3307,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058746,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5341 out=138",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "e7212e1c4bf99c2e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "928cc3aa-e733-4b42-9a6e-3021e08c831a"
+        },
+        "detail": {
+         "duration_ms": 3301,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995058747,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "54af856633d15752",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 10,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995061944,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f5d3cbbe5bece8e7",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 48,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5557 out=120 masked_before_model=True",
+        "keys": {
+         "request_id": "f27708da-2ee3-4815-ae14-193cd9b82fe7",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "**Step 2: De-identify the application** "
+        }
+       },
+       {
+        "ts": 1788995062003,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "e85d2daa8d80f43e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 43,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062049,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool intake-application___intake_application tool=intake-application___intake_application",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "fe3d1a26cd2b38fb",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 769,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062051,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call intake-application___intake_application tool=intake-application___intake_application",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "d74466300eefd090",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 767,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062136,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "3d5889062207b10d"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062140,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f219198572a981cd"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062519,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "b87c89c69c1914ef"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062521,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995062521,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995062525,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995062525,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995062603,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995062603,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995062630,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-intake-application/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "131ee6ecf792fb0e"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062635,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-intake-application/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "cd53e3d905077108"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062809,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "intake_application -> ok",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "f36c7492-b65c-43da-b87b-ecc0242f2173",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "case_ref",
+          "consent",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "c3541d966018dca025fae822eb2e42e611da40da22080a2b10df0599c1457ab8",
+         "duration_ms": 151
+        }
+       },
+       {
+        "ts": 1788995062809,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "25723ba82c5060fb"
+        },
+        "detail": {
+         "duration_ms": 3,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062813,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995062813,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995062813,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995062813,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995062819,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "09e2275c308c2eaf",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 3507,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062820,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5557 out=120",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "38b707db572e453e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 2596,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062821,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "8a62bef287931172",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995062821,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5557 out=120",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "ac10295afc4558ad",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "f27708da-2ee3-4815-ae14-193cd9b82fe7"
+        },
+        "detail": {
+         "duration_ms": 2595,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065398,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "1f390cf4dd8d1809",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065407,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "fb17cbf9663923ce",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065417,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool mask-pii___mask_pii tool=mask-pii___mask_pii",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "63d5b170b5c6b838",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 908,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065418,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call mask-pii___mask_pii tool=mask-pii___mask_pii",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "df0462914a1b534e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 906,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065512,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "72c37601dba1edd8"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065518,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6153acca7acd8405"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065691,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6e7d1c8f09600095"
+        },
+        "detail": {
+         "duration_ms": 6,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065693,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995065693,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995065698,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995065698,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995065779,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995065779,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995065792,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-mask-pii/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "0cea6520e0ff3002"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995065803,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-mask-pii/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "2d73c09b4e6d0f7a"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995066000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5980 out=393 masked_before_model=True",
+        "keys": {
+         "request_id": "36c558cf-fb15-40d7-9fb4-56dbd4d19e76",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "**Step 3: Assess eligibility with de-identified data** "
+        }
+       },
+       {
+        "ts": 1788995066316,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "mask_pii -> deidentified=True",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "fe26d42d-ccf6-4812-818e-75732f3ff656",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "case_ref",
+          "consent",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "c3541d966018dca025fae822eb2e42e611da40da22080a2b10df0599c1457ab8",
+         "duration_ms": 488
+        }
+       },
+       {
+        "ts": 1788995066316,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6c0d909e28e97cd4"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995066321,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995066321,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995066321,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995066321,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995066326,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "e1ff0d8afaf08f14",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 5096,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995066328,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5980 out=393",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "1873d49fb8ce58fb",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "36c558cf-fb15-40d7-9fb4-56dbd4d19e76"
+        },
+        "detail": {
+         "duration_ms": 4655,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995066328,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5980 out=393",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "46b73a2d401af345",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 4657,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995066329,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "0c00d381e496f264",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995070967,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6716d644b7a89796",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995070975,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "0b1ba62c04f5e93e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995070985,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "9881e94a0db877b7",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 437,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995070986,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "c883b5007e7344ef",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 435,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6604 out=562 masked_before_model=True",
+        "keys": {
+         "request_id": "0b38e142-4884-41fd-985c-74bda7fe593c",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "**Step 4: Draft the determination notice** "
+        }
+       },
+       {
+        "ts": 1788995071086,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "07e865b6dc7bca61"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071093,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "590f95817623c6e6"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071252,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "fb9a76bafcf2ebfd"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071256,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995071256,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995071260,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995071260,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995071352,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995071352,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995071380,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-assess-eligibility/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "7c9b32a9ab15e2db"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071391,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-assess-eligibility/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "50a02d3b163781c1"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071412,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "assess_eligibility -> ok",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "a20092da-27f8-443b-9e03-e79bea69ef18",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "categorical_eligibility",
+          "consent",
+          "deidentified",
+          "household_size",
+          "liquid_resources",
+          "monthly_income",
+          "purpose",
+          "sanitized_ref",
+          "within_service_window"
+         ],
+         "args_sha256": "fad1eb48bffb17582fd7d4b8f4418de5371a5dfc8d539cf1f0bf1757bc88d559",
+         "duration_ms": 0
+        }
+       },
+       {
+        "ts": 1788995071412,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "4209a8a561c69e79"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071417,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995071417,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995071417,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995071417,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995071423,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f7b60157eab55d71",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 6896,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071424,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6604 out=562",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f21b1240bc2fe1e1",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 6445,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071425,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6604 out=562",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "323a9ec5d27f7b08",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "0b38e142-4884-41fd-985c-74bda7fe593c"
+        },
+        "detail": {
+         "duration_ms": 6443,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995071426,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "56c363af192b1e85",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077830,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "0382e72341c016ec",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077838,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "77b7725b64680e1f",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 29,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077870,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool ben-core___draft_notice tool=ben-core___draft_notice",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6f23e609d6b5e556",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 449,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077871,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call ben-core___draft_notice tool=ben-core___draft_notice",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "8cee1f72a011f5c8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 447,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077980,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "549d0de0d75380f3"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995077986,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "11e3a2edc31df9cd"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7214 out=327 masked_before_model=True",
+        "keys": {
+         "request_id": "c6188c07-83a9-4dea-b278-1ca5ac8eddb0",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "I see the draft_notice tool is enforcing the sign-off gate. Let me continue with the audit and sign-off request steps.\n\n**Step 5: Write audit INTENT record** "
+        }
+       },
+       {
+        "ts": 1788995078171,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "ddc7be164e971161"
+        },
+        "detail": {
+         "duration_ms": 6,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078174,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995078174,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995078178,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995078178,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995078255,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995078255,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995078286,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-core-tools/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "1da89a4e2355ab4f"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078290,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-core-tools/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f978d580712ffcdd"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078309,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "benefits_core -> committed=False",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "be602d36-a601-4126-8554-de68ea5ab36e",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "consent",
+          "deidentified",
+          "determination",
+          "purpose",
+          "sanitized_ref",
+          "within_service_window"
+         ],
+         "args_sha256": "c12fb59423a750c97f7e3b4a885dfee139d7d006122b710f12cdef40d3d5a48a",
+         "duration_ms": 0
+        }
+       },
+       {
+        "ts": 1788995078310,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "314f85cadcb25b2a"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078314,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995078314,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995078314,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995078314,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995078320,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "c35c41dff2662484",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 6176,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078322,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7214 out=327",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "3952350675de7338",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 4720,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078323,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7214 out=327",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "06b5a474d0759d90",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "c6188c07-83a9-4dea-b278-1ca5ac8eddb0"
+        },
+        "detail": {
+         "duration_ms": 4718,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078329,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6f1faeb9dbda62df",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 44,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995078375,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "3bb4495ac969c088",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083026,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "92d1f5c253f1d74d",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083033,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6c8067c43a67c696",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 6,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083043,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool write-audit___write_audit tool=write-audit___write_audit",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "a0b01f7b658418d9",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 1453,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083044,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call write-audit___write_audit tool=write-audit___write_audit",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "988ee5169c288920",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 1451,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083147,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "5b0236864d4053d0"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083152,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "960f633a8477c198"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083577,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "3f0306ec989921b2"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083581,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995083581,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995083584,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995083584,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995083657,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995083657,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995083678,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-write-audit/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "4f9c592e2e5167b7"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995083692,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-write-audit/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "c86524a43a90f90c"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995084000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7834 out=111 masked_before_model=True",
+        "keys": {
+         "request_id": "83535c74-8e2c-48ee-a49c-9b7e1ed1c1a9",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "**Step 6: Request caseworker sign-off** "
+        }
+       },
+       {
+        "ts": 1788995084000,
+        "source": "worm",
+        "kind": "evidence",
+        "summary": "INTENT benefits-determination seq=0 chain=7e5fe8d6ac23\u2026",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "df2e587d-8622-4722-875d-62be17eaa358",
+         "tenant": "sp-a",
+         "audit_id": "e3cc1019727777ea02a982734c7006a1f3f1295c324b7b87d59350a9d8ab1dcb"
+        },
+        "detail": {
+         "table": "ben-fp6-sp-a-audit-ledger",
+         "worm_key": null
+        }
+       },
+       {
+        "ts": 1788995084486,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "write_audit -> stored=True",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "df2e587d-8622-4722-875d-62be17eaa358",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "action",
+          "actor",
+          "budget_ok",
+          "case_id",
+          "consent",
+          "icsr_id",
+          "payload",
+          "phase",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "90c371286263b0204d46f53d6ddad9c3de753ce45d28f215297ec673f4b95e76",
+         "duration_ms": 770
+        }
+       },
+       {
+        "ts": 1788995084487,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "402f935b70e0af73"
+        },
+        "detail": {
+         "duration_ms": 37,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995084491,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995084491,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995084491,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995084491,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995084497,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "fe6bd250ef8626b7",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 5041,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995084498,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7834 out=111",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "1a3334aafaacb89e",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 2684,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995084499,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7834 out=111",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "cb382ca3beff7dab",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "83535c74-8e2c-48ee-a49c-9b7e1ed1c1a9"
+        },
+        "detail": {
+         "duration_ms": 2682,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995084500,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "33d1a240969a181b",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087168,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "1e089fe368002e6d",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087175,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "831483effb2c574a",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 6,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087183,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool request-signoff___request_signoff tool=request-signoff___request_signoff",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "f62bfaef855d826c",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 2354,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087184,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call request-signoff___request_signoff tool=request-signoff___request_signoff",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "27402dfbbff00920",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 2352,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087280,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "44662d498c5c5b1e"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087285,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "c3b62adc4255ed7f"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087452,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "4ea287a95e839ce5"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087455,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995087455,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995087459,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995087459,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995087555,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995087555,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995087584,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-request-signoff/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "165dd0d6c8266f4a"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995087740,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Init/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "e145540c3398ed0e"
+        },
+        "detail": {
+         "duration_ms": 333,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995088077,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-request-signoff/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "6c57812a51fc866a"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7996 out=417 masked_before_model=True",
+        "keys": {
+         "request_id": "56b712cf-7f1a-44ca-9b64-effaa0ec5e13",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-551dd71c-205e-4368-8518-671d727943c7",
+         "requestMetadata": {
+          "requester": "cw-a",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "34283418-a051-709e-55ae-2b9943fb74fd",
+          "case_id": "OBS-SPA-BD89D",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+          "tenant": "sp-a"
+         },
+         "reasoning_excerpt": "---\n\n## Summary\n\n**Case ID:** OBS-SPA-BD89D  \n**Requester:** cw-a\n\n### Workflow Completed:\n\n1. \u2705 **Intake Application** - Successfully extracted decision fields from case reference:\n   - Household size: 3\n   - Monthly income: $1,800\n   - Liquid resources: $400\n   - Categorical eligibility: No\n\n2. \u2705 **PII Masking** - Successfully de-identified application (4 PII entities masked)\n\n3. \u2705 **Eligibility Assessment** - **ELIGIBLE**\n   - Processing clock: STANDARD (30 days)\n   - Income at 79.1% of FPL (within 130% limit of $2,960)\n   - Assessed using 2026 HHS Poverty Guidelines\n\n4. \u26a0\ufe0f **Draft Notice**"
+        }
+       },
+       {
+        "ts": 1788995089527,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "request_signoff -> requested=False",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "03486dcc-1438-4afe-bc7a-158cdafa0cae",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "consent",
+          "icsr_id",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "79a90d1b59d6e302f9a9ba624b482b0d4d460b266ce3a49ee5b52a490020f3b4",
+         "duration_ms": 197
+        }
+       },
+       {
+        "ts": 1788995089528,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "5d32b81f3ca0db38"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089532,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995089532,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995089533,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995089533,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8"
+        }
+       },
+       {
+        "ts": 1788995089538,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "074a36e31891d980",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 8577,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089540,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7996 out=417",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "edf7dccf6a8bb441",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "tenant": "sp-a",
+         "case_id": "OBS-SPA-BD89D"
+        },
+        "detail": {
+         "duration_ms": 8575,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089541,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7996 out=417",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "9c3266d9e04ca91d",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d",
+         "request_id": "56b712cf-7f1a-44ca-9b64-effaa0ec5e13"
+        },
+        "detail": {
+         "duration_ms": 8573,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089542,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "fbb2704a28613c3a",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 5,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995089548,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "e292d024946293f3",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995098080,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "975cfca48cc774df",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995098087,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e5f177f601227bf09b5e2a51a6f8",
+         "span_id": "b81a35824042c9bf",
+         "session_id": "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+        },
+        "detail": {
+         "duration_ms": 26,
+         "reasoning": null
+        }
+       }
+      ],
+      "verdict": {
+       "worm_records": 1,
+       "model_invocations_joined_to_spans": 7,
+       "agent_spans": 1,
+       "model_spans": 14,
+       "tool_spans": 12,
+       "gateway_requests": 33,
+       "lambda_calls": 7,
+       "lambda_calls_joined_to_evidence": 6,
+       "model_invocations": 7,
+       "model_invocations_tagged_tenant": 7,
+       "masked_before_model_all": true,
+       "sessions": [
+        "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+       ],
+       "tenants_seen": [
+        "sp-a"
+       ],
+       "single_tenant": true
+      },
+      "join_keys": {
+       "trace_id": [
+        "6aa1e5f177f601227bf09b5e2a51a6f8"
+       ],
+       "session_id": [
+        "aegis-sp-a-3d3032d5b6bd458e93605516d1ab7a6d"
+       ],
+       "mcp_session_id": [],
+       "execution_arn": [],
+       "request_id": [
+        "df2e587d-8622-4722-875d-62be17eaa358"
+       ],
+       "tenant": [
+        "sp-a"
+       ]
+      }
+     },
+     "sp-b": {
+      "case_id": "OBS-SPB-7628A",
+      "tenant": "sp-b",
+      "generated_at": 1788995320,
+      "timeline": [
+       {
+        "ts": 1788995098562,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "ingest_application -> ingested=True",
+        "keys": {
+         "trace_id": "6aa1e61a2eb373a342435be27fe1d42b",
+         "request_id": "c1d34fa4-2120-4c5b-9c58-8e9b9cbaf14f",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "access_token",
+          "application",
+          "case_id",
+          "consent_attested",
+          "purpose"
+         ],
+         "args_sha256": "a330d24f7e83e0ce00d14682a75cf6ac16e3cf799a3e62184ca267b8aa5759ea",
+         "duration_ms": 301
+        }
+       },
+       {
+        "ts": 1788995099125,
+        "source": "runtime-span",
+        "kind": "runtime-invoke",
+        "summary": "AgentCore.Runtime.Invoke",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "1641fa456288a68f",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 39921,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995099722,
+        "source": "runtime-span",
+        "kind": "runtime-http",
+        "summary": "POST /invocations",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "bcfd2f5078a82d1e",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 39308,
+         "reasoning": [
+          "{\"aegis\": \"invocation\", \"case_id\": \"OBS-SPB-7628A\", \"correlation_source\": \"case_id+requester:caller,tenant+subject:jwt\", \"requester\": \"cw-b\", \"session.id\": \"aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e\", \"subject\": \"54787498-d091-7016-4c2a-e34c585a1b92\", \"tenant\": \"sp-b\"}"
+         ]
+        }
+       },
+       {
+        "ts": 1788995099816,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "38413cff64d79211",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 41,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995099864,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "24ec0aa7370d27ac",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 39,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995099928,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "ea08089935a790fe",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 49,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995099978,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "59fd68423e49e030",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 4,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5342 out=238 masked_before_model=True",
+        "keys": {
+         "request_id": "097ad960-06c7-4339-8d22-7e3c2708f738",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-e5d99790-c3a0-4eae-bdf7-83b6e8ee8f33",
+         "requestMetadata": {
+          "requester": "cw-b",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "54787498-d091-7016-4c2a-e34c585a1b92",
+          "case_id": "OBS-SPB-7628A",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+          "tenant": "sp-b"
+         },
+         "reasoning_excerpt": "I'll process the intake for case OBS-SPB-7628A following the governed workflow. Let me start with steps 1 and 2, which can run independently.  "
+        }
+       },
+       {
+        "ts": 1788995100078,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "mcp.session",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "5c79502cba0f39bf",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 38948,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100225,
+        "source": "runtime-span",
+        "kind": "mcp-list",
+        "summary": "mcp tools/list",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "a52959eff5cb5a95",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 362,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100460,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "549035b0e9c64ec6"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100465,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "082c34c8d5d0e18a"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100486,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "4a69dfda76166b70"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100488,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995100488,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995100493,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995100493,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995100581,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995100581,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995100590,
+        "source": "runtime-span",
+        "kind": "agent",
+        "summary": "invoke_agent Strands Agents model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=33407 out=2183",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "845e48a1f369eb08",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 38435,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100591,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "1a831fbfa02ddc9b",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 4848,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100592,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5342 out=238",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "a8707da6d51e6654",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 3992,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100603,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=5342 out=238",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "4cf6ea728f97a4db",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "097ad960-06c7-4339-8d22-7e3c2708f738"
+        },
+        "detail": {
+         "duration_ms": 3979,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995100604,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "90b6bcad9dc0b89b",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104530,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "6300d9d5eb2c4f3d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104548,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "c7b3c10d94cba500",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 33,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104585,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool intake-application___intake_application tool=intake-application___intake_application",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "cb3a3c2e4f035497",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 726,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104586,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool mask-pii___mask_pii tool=mask-pii___mask_pii",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "eaf2e3b430960539",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 852,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104587,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call intake-application___intake_application tool=intake-application___intake_application",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d957fc57aedade38",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 723,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104588,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call mask-pii___mask_pii tool=mask-pii___mask_pii",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "de0c662703bd0701",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 850,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104640,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "20a4d73b375cc067"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104645,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d12e876df5f59226"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104696,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "11d13eae45ef88ac"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104832,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "f4084d8e248b9da4"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104835,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995104835,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995104836,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995104836,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995104837,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "1bb662488aa384a6"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104850,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Init/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "6b00abdc3f36d195"
+        },
+        "detail": {
+         "duration_ms": 113,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104924,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995104924,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995104948,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-mask-pii/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "2da5e8c853c41400"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995104955,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-mask-pii/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d99df70e647bcbdb"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6011 out=408 masked_before_model=True",
+        "keys": {
+         "request_id": "4082d72b-8b7f-408f-b500-e6af19ffdd5a",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-e5d99790-c3a0-4eae-bdf7-83b6e8ee8f33",
+         "requestMetadata": {
+          "requester": "cw-b",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "54787498-d091-7016-4c2a-e34c585a1b92",
+          "case_id": "OBS-SPB-7628A",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+          "tenant": "sp-b"
+         },
+         "reasoning_excerpt": "Great! Now I have the extracted fields and the sanitized_ref. Let me proceed with step 3 - assess_eligibility: "
+        }
+       },
+       {
+        "ts": 1788995105020,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "3786d411436a096b"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105023,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105023,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105027,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105027,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105103,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105103,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105139,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-intake-application/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "21fcec9d99015e9e"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105145,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-intake-application/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "8a16061572d06f8b"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105301,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "intake_application -> ok",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "56531504-bd48-4c8a-bdfb-0202c933d653",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "case_ref",
+          "consent",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "c242f485b02999de4ef3fb2fa7d062c54e7426cd43baf016a92f5713c17dac2c",
+         "duration_ms": 133
+        }
+       },
+       {
+        "ts": 1788995105302,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "ea1cdf6e1619c9fd"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105306,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105306,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105306,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105306,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105428,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "mask_pii -> deidentified=True",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "be90958f-8551-4473-ada5-a935d46f6280",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "case_ref",
+          "consent",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "c242f485b02999de4ef3fb2fa7d062c54e7426cd43baf016a92f5713c17dac2c",
+         "duration_ms": 447
+        }
+       },
+       {
+        "ts": 1788995105430,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "104f943f59bcd688"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105434,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105434,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105434,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995105434,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995105439,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "5f8a32fd20312524",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 5333,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105440,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6011 out=408",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "e55fbe82e005efda",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 4944,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105441,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6011 out=408",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "9ef1c7eadbd18a36",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "4082d72b-8b7f-408f-b500-e6af19ffdd5a"
+        },
+        "detail": {
+         "duration_ms": 4943,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995105442,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "827802e2b222bee7",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6650 out=583 masked_before_model=True",
+        "keys": {
+         "request_id": "7818ed2b-7111-4a64-aa09-650d8941a718",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-e5d99790-c3a0-4eae-bdf7-83b6e8ee8f33",
+         "requestMetadata": {
+          "requester": "cw-b",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "54787498-d091-7016-4c2a-e34c585a1b92",
+          "case_id": "OBS-SPB-7628A",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+          "tenant": "sp-b"
+         },
+         "reasoning_excerpt": "Perfect! The applicant is ELIGIBLE with a STANDARD 30-day processing clock. Now let me draft the notice (step 4): "
+        }
+       },
+       {
+        "ts": 1788995110370,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "491a8437fff17d6b",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110377,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "44f72916eed3e048",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 6,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110386,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d5ee6e68994e8dbe",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 386,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110387,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call assess-eligibility___assess_eligibility tool=assess-eligibility___assess_eligibility",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "dbd945f7aadfb3ab",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 384,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110431,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "608cf85fe9058fa5"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110436,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "7a037398bbaa2ac8"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110614,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "f537455e7149cd3b"
+        },
+        "detail": {
+         "duration_ms": 1,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110618,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995110618,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995110622,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995110622,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995110698,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995110698,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995110732,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-assess-eligibility/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "77417ccecbf456dc"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110737,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-assess-eligibility/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "e36f5135b8101d8d"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110762,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "assess_eligibility -> ok",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "93636775-883c-430a-a2b2-dc082a4b6567",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "categorical_eligibility",
+          "consent",
+          "deidentified",
+          "household_size",
+          "liquid_resources",
+          "monthly_income",
+          "purpose",
+          "sanitized_ref",
+          "within_service_window"
+         ],
+         "args_sha256": "1b24466dc2cbc6f524523293fa1b3f3613b9cf767d629ddb7dfbb8568452f815",
+         "duration_ms": 0
+        }
+       },
+       {
+        "ts": 1788995110763,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "92d2466592caba30"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110767,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995110767,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995110767,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995110767,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995110773,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "8131f761c47ed3d6",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 7035,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110774,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6650 out=583",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "c3add38f23d0dddf",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 6590,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110775,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "c6b1dc1a9c10442e",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995110775,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=6650 out=583",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "54738ae8ae4aaf75",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "7818ed2b-7111-4a64-aa09-650d8941a718"
+        },
+        "detail": {
+         "duration_ms": 6588,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7281 out=444 masked_before_model=True",
+        "keys": {
+         "request_id": "d2defdbe-5aaf-4d55-8a28-c8d26bbeddc1",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-e5d99790-c3a0-4eae-bdf7-83b6e8ee8f33",
+         "requestMetadata": {
+          "requester": "cw-b",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "54787498-d091-7016-4c2a-e34c585a1b92",
+          "case_id": "OBS-SPB-7628A",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+          "tenant": "sp-b"
+         },
+         "reasoning_excerpt": "I see - the draft_notice tool is blocked by policy at this stage. This is the governance control enforcing separation of duties. Let me proceed with steps 5 and 6 - writing the audit record and requesting sign-off:  "
+        }
+       },
+       {
+        "ts": 1788995117321,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "b0605034e623e1f8",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117329,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d79ead36e277e0c3",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 33,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117365,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool ben-core___draft_notice tool=ben-core___draft_notice",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "1b9a172f318a1389",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 442,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117366,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call ben-core___draft_notice tool=ben-core___draft_notice",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "586dddde5c5d9179",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 440,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117470,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "69d9a7b9a01634be"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117475,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "56e2bed8cb40b36a"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117652,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "3f23e492d56b15de"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117655,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995117655,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995117659,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995117659,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995117745,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995117745,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995117765,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-core-tools/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "470c212853e7bc5c"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117778,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-core-tools/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "49864d277aaae4ce"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117798,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "benefits_core -> committed=False",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "563190a6-5b8b-481d-8aa7-b64319e333c2",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "consent",
+          "deidentified",
+          "determination",
+          "purpose",
+          "sanitized_ref",
+          "within_service_window"
+         ],
+         "args_sha256": "9a8539a18488144bd01548edbb92b872967e30adc28092688629216366f21429",
+         "duration_ms": 0
+        }
+       },
+       {
+        "ts": 1788995117799,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "0e9c96f45cdd393a"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117803,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995117803,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995117803,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995117803,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995117808,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "a56926409a5e6e7d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 11429,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117810,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7281 out=444",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "cb90c4874466e30d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 6945,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117811,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=7281 out=444",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "2ea6d5b604985a96",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "d2defdbe-5aaf-4d55-8a28-c8d26bbeddc1"
+        },
+        "detail": {
+         "duration_ms": 6943,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117818,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "SSM.GetParameter",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "f6e1494c024611aa",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 38,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995117859,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "b53cc97e39a2b89e",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 8,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124720,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "5729b15a8b91e2f3",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124727,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "6a081812a2bd2e7d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 25,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124755,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool write-audit___write_audit tool=write-audit___write_audit",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "52f1c09b72a1514f",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 4481,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124756,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "execute_tool request-signoff___request_signoff tool=request-signoff___request_signoff",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "cbb5b7402ec36f2b",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 446,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124757,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call request-signoff___request_signoff tool=request-signoff___request_signoff",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "74d85291320cc242",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 444,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124757,
+        "source": "runtime-span",
+        "kind": "tool",
+        "summary": "mcp tools/call write-audit___write_audit tool=write-audit___write_audit",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "b805d2ed097dba10",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 4479,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124872,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "51a91bf38cef9635"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124877,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "b00780834e16fdb0"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124887,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "3ea27e824a3790f6"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995124894,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-tenant-interceptor/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "5feab96eac318db4"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995125051,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "d461d8c19a90f814"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995125053,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995125053,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995125058,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995125058,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995125141,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995125141,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995125170,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-request-signoff/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "14a8196524e7ccf6"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995125175,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-request-signoff/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "8b55dafd4ee94666"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995125193,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "request_signoff -> requested=False",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "5856f1ba-45ae-4d65-8d95-ed782d88817a",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "budget_ok",
+          "case_id",
+          "consent",
+          "icsr_id",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "a2515e083d6953dedd4d2238af890d1f3d288860464946ce1e9d24cf6b8953a2",
+         "duration_ms": 0
+        }
+       },
+       {
+        "ts": 1788995125193,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "6855d05914a60f6c"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995125198,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995125198,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995125198,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995125198,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995128000,
+        "source": "worm",
+        "kind": "evidence",
+        "summary": "INTENT benefits-determination seq=0 chain=ee9d59dd1723\u2026",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "df4520f4-41af-421f-851f-5a123c71547b",
+         "tenant": "sp-b",
+         "audit_id": "dc619ffa39c618ccec7bf3854e8ebb8e4dc7c9da7d8599cecdda399d93b65be9"
+        },
+        "detail": {
+         "table": "ben-fp6-sp-b-audit-ledger",
+         "worm_key": null
+        }
+       },
+       {
+        "ts": 1788995128560,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "ea1727feaca10467"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995128563,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995128563,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995128567,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995128567,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995128654,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995128654,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995128678,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-write-audit/LambdaService",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "30762caf9f187e79"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995128685,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "ben-fp6-write-audit/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "1301c0f49f385872"
+        },
+        "detail": {
+         "duration_ms": null,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995129000,
+        "source": "bedrock-model-log",
+        "kind": "model-invocation",
+        "summary": "Converse us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8123 out=510 masked_before_model=True",
+        "keys": {
+         "request_id": "6df260ac-0726-48a9-9e17-730397c79d70",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "masked_before_model": true,
+         "identity": "arn:aws:sts::111122223333:assumed-role/ben-fp6-agentcore-runtime/BedrockAgentCore-e5d99790-c3a0-4eae-bdf7-83b6e8ee8f33",
+         "requestMetadata": {
+          "requester": "cw-b",
+          "component": "runtime",
+          "governed_by": "aegis",
+          "subject": "54787498-d091-7016-4c2a-e34c585a1b92",
+          "case_id": "OBS-SPB-7628A",
+          "correlation_source": "case_id+requester:caller,tenant+subject:jwt",
+          "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+          "tenant": "sp-b"
+         },
+         "reasoning_excerpt": "---\n\n## Summary\n\nI successfully processed the intake for case **OBS-SPB-7628A** through the governed workflow:\n\n### Completed Steps:\n1. \u2705 **intake_application** - Extracted decision fields from case_ref case-c6c53e5ac6454276a67d7868896a5c67:\n   - Household size: 3\n   - Monthly income: $1,800\n   - Liquid resources: $400\n   - Categorical eligibility: false\n\n2. \u2705 **mask_pii** - De-identified the application (4 PII entities masked, sanitized_ref generated)\n\n3. \u2705 **assess_eligibility** - Determination completed:\n   - **Result: ELIGIBLE**\n   - Processing clock: STANDARD (30 days)\n   - Income at 79.1"
+        }
+       },
+       {
+        "ts": 1788995129204,
+        "source": "lambda",
+        "kind": "call",
+        "summary": "write_audit -> stored=True",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "df4520f4-41af-421f-851f-5a123c71547b",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "arg_keys": [
+          "action",
+          "actor",
+          "budget_ok",
+          "case_id",
+          "consent",
+          "icsr_id",
+          "payload",
+          "phase",
+          "purpose",
+          "within_service_window"
+         ],
+         "args_sha256": "8d7246205d4c8ed73b550a8bbe373ac6829b76773548db33505a3cf1d0471e65",
+         "duration_ms": 495
+        }
+       },
+       {
+        "ts": 1788995129224,
+        "source": "runtime-span",
+        "kind": "lambda-segment",
+        "summary": "Overhead/LambdaExecutionEnvironment",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "116d676e2b0bfc74"
+        },
+        "detail": {
+         "duration_ms": 0,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995129232,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995129232,\"body\":{\"isError\":false,\"lo",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995129232,
+        "source": "gateway",
+        "kind": "request",
+        "summary": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fp6-ben-gw-zpi6a0xku6\",\"event_timestamp\":1788995129232,\"body\":{\"isError\":false,\"re",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d"
+        }
+       },
+       {
+        "ts": 1788995129238,
+        "source": "runtime-span",
+        "kind": "cycle",
+        "summary": "execute_event_loop_cycle",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "3e4323bd79d559a0",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 9786,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995129240,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8123 out=510",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "c6a3110db3c9fdc7",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "tenant": "sp-b",
+         "case_id": "OBS-SPB-7628A"
+        },
+        "detail": {
+         "duration_ms": 9784,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995129241,
+        "source": "runtime-span",
+        "kind": "model",
+        "summary": "chat us.anthropic.claude-sonnet-4-5-20250929-v1:0 model=us.anthropic.claude-sonnet-4-5-20250929-v1:0 in=8123 out=510",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "43d8c9498480420a",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e",
+         "request_id": "6df260ac-0726-48a9-9e17-730397c79d70"
+        },
+        "detail": {
+         "duration_ms": 9782,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995129242,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "772daab54ec6fe88",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995138983,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.UpdateItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "b0276f4dd5718611",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 7,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995138991,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "DynamoDB.GetItem",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "9f7d860a2b9a8987",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 4,
+         "reasoning": null
+        }
+       },
+       {
+        "ts": 1788995138996,
+        "source": "runtime-span",
+        "kind": "span",
+        "summary": "CloudWatch.PutMetricData",
+        "keys": {
+         "trace_id": "6aa1e61a24148b3a1ae5fe3d3989381d",
+         "span_id": "011f9328f6b618e2",
+         "session_id": "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+        },
+        "detail": {
+         "duration_ms": 26,
+         "reasoning": null
+        }
+       }
+      ],
+      "verdict": {
+       "worm_records": 1,
+       "model_invocations_joined_to_spans": 5,
+       "agent_spans": 1,
+       "model_spans": 10,
+       "tool_spans": 12,
+       "gateway_requests": 33,
+       "lambda_calls": 7,
+       "lambda_calls_joined_to_evidence": 6,
+       "model_invocations": 5,
+       "model_invocations_tagged_tenant": 5,
+       "masked_before_model_all": true,
+       "sessions": [
+        "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+       ],
+       "tenants_seen": [
+        "sp-b"
+       ],
+       "single_tenant": true
+      },
+      "join_keys": {
+       "trace_id": [
+        "6aa1e61a24148b3a1ae5fe3d3989381d"
+       ],
+       "session_id": [
+        "aegis-sp-b-8f171ffd07f54fa38aace6e222c1819e"
+       ],
+       "mcp_session_id": [],
+       "execution_arn": [],
+       "request_id": [
+        "df4520f4-41af-421f-851f-5a123c71547b"
+       ],
+       "tenant": [
+        "sp-b"
+       ]
+      }
+     }
+    },
+    "cross_tenant_worm_rows": {
+     "sp-a": 0,
+     "sp-b": 0
+    },
+    "verdict": {
+     "sp-a": {
+      "runtime_invoked_200": true,
+      "worm_records": true,
+      "agent_span_with_session": true,
+      "model_reasoning_spans": true,
+      "tool_spans": true,
+      "lambda_calls_logged": true,
+      "lambda_calls_joined_to_evidence": true,
+      "model_invocations_logged": true,
+      "model_invocations_tagged_tenant": true,
+      "model_invocations_joined_to_spans": true,
+      "masked_before_model_all": true,
+      "single_tenant_timeline": true,
+      "other_tenant_ledger_empty": true
+     },
+     "sp-b": {
+      "runtime_invoked_200": true,
+      "worm_records": true,
+      "agent_span_with_session": true,
+      "model_reasoning_spans": true,
+      "tool_spans": true,
+      "lambda_calls_logged": true,
+      "lambda_calls_joined_to_evidence": true,
+      "model_invocations_logged": true,
+      "model_invocations_tagged_tenant": true,
+      "model_invocations_joined_to_spans": true,
+      "masked_before_model_all": true,
+      "single_tenant_timeline": true,
+      "other_tenant_ledger_empty": true
+     },
+     "PASS": true
+    }
+   }
+  },
+  "canary": {
+   "cmd": "C:\\Users\\daryd\\AppData\\Local\\Programs\\Python\\Python312\\python.exe C:\\Users\\daryd\\Projects-DR\\benefits_eligibility_agent\\scripts\\pii_canary.py --prefix ben-fp6 --execute --strict --wait 150 --access-token <access-token> --extra-log-group /aws/vendedlogs/bedrock-agentcore/gateway/ben-fp6 --info-log-group /aws/bedrock/modelinvocations/ben-fp6",
+   "exit": 0,
+   "seconds": 162.5,
+   "json": {
+    "verdict": "PASS",
+    "leaks": {},
+    "marker": "CANARY-DB272F00E45B-TELEMETRYPROBE",
+    "prefix": "ben-fp6",
+    "swept_at": "2026-09-09T23:11:19.053751+00:00",
+    "informational_model_path": {
+     "hits": {
+      "/aws/bedrock/modelinvocations/ben-fp6": 0
+     },
+     "note": "not gated: synthetic marker vs Comprehend NAME recall; the model-path control is masked_before_model (trace_case, realistic PII)"
+    }
+   }
+  }
+ },
+ "verdict": {
+  "isolation_and_audit_routing_12_checks": true,
+  "transparency_13_checks_per_tenant": true,
+  "pii_canary_strict": true,
+  "PASS": true
+ },
+ "finished_at": 1788995489
+}

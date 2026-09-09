@@ -82,8 +82,26 @@ if [ -z "$M2M_ID" ] || [ "$M2M_ID" = "None" ]; then
 else log "reusing M2M client $M2M_ID"; fi
 M2M_SECRET="$(aws cognito-idp describe-user-pool-client --user-pool-id "$POOL_ID" --client-id "$M2M_ID" --region "$REGION" --query "UserPoolClient.ClientSecret" --output text | tr -d '\r')"
 
+# ---- 3b. Connector exec role. MOVED AHEAD OF THE LAMBDAS ON PURPOSE (2026-09-09, ben-fp6).
+# The SoR Lambda used to be created with $TOOL_ROLE_ARN ("<prefix>-tool-exec"), which is the
+# AGENTCORE TOOL execution role: it trusts bedrock-agentcore, not Lambda. AWS said so plainly once
+# the error path existed - "The role defined for the function cannot be assumed by Lambda" - and no
+# amount of retrying fixes a trust policy. This role already trusts lambda.amazonaws.com and was
+# built for exactly this; it was simply created at step 7, three steps AFTER the Lambda that needed
+# it. Both Lambdas now use it.
+printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}' > lam-trust.json
+if ! aws iam get-role --role-name "$CONN_ROLE" >/dev/null 2>&1; then
+  aws iam create-role --role-name "$CONN_ROLE" --assume-role-policy-document file://lam-trust.json >/dev/null \
+    || err "could not create role $CONN_ROLE"
+  aws iam attach-role-policy --role-name "$CONN_ROLE" --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  log "created role $CONN_ROLE"
+fi
+printf '%s' '{"Version":"2012-10-17","Statement":[{"Sid":"Identity","Effect":"Allow","Action":["bedrock-agentcore:GetWorkloadAccessToken","bedrock-agentcore:GetResourceOauth2Token"],"Resource":"*"},{"Sid":"Secret","Effect":"Allow","Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}' > conn-perms.json
+aws iam put-role-policy --role-name "$CONN_ROLE" --policy-name "${P}-connector-perms" --policy-document file://conn-perms.json
+CONN_ROLE_ARN="arn:aws:iam::$ACC:role/$CONN_ROLE"
+sleep 8
+
 # ---- 4. Mock SoR Lambda + API Gateway HTTP API (OAuth-protected) ----
-TOOL_ROLE_ARN="arn:aws:iam::$ACC:role/${P}-tool-exec"
 cp "$SELF/sor_api.py" lambda_function.py
 "$PY" -c "import zipfile;z=zipfile.ZipFile('sor.zip','w',zipfile.ZIP_DEFLATED);z.write('lambda_function.py');z.close()"
 if aws lambda get-function --function-name "$SOR_FN" --region "$REGION" >/dev/null 2>&1; then
@@ -96,7 +114,7 @@ else
   CREATED=0
   for attempt in 1 2 3 4 5 6; do
     CREATE_ERR="$(aws lambda create-function --function-name "$SOR_FN" --runtime python3.12 \
-      --role "$TOOL_ROLE_ARN" --handler lambda_function.handler --zip-file fileb://sor.zip \
+      --role "$CONN_ROLE_ARN" --handler lambda_function.handler --zip-file fileb://sor.zip \
       --timeout 15 --region "$REGION" 2>&1 >/dev/null)" && { CREATED=1; break; }
     case "$CREATE_ERR" in
       *"cannot be assumed"*|*InvalidParameterValueException*) sleep 5 ;;
@@ -104,7 +122,7 @@ else
     esac
   done
   if [ "$CREATED" -eq 1 ]; then log "created SoR Lambda $SOR_FN"
-  else err "could not create SoR Lambda $SOR_FN (role $TOOL_ROLE_ARN): ${CREATE_ERR:-unknown}"; fi
+  else err "could not create SoR Lambda $SOR_FN (role $CONN_ROLE_ARN): ${CREATE_ERR:-unknown}"; fi
 fi
 for i in 1 2 3 4 5 6; do aws lambda update-function-configuration --function-name "$SOR_FN" \
   --environment "Variables={EXPECTED_ISS=$ISSUER,EXPECTED_CLIENT_ID=$M2M_ID,REQUIRED_SCOPE=$SCOPE,SOR_LABEL=$SOR_LABEL}" --region "$REGION" >/dev/null 2>&1 && break; sleep 4; done
@@ -147,17 +165,6 @@ except Exception as e:
     else: raise
 PYEOF
 
-# ---- 7. Connector exec role (Identity outbound perms) ----
-printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}' > lam-trust.json
-if ! aws iam get-role --role-name "$CONN_ROLE" >/dev/null 2>&1; then
-  aws iam create-role --role-name "$CONN_ROLE" --assume-role-policy-document file://lam-trust.json >/dev/null
-  aws iam attach-role-policy --role-name "$CONN_ROLE" --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-  log "created role $CONN_ROLE"
-fi
-printf '%s' '{"Version":"2012-10-17","Statement":[{"Sid":"Identity","Effect":"Allow","Action":["bedrock-agentcore:GetWorkloadAccessToken","bedrock-agentcore:GetResourceOauth2Token"],"Resource":"*"},{"Sid":"Secret","Effect":"Allow","Action":["secretsmanager:GetSecretValue"],"Resource":"*"}]}' > conn-perms.json
-aws iam put-role-policy --role-name "$CONN_ROLE" --policy-name "${P}-connector-perms" --policy-document file://conn-perms.json
-sleep 8
-
 # ---- 8. verify_source Lambda (bundled boto3 for the bedrock-agentcore client) ----
 rm -rf pkg && mkdir pkg
 cp "$SELF/verify_source.py" pkg/lambda_function.py
@@ -171,7 +178,6 @@ for root, _, files in os.walk('pkg'):
         fp = os.path.join(root, f); z.write(fp, os.path.relpath(fp, 'pkg'))
 z.close()
 PYZIP
-CONN_ROLE_ARN="arn:aws:iam::$ACC:role/$CONN_ROLE"
 if aws lambda get-function --function-name "$VERIFY_FN" --region "$REGION" >/dev/null 2>&1; then
   aws lambda update-function-code --function-name "$VERIFY_FN" --zip-file fileb://vi.zip --region "$REGION" >/dev/null
 else
@@ -190,6 +196,25 @@ cat > vitarget.json <<JSON
 {"mcp":{"lambda":{"lambdaArn":"arn:aws:lambda:$REGION:$ACC:function:$VERIFY_FN","toolSchema":{"inlinePayload":[{"name":"verify_source","description":"Verify a case against an OAuth2-protected external system of record. The outbound OAuth token is minted by AgentCore Identity (client_credentials/M2M); this tool holds no secret. Non-consequential; Cedar-authorized like every tool.","inputSchema":{"type":"object","properties":{"case_id":{"type":"string","description":"Case id to verify."}},"required":[]}}]}}}}
 JSON
 EXIST="$(aws bedrock-agentcore-control list-gateway-targets --gateway-identifier "$GW_ID" --region "$REGION" --query "items[?name=='verify-source'].targetId | [0]" --output text 2>/dev/null | tr -d '\r')"
+# The gateway's own execution role must be allowed to invoke the tool Lambda. On ben-fp6 it was
+# not, and AWS said exactly that once the error path existed: "Gateway execution role lacks
+# permission to invoke Lambda function ...:ben-fp6-verify-source. Update the permission and retry."
+# Nothing in this script had ever granted it. Read the role off the LIVE gateway rather than
+# guessing its name from a prefix - the gateway is the artifact, the naming convention is a belief.
+GW_ROLE_ARN="$(aws bedrock-agentcore-control get-gateway --gateway-identifier "$GW_ID" --region "$REGION" --query roleArn --output text 2>/dev/null | tr -d '\r')"
+if [ -n "$GW_ROLE_ARN" ] && [ "$GW_ROLE_ARN" != "None" ]; then
+  GW_ROLE_NAME="${GW_ROLE_ARN##*/}"
+  printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:%s:%s:function:%s"}]}' \
+    "$REGION" "$ACC" "$VERIFY_FN" > gw-invoke.json
+  aws iam put-role-policy --role-name "$GW_ROLE_NAME" --policy-name "${P}-gw-invoke-verify" \
+    --policy-document file://gw-invoke.json >/dev/null 2>&1 \
+    && log "granted $GW_ROLE_NAME lambda:InvokeFunction on $VERIFY_FN" \
+    || err "could not grant $GW_ROLE_NAME permission to invoke $VERIFY_FN"
+  sleep 10   # IAM propagation; the target call below fails closed if this was not enough
+else
+  err "could not read roleArn from gateway $GW_ID - cannot grant invoke permission"
+fi
+
 # Attaching the governed tool to the gateway IS the claim this connector exists to support, and
 # on ben-fp5 it failed leaving no trace at all: both branches log only on success via `&&`, with
 # no error path, so the script walked from "verify_source Lambda ready" straight to "DONE" and
@@ -199,9 +224,16 @@ if [ -n "$EXIST" ] && [ "$EXIST" != "None" ]; then
     --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" 2>&1 >/dev/null)" \
     && log "updated target verify-source" || err "update-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 else
-  TGT_ERR="$(aws bedrock-agentcore-control create-gateway-target --gateway-identifier "$GW_ID" --name verify-source \
-    --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" 2>&1 >/dev/null)" \
-    && log "created target verify-source" || err "create-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
+  TGT_OK=0
+  for attempt in 1 2 3 4 5 6; do
+    TGT_ERR="$(aws bedrock-agentcore-control create-gateway-target --gateway-identifier "$GW_ID" --name verify-source \
+      --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" 2>&1 >/dev/null)" \
+      && { TGT_OK=1; break; }
+    # Only the IAM-propagation shape is worth retrying; anything else is a real defect.
+    case "$TGT_ERR" in *"lacks permission"*|*"not authorized"*) sleep 10 ;; *) break ;; esac
+  done
+  [ "$TGT_OK" -eq 1 ] && log "created target verify-source" \
+    || err "create-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 fi
 
 cat > "$AGENT/connector-state.env" <<EOF
