@@ -214,7 +214,11 @@ workflow:
     - "request_signoff - request caseworker sign-off to commit (a DIFFERENT qualified person must approve)."
 
 honesty_boundary:
-  stubbed: [verify_income, connect_system_of_record]
+  # CONN-1 (2026-09-09): verify_source is no longer stubbed - it is a governed Gateway target
+  # calling a REAL OAuth2-protected system of record (RS256/JWKS verified), with the outbound
+  # token minted by AgentCore Identity so the tool holds no client secret. State the limit in
+  # the same breath: the SoR is OUR mock. A real CUSTOMER system of record is still ungoverned.
+  stubbed: [connect_system_of_record]
   connectors: "state benefits system / eligibility system integration is customer engagement work"
   not_certified: true
 

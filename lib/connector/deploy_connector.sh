@@ -3,7 +3,16 @@
 # verify_source connector that authenticates to it via AgentCore Identity OUTBOUND auth
 # (client_credentials / M2M), for ANY agent. Prefix-parameterized from the manifest.
 # Usage: bash lib/connector/deploy_connector.sh <agent_dir> ["SOR label"]
+# 2026-09-09 (CONN-1). This was `set -uo pipefail` - no -e - and every step swallows its own
+# failure with `|| true` or `|| log`, so the script returned 0 whether it created nine resources or
+# none. On the ben-fp3 run it returned 0 having created NOTHING, because it had sourced a five-week-
+# old spine-state naming a pool and gateway that no longer existed. A deploy script that cannot
+# report failure is not a deploy script, it is a wish. The gate now verifies artifacts rather than
+# this exit code, and `err` below makes the script itself honest about the steps that matter.
 set -uo pipefail
+FAILED=0
+err(){ echo "[connector] ERROR: $*" >&2; FAILED=1; }
+trap 'if [ "$FAILED" -ne 0 ]; then echo "[connector] DEPLOY INCOMPLETE - see ERROR lines above"; exit 1; fi' EXIT
 export AWS_PAGER="" MSYS_NO_PATHCONV=1
 AGENT_DIR="${1:?usage: deploy_connector.sh <agent_dir> [sor_label]}"
 SOR_LABEL="${2:-MOCK-SOR}"
@@ -66,6 +75,7 @@ if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
   aws lambda add-permission --function-name "$SOR_FN" --statement-id apigw-invoke --action lambda:InvokeFunction \
     --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:$REGION:$ACC:$API_ID/*" --region "$REGION" >/dev/null 2>&1 || true
 fi
+[ -n "$API_ID" ] && [ "$API_ID" != "None" ] || err "no API id for $SOR_FN"
 SOR_URL="https://$API_ID.execute-api.$REGION.amazonaws.com/"
 log "mock SoR ($SOR_LABEL, OAuth-protected, API Gateway) at $SOR_URL"
 
@@ -130,6 +140,8 @@ else
 fi
 for i in 1 2 3 4 5 6; do aws lambda update-function-configuration --function-name "$VERIFY_FN" \
   --environment "Variables={SOR_URL=$SOR_URL,PROVIDER_NAME=$PROVIDER,WI_NAME=$WI,SCOPE=$SCOPE}" --region "$REGION" >/dev/null 2>&1 && break; sleep 4; done
+aws lambda get-function --function-name "$VERIFY_FN" --region "$REGION" >/dev/null 2>&1 \
+  || err "verify_source Lambda $VERIFY_FN does not exist after create/update"
 log "verify_source Lambda ready"
 
 # ---- 9. Add the governed tool as a Gateway target on the LIVE gateway ----

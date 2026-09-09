@@ -8,7 +8,14 @@ SELF="$(cd "$(dirname "$0")" && pwd)"; LIB="$(cd "$SELF/.." && pwd)"
 AGENT="$(cd "$AGENT_DIR" && pwd)"; BUILD="$AGENT/.build"
 mkdir -p "$BUILD"; python "$LIB/engine/render.py" "$AGENT/manifest.yaml" "$BUILD" >/dev/null 2>&1 || true
 source "$BUILD/agent.env"; source "$AGENT/spine-state.env"; source "$AGENT/connector-state.env"
-CLIENT="$LIB/controls/mcp_client.py"
+# mcp_client lives in the PINNED governed-core, not in this repo. Pointing at
+# "$LIB/controls/mcp_client.py" meant this proof could never run: the file exists nowhere in the
+# tree, and copying it here would shadow the core module - which tests/test_core_dependency.py
+# exists to forbid. Resolve it from the installed package instead, so the proof uses the same
+# hash-locked client everything else does.
+PY="$LIB/runtime/.venv/Scripts/python.exe"; [ -f "$PY" ] || PY="$LIB/runtime/.venv/bin/python"; [ -f "$PY" ] || PY=python
+CLIENT="$("$PY" -c 'import governed_core, os; print(os.path.join(governed_core.controls_dir(), "mcp_client.py"))' 2>/dev/null)"
+[ -f "$CLIENT" ] || { echo "FAIL | cannot resolve mcp_client.py from the pinned governed-core"; exit 1; }
 tok(){ aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$CLIENT_ID" \
         --auth-parameters "USERNAME=$1,PASSWORD=$2" --region "$REGION" --query 'AuthenticationResult.AccessToken' --output text | tr -d '\r'; }
 REV_U="$(awk -F'\t' '$3=="yes"{print $1; exit}' "$BUILD/users.tsv")"; REV_P="$(awk -F'\t' '$3=="yes"{print $2; exit}' "$BUILD/users.tsv")"

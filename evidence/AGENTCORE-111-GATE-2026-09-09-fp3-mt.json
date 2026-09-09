@@ -1,0 +1,428 @@
+{
+ "env": "fp3",
+ "prefix": "ben-fp3",
+ "tenants": [
+  "sp-a",
+  "sp-b"
+ ],
+ "gateway_url": "https://ben-fp3-ben-gw-hctkitwudd.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+ "enforcement": "ENFORCE",
+ "policy_engine": "ben_fp3_ben_authz-1pob16izvf",
+ "steps": [
+  {
+   "step": "users",
+   "created": {
+    "cw-a": [
+     "benefits_caseworker",
+     "tools_granted",
+     "tenant_sp-a"
+    ],
+    "cw-b": [
+     "benefits_caseworker",
+     "tools_granted",
+     "tenant_sp-b"
+    ],
+    "cw-none": [
+     "benefits_caseworker",
+     "tools_granted"
+    ]
+   }
+  },
+  {
+   "step": "store_counts_before",
+   "counts": {
+    "sp-a": 0,
+    "sp-b": 0,
+    "base": 0
+   }
+  },
+  {
+   "identity": "cw-a",
+   "groups": [
+    "benefits_caseworker",
+    "tools_granted",
+    "tenant_sp-a"
+   ],
+   "expect_allowed": true,
+   "initialize": {
+    "status": 200,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "result": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {
+       "tools": {
+        "listChanged": false
+       },
+       "prompts": {
+        "listChanged": false
+       },
+       "resources": {
+        "listChanged": false
+       }
+      },
+      "serverInfo": {
+       "version": "1.0.0",
+       "name": "ben-fp3-ben-gw"
+      }
+     }
+    }
+   },
+   "tools_list": {
+    "status": 200,
+    "tools": [
+     "assess-eligibility___assess_eligibility",
+     "ben-core___draft_notice",
+     "intake-application___intake_application",
+     "mask-pii___mask_pii",
+     "overpayment___detect_overpayment",
+     "redetermine___redetermine",
+     "request-signoff___request_signoff",
+     "write-audit___write_audit"
+    ],
+    "error": null
+   },
+   "mask_pii_call": {
+    "status": 200,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 4,
+     "result": {
+      "isError": false,
+      "content": [
+       {
+        "type": "text",
+        "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"02711901f5324ce49e91008c5bad1707\",\"sanitized_sha256\":\"91d08f750ed689f1036cdaf021e28fd5ce75274dd1c79c7d0b8b72c3f79a0d15\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788978442,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"e2f326869241e96bb8e7fcd84425e0ce1357866c1eb33bb38224350b04bda90a\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:IP_ADDRESS]\"}"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "step": "store_counts_after_cw-a",
+   "counts": {
+    "sp-a": 1,
+    "sp-b": 0,
+    "base": 0
+   }
+  },
+  {
+   "identity": "cw-b",
+   "groups": [
+    "benefits_caseworker",
+    "tools_granted",
+    "tenant_sp-b"
+   ],
+   "expect_allowed": true,
+   "initialize": {
+    "status": 200,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "result": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {
+       "tools": {
+        "listChanged": false
+       },
+       "prompts": {
+        "listChanged": false
+       },
+       "resources": {
+        "listChanged": false
+       }
+      },
+      "serverInfo": {
+       "version": "1.0.0",
+       "name": "ben-fp3-ben-gw"
+      }
+     }
+    }
+   },
+   "tools_list": {
+    "status": 200,
+    "tools": [
+     "assess-eligibility___assess_eligibility",
+     "ben-core___draft_notice",
+     "intake-application___intake_application",
+     "mask-pii___mask_pii",
+     "overpayment___detect_overpayment",
+     "redetermine___redetermine",
+     "request-signoff___request_signoff",
+     "write-audit___write_audit"
+    ],
+    "error": null
+   },
+   "mask_pii_call": {
+    "status": 200,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 4,
+     "result": {
+      "isError": false,
+      "content": [
+       {
+        "type": "text",
+        "text": "{\"deidentified\":true,\"entities_masked\":5,\"comprehend_entities\":5,\"regex_backstop\":1,\"masked_by\":\"comprehend:DetectPiiEntities+regex-backstop\",\"sanitized_ref\":{\"artifact_id\":\"f0957f82327f46c59ad497556c11edc4\",\"sanitized_sha256\":\"91d08f750ed689f1036cdaf021e28fd5ce75274dd1c79c7d0b8b72c3f79a0d15\",\"engine\":\"comprehend:DetectPiiEntities+regex-backstop\",\"entities_masked\":5,\"ts\":1788978446,\"source\":\"mask_pii \u2014 fail-closed PHI/PII de-identification (server-issued sanitized artifact)\",\"authoritative\":true,\"sig\":\"db29e7cc5b08552901daa3299033fe4d5f16ac2f3a2db514a45af379c6762562\",\"alg\":\"HMAC-SHA256\",\"stored\":true},\"note\":\"pass sanitized_ref (JSON) to assess_eligibility/redetermine/overpayment/draft_notice - it is the server-signed proof of masking; the deidentified boolean alone is not accepted\",\"masked_case\":\"Applicant [REDACTED:NAME], SSN [REDACTED:SSN], DOB [REDACTED:DATE_TIME], [REDACTED:ADDRESS]. Household 3, monthly income 1800, liquid resources 400, no TANF. [REDACTED:IP_ADDRESS]\"}"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "step": "store_counts_after_cw-b",
+   "counts": {
+    "sp-a": 1,
+    "sp-b": 1,
+    "base": 0
+   }
+  },
+  {
+   "identity": "cw-none",
+   "groups": [
+    "benefits_caseworker",
+    "tools_granted"
+   ],
+   "expect_allowed": false,
+   "initialize": {
+    "status": 200,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "result": {
+      "protocolVersion": "2025-03-26",
+      "capabilities": {
+       "tools": {
+        "listChanged": false
+       },
+       "prompts": {
+        "listChanged": false
+       },
+       "resources": {
+        "listChanged": false
+       }
+      },
+      "serverInfo": {
+       "version": "1.0.0",
+       "name": "ben-fp3-ben-gw"
+      }
+     }
+    }
+   },
+   "tools_list": {
+    "status": 200,
+    "tools": [],
+    "error": null
+   },
+   "mask_pii_call": {
+    "status": 403,
+    "body": {
+     "jsonrpc": "2.0",
+     "id": 4,
+     "error": {
+      "code": -32000,
+      "message": "multi-tenant: identity carries no tenant (custom:tenant); refused"
+     }
+    }
+   }
+  },
+  {
+   "step": "audit_gateway",
+   "before": {
+    "ledger": {
+     "sp-a": 0,
+     "sp-b": 0,
+     "base": 0
+    },
+    "worm": {
+     "sp-a": 0,
+     "sp-b": 0,
+     "base": 0
+    }
+   },
+   "cw-a": {
+    "identity": "cw-a",
+    "call": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"stored\":true,\"worm\":true,\"chain_hash\":\"b00f19ec5f0c0346e363ab8001893227e532f86487fbe38117d0faaba5403c4b\",\"prev_hash\":\"GENESIS\",\"seq\":0,\"phase\":\"INTENT\",\"audit_id\":\"222e70eec441f89b25727620170dae29057392624c1a00a4757a35a0684a3c7a\",\"entry_hash\":\"cdef476b1d2ada190ecc5c52392bac6404ecb751461ebf2767dcbd275bafd2ba\",\"case_id\":\"MT-A9688CCE\",\"policy_version\":\"cedar-534be1c676bb\",\"rule_version\":\"manifest-f9304ea72e8d\",\"table\":\"ben-fp3-sp-a-audit-ledger\",\"bucket\":\"ben-fp3-sp-a-worm-111122223333\",\"key\":\"MT-A9688CCE/222e70eec441f89b25727620170dae29057392624c1a00a4757a35a0684a3c7a.json\"}"
+        }
+       ]
+      }
+     }
+    },
+    "tool_result": {
+     "stored": true,
+     "worm": true,
+     "chain_hash": "b00f19ec5f0c0346e363ab8001893227e532f86487fbe38117d0faaba5403c4b",
+     "prev_hash": "GENESIS",
+     "seq": 0,
+     "phase": "INTENT",
+     "audit_id": "222e70eec441f89b25727620170dae29057392624c1a00a4757a35a0684a3c7a",
+     "entry_hash": "cdef476b1d2ada190ecc5c52392bac6404ecb751461ebf2767dcbd275bafd2ba",
+     "case_id": "MT-A9688CCE",
+     "policy_version": "cedar-534be1c676bb",
+     "rule_version": "manifest-f9304ea72e8d",
+     "table": "ben-fp3-sp-a-audit-ledger",
+     "bucket": "ben-fp3-sp-a-worm-111122223333",
+     "key": "MT-A9688CCE/222e70eec441f89b25727620170dae29057392624c1a00a4757a35a0684a3c7a.json"
+    }
+   },
+   "after_cw-a": {
+    "ledger": {
+     "sp-a": 2,
+     "sp-b": 0,
+     "base": 0
+    },
+    "worm": {
+     "sp-a": 1,
+     "sp-b": 0,
+     "base": 0
+    }
+   },
+   "cw-b": {
+    "identity": "cw-b",
+    "call": {
+     "status": 200,
+     "body": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+       "isError": false,
+       "content": [
+        {
+         "type": "text",
+         "text": "{\"stored\":true,\"worm\":true,\"chain_hash\":\"ecfd6408f8f9fc8387405a939194eefe09748a005cdcc11b2edbb285dfe4cc8a\",\"prev_hash\":\"GENESIS\",\"seq\":0,\"phase\":\"INTENT\",\"audit_id\":\"688cecd8c11a65bf4030e2b466b65f54655bcac4fd52206eb870a3a091791555\",\"entry_hash\":\"485d437d2cea5f0484e107070348e01709b4148dfbf9ac2de63e45e7c4cf9bed\",\"case_id\":\"MT-F6C39B84\",\"policy_version\":\"cedar-534be1c676bb\",\"rule_version\":\"manifest-f9304ea72e8d\",\"table\":\"ben-fp3-sp-b-audit-ledger\",\"bucket\":\"ben-fp3-sp-b-worm-111122223333\",\"key\":\"MT-F6C39B84/688cecd8c11a65bf4030e2b466b65f54655bcac4fd52206eb870a3a091791555.json\"}"
+        }
+       ]
+      }
+     }
+    },
+    "tool_result": {
+     "stored": true,
+     "worm": true,
+     "chain_hash": "ecfd6408f8f9fc8387405a939194eefe09748a005cdcc11b2edbb285dfe4cc8a",
+     "prev_hash": "GENESIS",
+     "seq": 0,
+     "phase": "INTENT",
+     "audit_id": "688cecd8c11a65bf4030e2b466b65f54655bcac4fd52206eb870a3a091791555",
+     "entry_hash": "485d437d2cea5f0484e107070348e01709b4148dfbf9ac2de63e45e7c4cf9bed",
+     "case_id": "MT-F6C39B84",
+     "policy_version": "cedar-534be1c676bb",
+     "rule_version": "manifest-f9304ea72e8d",
+     "table": "ben-fp3-sp-b-audit-ledger",
+     "bucket": "ben-fp3-sp-b-worm-111122223333",
+     "key": "MT-F6C39B84/688cecd8c11a65bf4030e2b466b65f54655bcac4fd52206eb870a3a091791555.json"
+    }
+   },
+   "after_cw-b": {
+    "ledger": {
+     "sp-a": 2,
+     "sp-b": 2,
+     "base": 0
+    },
+    "worm": {
+     "sp-a": 1,
+     "sp-b": 1,
+     "base": 0
+    }
+   }
+  },
+  {
+   "step": "audit_workflow",
+   "ingest": {
+    "ingested": true,
+    "case_ref": "case-b68c8b703b63435ab2eb0f1f2f0f0f5d",
+    "case_id": "MT-WF-3771FA",
+    "chars": 146,
+    "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+    "authz_recorded": true,
+    "authz_table": "ben-fp3-sp-a-authz-context",
+    "authorized_purpose": "eligibility"
+   },
+   "ingest_minted_binding": true,
+   "ingest_without_token": {
+    "ingested": false,
+    "error": "multi-tenant: ingestion identity not verified: no access token presented"
+   },
+   "pending_before": {
+    "sp-a": false,
+    "sp-b": false,
+    "base": false
+   },
+   "execution": "arn:aws:states:us-east-1:111122223333:execution:ben-fp3-determination-workflow:mtproof-mt-wf-3771fa",
+   "status": "RUNNING",
+   "states": [
+    "Extract",
+    "GuardExtracted",
+    "MaskPii",
+    "GuardDeidentified",
+    "AssessEligibility",
+    "GuardRulesExecuted",
+    "CheckAdverseNotice",
+    "DraftNotice",
+    "AuditIntent",
+    "HumanSignoff"
+   ],
+   "execution_without_binding": {
+    "status": "FAILED",
+    "error": "States.Runtime",
+    "cause": "An error occurred while executing the state 'Extract' (entered at the event id #2). The JSONPath '$.__aegis_tenant' specified for the field '__aegis_tenant.$' could not be found in the input '{\"case_id\": \"MT-WF-3771FA-NB\", \"requester\": \"cw-a\", \"case_ref\": \"case-b68c8b703b63435ab2eb0f1f2f0f0f5d\", \"re"
+   },
+   "pending_after": {
+    "sp-a": true,
+    "sp-b": false,
+    "base": false
+   },
+   "audit_before": {
+    "ledger": {
+     "sp-a": 2,
+     "sp-b": 2,
+     "base": 0
+    },
+    "worm": {
+     "sp-a": 1,
+     "sp-b": 1,
+     "base": 0
+    }
+   },
+   "audit_after": {
+    "ledger": {
+     "sp-a": 4,
+     "sp-b": 2,
+     "base": 0
+    },
+    "worm": {
+     "sp-a": 2,
+     "sp-b": 1,
+     "base": 0
+    }
+   }
+  }
+ ],
+ "verdict": {
+  "cw-a_allowed": true,
+  "cw-b_allowed": true,
+  "cw-none_denied": true,
+  "routing_cw-a_only_to_sp-a": true,
+  "routing_cw-b_only_to_sp-b": true,
+  "audit_cw-a_ledger_and_worm_only_sp-a": true,
+  "audit_cw-b_ledger_and_worm_only_sp-b": true,
+  "ingest_refuses_without_verified_token": true,
+  "workflow_reached_signoff_with_binding": true,
+  "workflow_intent_evidence_only_sp-a": true,
+  "workflow_pending_approval_only_sp-a": true,
+  "workflow_without_binding_fails_closed": true,
+  "PASS": true
+ }
+}

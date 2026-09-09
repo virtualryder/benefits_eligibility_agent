@@ -462,7 +462,17 @@ def main():
     if a.teardown_only:
         a.skip_deploy = a.skip_runtime = a.teardown_on_fail = True
     env, region, prefix = a.env, a.region, "%s-%s" % (PACK["prefix_prefix"], a.env)
+    # Evidence file names carried the DATE only, so two runs on the same day overwrote each
+    # other's artifacts. On 2026-09-09 the ben-fp3 run silently replaced the twelve evidence files
+    # that tag v0.7.0-pilot-rc1 cites - the gate destroyed the proof of the release it had just been
+    # tagged on. Same defect class as tools/final_validation.py's hard-coded output name, fixed
+    # earlier the same day: an artifact whose name cannot distinguish the run that produced it.
+    #
+    # The env is now part of the stem. `fp` keeps the bare date so the historical names in
+    # VALIDATED_RELEASE.md, RELEASE-MANIFEST.md and the v0.6.0/v0.7.0 tags stay resolvable; every
+    # other env gets a suffix.
     date = datetime.date.today().isoformat()
+    stem = date if a.env == "fp" else "%s-%s" % (date, a.env)
     s = boto3.Session(region_name=region)
     acct = s.client("sts").get_caller_identity()["Account"]
     cf = s.client("cloudformation")
@@ -658,13 +668,13 @@ def main():
                   "--runtime-arn", runtime_arn, "--runtime-log-group", runtime_log_group]
         ev = os.path.join(REPO, "evidence")
         steps["gate_111"] = sh([sys.executable, script("gate_111.py"), *common,
-                                "--out", os.path.join(ev, "AGENTCORE-111-GATE-%s" % date)], cwd=REPO, timeout=3600)
+                                "--out", os.path.join(ev, "AGENTCORE-111-GATE-%s" % stem)], cwd=REPO, timeout=3600)
         check("G111_consolidated_gate", steps["gate_111"]["rc"] == 0, "rc=%s in %ss" % (steps["gate_111"]["rc"], steps["gate_111"]["secs"]))
         steps["kill_switch"] = sh([sys.executable, script("kill_switch_proof.py"), *common,
-                                   "--out", os.path.join(ev, "AGENTCORE-KILL-SWITCH-%s" % date)], cwd=REPO, timeout=3600)
+                                   "--out", os.path.join(ev, "AGENTCORE-KILL-SWITCH-%s" % stem)], cwd=REPO, timeout=3600)
         check("KS_kill_switch_proof", steps["kill_switch"]["rc"] == 0, "rc=%s in %ss" % (steps["kill_switch"]["rc"], steps["kill_switch"]["secs"]))
         steps["budget"] = sh([sys.executable, script("budget_proof.py"), *common,
-                              "--out", os.path.join(ev, "AGENTCORE-BUDGET-%s" % date)], cwd=REPO, timeout=3600)
+                              "--out", os.path.join(ev, "AGENTCORE-BUDGET-%s" % stem)], cwd=REPO, timeout=3600)
         check("BUD_budget_proof", steps["budget"]["rc"] == 0, "rc=%s in %ss" % (steps["budget"]["rc"], steps["budget"]["secs"]))
         # runtime model calls were guardrail-assessed (RT-2): the invocation log carries the guardrail trace
         try:
@@ -742,9 +752,97 @@ def main():
         # 0-unexpected-errors sweep
         steps["e2e"] = sh([sys.executable, script("e2e_regression.py"), "--env", env, "--region", region,
                            "--since-minutes", str(int((time.time() * 1000 - t_start) / 60000) + 5),
-                           "--runtime-log-group", runtime_log_group, "--out", os.path.join(ev, "FULL-PORTFOLIO-GATE-%s-regression.json" % date)],
+                           "--runtime-log-group", runtime_log_group, "--out", os.path.join(ev, "FULL-PORTFOLIO-GATE-%s-regression.json" % stem)],
                           cwd=REPO, timeout=1800)
         check("E2E_zero_unexpected", steps["e2e"]["rc"] == 0, "rc=%s %s" % (steps["e2e"]["rc"], steps["e2e"]["out"][-200:].replace("\n", " | ")))
+
+        # ---- CONN-1: the governed system-of-record connector -------------------------------
+        # Runs last among the proofs because it needs the LIVE gateway and user pool from
+        # spine-state. Deliberately NOT fatal to the rest of the gate: it is an additive claim,
+        # and a connector failure should not mask an otherwise-green governed path.
+        #
+        # Read the two checks below together and do not merge them. `CONN_deploy` says the
+        # connector stood up. `CONN_proof` says the system of record genuinely refuses
+        # unauthenticated callers, that the token came from the AgentCore Identity vault rather
+        # than from a secret in the tool, and that Cedar deny-by-default reached the new tool.
+        # A deploy that succeeds and a proof that fails is the interesting case, which is why
+        # collapsing them into one name would be a mistake of exactly the L56 kind.
+        conn_label = PACK.get("connector", {}).get("sor_label", "MOCK-SOR (OAuth2, RS256/JWKS)")
+        # The connector scripts source $AGENT/spine-state.env. On the 2026-09-09 ben-fp3 run that file
+        # was five weeks stale and named a pool and gateway that no longer existed, so the connector
+        # aimed at a dead deployment while a live one sat beside it. Point it at THIS run's state.
+        shutil.copyfile(state, os.path.join(AGENT, "spine-state.env"))
+        steps["conn_deploy"] = bash(os.path.join(REPO, "lib", "connector", "deploy_connector.sh"),
+                                    AGENT, conn_label, timeout=1800)
+
+        # rc is not evidence. deploy_connector.sh runs under `set -uo pipefail` with no -e and every
+        # step swallows its own failure, so it returned 0 having created nothing. Verify the
+        # ARTIFACTS instead - and verify the gateway target is on THIS gateway, not merely present.
+        def conn_artifacts():
+            found = {"sor_lambda": False, "verify_lambda": False, "sor_rejects_anonymous": None,
+                     "credential_provider": False, "gateway_target": False, "sor_url": ""}
+            cst = {}
+            try:
+                for ln in open(os.path.join(AGENT, "connector-state.env"), encoding="utf-8"):
+                    if "=" in ln:
+                        k, v = ln.strip().split("=", 1)
+                        cst[k] = v
+            except OSError:
+                return found, "connector-state.env absent - deploy wrote no state"
+            found["sor_url"] = cst.get("SOR_URL", "")
+            lam = s.client("lambda")
+            for key, fn in (("sor_lambda", "%s-sor-api" % PACK["prefix_prefix"]),
+                            ("verify_lambda", "%s-verify-source" % PACK["prefix_prefix"])):
+                try:
+                    lam.get_function(FunctionName=fn)
+                    found[key] = True
+                except Exception:
+                    pass
+            # The system of record must genuinely refuse an unauthenticated caller. If this comes
+            # back 200 the "OAuth2-protected" claim is false and the whole proof is theatre.
+            if found["sor_url"]:
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(found["sor_url"] + "?case_id=GATE-PROBE")
+                    with urllib.request.urlopen(req, timeout=20) as r:   # noqa: S310 - https, from our own deploy
+                        found["sor_rejects_anonymous"] = r.status
+                except Exception as exc:
+                    found["sor_rejects_anonymous"] = getattr(exc, "code", str(exc)[:60])
+            try:
+                cc = s.client("bedrock-agentcore-control")
+                names = [p.get("name") for p in
+                         cc.list_oauth2_credential_providers().get("credentialProviders", [])]
+                found["credential_provider"] = cst.get("PROVIDER") in names
+                # The gateway id is not a variable in this scope; derive it from the gateway
+                # ARN the deploy emitted, so the target check is bound to THIS run's gateway
+                # rather than to any gateway that happens to carry the name.
+                gid = (gw.get("GatewayArn", "") or "").rsplit("/", 1)[-1]
+                if not gid:
+                    return found, "no GatewayArn in outputs - cannot verify the target"
+                tgts = cc.list_gateway_targets(gatewayIdentifier=gid).get("items", [])
+                found["gateway_target"] = any(x.get("name") == "verify-source" for x in tgts)
+            except Exception as exc:
+                return found, "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return found, ""
+
+        art, art_err = conn_artifacts()
+        steps["conn_artifacts"] = art
+        conn_ok = (art["sor_lambda"] and art["verify_lambda"] and art["credential_provider"]
+                   and art["gateway_target"] and art["sor_rejects_anonymous"] in (401, 403))
+        check("CONN_deploy", conn_ok,
+              "rc=%s in %ss artifacts=%s %s" % (steps["conn_deploy"]["rc"],
+                                                steps["conn_deploy"]["secs"], art, art_err))
+        if conn_ok:
+            steps["conn_proof"] = bash(os.path.join(REPO, "lib", "connector", "prove_connector.sh"),
+                                       AGENT, timeout=900)
+            out = steps["conn_proof"]["out"]
+            check("CONN_governed_sor_proof",
+                  steps["conn_proof"]["rc"] == 0 and "CONNECTOR PROOF: PASS" in out,
+                  "rc=%s %s" % (steps["conn_proof"]["rc"], out[-260:].replace("\n", " | ")))
+        else:
+            check("CONN_governed_sor_proof", False,
+                  "not attempted: the connector did not actually deploy (see CONN_deploy artifacts)")
+
     except _TeardownOnly:
         steps["teardown_only"] = True
     except Exception as exc:
@@ -757,6 +855,21 @@ def main():
         steps["teardown_skipped_for_diagnosis"] = failed
         check("teardown_zero_stack_residue", False, "SKIPPED: environment kept for diagnosis of %s" % failed)
     elif not a.skip_teardown:
+        # CONN-1 teardown runs BEFORE cdk destroy. deploy_connector.sh creates nine resources
+        # CloudFormation does not own - a Cognito hosted domain, a resource server, an M2M client,
+        # two Lambdas, an API Gateway HTTP API, an IAM role, an AgentCore credential provider
+        # holding that client's secret, a workload identity and a gateway target. `cdk destroy`
+        # deletes none of them, and the Cognito objects need the pool to still exist, which it
+        # will not after the identity stack goes.
+        # "already absent" is a pass for idempotency, so this check is only EVIDENCE of a real
+        # teardown when something was really created. Otherwise it is vacuous, as it was on ben-fp3.
+        if steps.get("conn_artifacts", {}).get("verify_lambda") or a.teardown_only:
+            steps["conn_destroy"] = bash(os.path.join(REPO, "lib", "connector", "destroy_connector.sh"),
+                                         AGENT, timeout=900)
+            check("CONN_teardown_zero_residue",
+                  steps["conn_destroy"]["rc"] == 0 and "CONNECTOR TEARDOWN: CLEAN" in steps["conn_destroy"]["out"],
+                  steps["conn_destroy"]["out"][-260:].replace("\n", " | "))
+
         try:
             if runtime_id:
                 s.client("bedrock-agentcore-control").delete_agent_runtime(agentRuntimeId=runtime_id)
@@ -917,7 +1030,7 @@ def main():
 
     ok = all(c["ok"] for c in checks.values()) and not fatal
     out = os.path.join(REPO, ".build" if a.teardown_only else "evidence",
-                       "FULL-PORTFOLIO-GATE-%s%s.json" % (date, "-teardown" if a.teardown_only else ""))
+                       "FULL-PORTFOLIO-GATE-%s%s.json" % (stem, "-teardown" if a.teardown_only else ""))
     with open(out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"env": env, "prefix": prefix, "region": region, "date": date, "PASS": ok, "fatal": fatal,
                    # PAR-4: name the pack this run gated and, per proof script, whether the PACK's own
