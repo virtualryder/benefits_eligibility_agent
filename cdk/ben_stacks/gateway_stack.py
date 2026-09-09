@@ -76,13 +76,28 @@ def _targets_from_manifest(compute, perimeter=False):
     return out
 
 
-def _policies(multitenant=False, perimeter=False):
+def _policies(prefix, multitenant=False, perimeter=False):
     """Every shipped .cedar, gateway ARN normalized to the runtime placeholder. Policies marked
     `scope: multitenant` in their header (phase 108 require_tenant) attach ONLY in multi-tenant
     deployments - in silo mode principals carry no tenant tag and they would forbid everything.
     Policies marked `scope: perimeter` (the #160/#161 nine-condition gates: entitlement, temporal,
     consent/purpose, budget, quantitative) attach ONLY in the perimeter profile (-c perimeter=1),
-    which also declares the context.input fields they read; the proven baseline set is unchanged."""
+    which also declares the context.input fields they read; the proven baseline set is unchanged.
+
+    Names are PREFIXED with the deployment prefix. AgentCore policy names are unique per ACCOUNT and
+    REGION, not per policy engine - lib/engine/render.py has said so since it was written, and this
+    path did not do it. The packs share logical policy names (mask_before_assess, require_tenant,
+    require_entitlement, no_self_commit, ...), so a pharmacovigilance deployment that is still up
+    takes those names account-wide and every benefits deploy afterwards fails on the FIRST shared one
+    with `ConflictException: Policy with the same name already exists` - a message that names neither
+    the policy nor the engine holding it. That cost four full-portfolio gate runs on 2026-09-08 and
+    three wrong diagnoses. Verified live: in a brand-new engine, `mask_before_assess` and
+    `mask_before_causality` (both held by a leftover pv_fp engine) were refused, while
+    `ben_mask_before_assess` and `caseworker_permit` were created.
+
+    The prefix is hyphen-to-underscore normalised because policy names must match
+    ^[A-Za-z][A-Za-z0-9_]*$ - the same rule already applied to EngineName below.
+    """
     pols = []
     for p in sorted((REPO / "policies").glob("*.cedar")):
         body = p.read_text(encoding="utf-8")
@@ -94,7 +109,8 @@ def _policies(multitenant=False, perimeter=False):
         body = re.sub(r'AgentCore::Gateway::"arn:aws:bedrock-agentcore:[^"]+"',
                       'AgentCore::Gateway::"__GATEWAY_ARN__"', body)
         mode = "IGNORE_ALL_FINDINGS" if "IGNORE_ALL_FINDINGS" in body else "FAIL_ON_ANY_FINDINGS"
-        pols.append({"name": p.stem, "definition": body, "validation_mode": mode})
+        pols.append({"name": "%s_%s" % (prefix.replace("-", "_"), p.stem),
+                     "definition": body, "validation_mode": mode})
     return pols
 
 
@@ -192,7 +208,7 @@ class GatewayStack(cdk.Stack):
                     "allowedClients": [identity.client.user_pool_client_id]}}),
                 "SsmParam": ssm_param,
                 "TargetsJson": json.dumps(targets, default=str),
-                "PoliciesJson": json.dumps(_policies(multitenant, perimeter)),
+                "PoliciesJson": json.dumps(_policies(prefix, multitenant, perimeter)),
                 "Enforcement": "ENFORCE",
                 # Phase 107: the REQUEST interceptor (passRequestHeaders so it sees the validated JWT)
                 "InterceptorLambdaArn": compute.tenant_interceptor.function_arn,
