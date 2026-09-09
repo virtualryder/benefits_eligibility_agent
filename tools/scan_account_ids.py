@@ -42,9 +42,19 @@ ALLOWED = {"111122223333", "123456789012", "000000000000",
 # timestamp, a hash fragment, a test fixture id) is not a finding, and treating it as one would train
 # people to ignore this check.
 PATTERNS = [
-    re.compile(r"arn:aws[a-z\-]*:[a-z0-9\-]*:[a-z0-9\-]*:(\d{12})"),
+    # {1,3} colons: S3 and IAM ARNs leave the region and/or account fields EMPTY
+    # (arn:aws:s3:::864...-bucket), so requiring exactly one colon missed them.
+    re.compile(r"arn:aws[a-z\-]*:[a-z0-9\-]*:[a-z0-9\-]*:{1,3}(\d{12})"),
     re.compile(r"\b(\d{12})\.dkr\.ecr\."),
-    re.compile(r"\baccount\b\s*[:=]\s*['\"]?(\d{12})"),
+    # L67b: this was `\baccount\b\s*[:=]\s*['"]?(\d{12})` and could not match `"account": "864..."`
+    # - the JSON spelling - because \s* cannot cross the closing quote of the KEY. Nor could the
+    # prose pattern below, whose separator class has no quote in it. So the single most likely way an
+    # account id appears in this repo's evidence (a JSON key) was the one shape the gate could not
+    # see, along with "account_id" and "awsAccountId", the two spellings the AWS CLI actually emits.
+    # Found 2026-09-09 by writing tests/test_scan_account_ids.py, not by the gate ever firing. Same
+    # family as L38-L49 and L40's own comment two lines down: this control was narrow enough to
+    # never false-positive and therefore narrow enough to never fire.
+    re.compile(r"(?i)\b(?:aws[_\-]?)?account(?:[_\-]?(?:id|number))?\b[\s:=*_`'\"\-]{0,6}(\d{12})\b"),
     re.compile(r"[a-z0-9\-]+-(\d{12})-[a-z0-9\-]+"),   # e.g. codebuild-sources-<acct>-us-east-1
     # L40: the three shapes above are how MACHINES write an account id. Every evidence file writes
     # it the way a PERSON does - "Account **111122223333** - us-east-1" in a header, or
@@ -57,6 +67,23 @@ PATTERNS = [
     # does not have: bucket `ben-mt2-pha-a-worm-111122223333`
     re.compile(r"[a-z0-9]-(\d{12})\b"),
 ]
+
+# L67: a UUID's final field is 12 HEX characters, and when they happen to be all decimal it is
+# indistinguishable from an account id sitting after a hyphen - which is exactly what the last
+# pattern matches. Lambda request ids quoted inside evidence excerpts hit this:
+# "35c572b3-d0da-404e-9377-039106473245". Found while committing the 2026-09-09 gate evidence; the
+# scan failed and the obvious "fix" was to rewrite the digits, i.e. to corrupt an evidence file to
+# satisfy an instrument that was wrong. Excluding this shape costs no coverage: an account id in an
+# ARN, an ECR hostname, an `account:` key or prose is caught by a different pattern, and none of
+# those positions can be preceded by four hex fields of 8-4-4-4. Proven by
+# tests/test_scan_account_ids.py, which asserts every real shape STILL fires.
+UUID_TAIL = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-$")
+
+
+def in_uuid(content, start):
+    """True when the 12 digits starting at `start` are the last field of a UUID."""
+    return bool(UUID_TAIL.search(content[:start]))
+
 
 # Binary/vendored paths where a match is noise.
 SKIP = (".png", ".jpg", ".jpeg", ".gif", ".pdf", ".pptx", ".docx", ".xlsx", ".zip", ".ico")
@@ -73,9 +100,11 @@ def scan(lines):
         if path.lower().endswith(SKIP):
             continue
         for pat in PATTERNS:
-            for acct in pat.findall(content):
-                if acct not in ALLOWED:
-                    findings.append((path, lineno, acct, content.strip()[:120]))
+            for m in pat.finditer(content):
+                acct = m.group(1)
+                if acct in ALLOWED or in_uuid(content, m.start(1)):
+                    continue
+                findings.append((path, lineno, acct, content.strip()[:120]))
     return findings
 
 
