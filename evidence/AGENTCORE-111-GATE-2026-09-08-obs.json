@@ -1,0 +1,232 @@
+{
+ "env": "fp2",
+ "prefix": "ben-fp2",
+ "tenants": [
+  "sp-a",
+  "sp-b"
+ ],
+ "runtime_arn": "arn:aws:bedrock-agentcore:us-east-1:111122223333:runtime/benefits_runtime_agent-Rz1G5IFOfL",
+ "runtime_log_group": "/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-Rz1G5IFOfL-DEFAULT",
+ "observability_outputs": {
+  "DashboardName": "ben-fp2-operations",
+  "ModelInvocationLargeDataBucket": "ben-fp2-observability-modelinvocationlargedata6a39-rxgvq0snebss",
+  "BedrockPerimeterBypassAlarm": "ben-fp2-bedrock-perimeter-bypass",
+  "GatewayRequestLogGroup": "/aws/vendedlogs/bedrock-agentcore/gateway/ben-fp2",
+  "UsdCeilingActionId": "0ceb2c32-7da7-4498-94a0-7f82f25af935",
+  "ModelInvocationLogGroup": "/aws/bedrock/modelinvocations/ben-fp2",
+  "BudgetDenyPolicyArn": "arn:aws:iam::111122223333:policy/ben-fp2-budget-deny-bedrock",
+  "BudgetBreachFunction": "ben-fp2-budget-breach",
+  "EvidenceTrailArn": "arn:aws:cloudtrail:us-east-1:111122223333:trail/ben-fp2-worm-data-events",
+  "UsdCeilingBudgetName": "ben-fp2-bedrock-usd-ceiling",
+  "AlarmTopicArn": "arn:aws:sns:us-east-1:111122223333:ben-fp2-ops-alarms"
+ },
+ "steps": [
+  {
+   "step": "runtime_invocation",
+   "identity": "cw-a",
+   "case_id": "OBS-SPA-EBB07",
+   "ingest": {
+    "ingested": true,
+    "case_ref": "case-e623799047f84fab9da8cfd06d3450a9",
+    "case_id": "OBS-SPA-EBB07",
+    "chars": 146,
+    "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+    "authz_recorded": true,
+    "authz_table": "ben-fp2-sp-a-authz-context",
+    "authorized_purpose": "eligibility"
+   },
+   "session_id": "aegis-sp-a-1492b92c4fe2424ba6736bd2913768bc",
+   "runtime_status": 401,
+   "runtime_seconds": 0.4,
+   "runtime_response": {
+    "jsonrpc": "2.0",
+    "error": {
+     "code": -32001,
+     "message": "Transaction token required: authorizer has AllowedWorkloadConfiguration configured"
+    }
+   },
+   "runtime_request_id": "05e67a77-380b-4e3d-8193-59c277c24af1"
+  },
+  {
+   "step": "runtime_invocation",
+   "identity": "cw-b",
+   "case_id": "OBS-SPB-D599F",
+   "ingest": {
+    "ingested": true,
+    "case_ref": "case-bf91556c6888441eb7ab56d97790f7d1",
+    "case_id": "OBS-SPB-D599F",
+    "chars": 146,
+    "note": "start the workflow with {case_id, requester, case_ref, **tenant_binding}",
+    "authz_recorded": true,
+    "authz_table": "ben-fp2-sp-b-authz-context",
+    "authorized_purpose": "eligibility"
+   },
+   "session_id": "aegis-sp-b-8e49c6eb9ed24f2fb15c9da66295ca66",
+   "runtime_status": 401,
+   "runtime_seconds": 0.3,
+   "runtime_response": {
+    "jsonrpc": "2.0",
+    "error": {
+     "code": -32001,
+     "message": "Transaction token required: authorizer has AllowedWorkloadConfiguration configured"
+    }
+   },
+   "runtime_request_id": "8e41b8d3-1aff-4dac-994d-e60dc668541d"
+  }
+ ],
+ "traces": {
+  "sp-a": {
+   "case_id": "OBS-SPA-EBB07",
+   "tenant": "sp-a",
+   "generated_at": 1788921562,
+   "timeline": [
+    {
+     "ts": 1788921396918,
+     "source": "lambda",
+     "kind": "call",
+     "summary": "ingest_application -> ingested=True",
+     "keys": {
+      "trace_id": "6aa0c6340ca3511c2634455719a3ac41",
+      "request_id": "93a47088-2eb7-4f8f-8f49-d3825ef8415f",
+      "tenant": "sp-a",
+      "case_id": "OBS-SPA-EBB07"
+     },
+     "detail": {
+      "arg_keys": [
+       "access_token",
+       "application",
+       "case_id",
+       "consent_attested",
+       "purpose"
+      ],
+      "args_sha256": "2a3f7fba0dfbb833c5c9a8a08735e647ff853db35b6aa95000968a6b09a6383d",
+      "duration_ms": 304
+     }
+    }
+   ],
+   "verdict": {
+    "worm_records": 0,
+    "model_invocations_joined_to_spans": 0,
+    "agent_spans": 0,
+    "model_spans": 0,
+    "tool_spans": 0,
+    "gateway_requests": 0,
+    "lambda_calls": 1,
+    "lambda_calls_joined_to_evidence": 0,
+    "model_invocations": 0,
+    "model_invocations_tagged_tenant": 0,
+    "masked_before_model_all": null,
+    "sessions": [],
+    "tenants_seen": [
+     "sp-a"
+    ],
+    "single_tenant": true
+   },
+   "join_keys": {
+    "trace_id": [],
+    "session_id": [
+     "aegis-sp-a-1492b92c4fe2424ba6736bd2913768bc"
+    ],
+    "mcp_session_id": [],
+    "execution_arn": [],
+    "request_id": [],
+    "tenant": []
+   }
+  },
+  "sp-b": {
+   "case_id": "OBS-SPB-D599F",
+   "tenant": "sp-b",
+   "generated_at": 1788921588,
+   "timeline": [
+    {
+     "ts": 1788921397700,
+     "source": "lambda",
+     "kind": "call",
+     "summary": "ingest_application -> ingested=True",
+     "keys": {
+      "trace_id": "6aa0c6350576928a5f1657a802275b72",
+      "request_id": "102e9040-9946-4586-b945-b75ce68db10b",
+      "tenant": "sp-b",
+      "case_id": "OBS-SPB-D599F"
+     },
+     "detail": {
+      "arg_keys": [
+       "access_token",
+       "application",
+       "case_id",
+       "consent_attested",
+       "purpose"
+      ],
+      "args_sha256": "3945309a8158480486c3af1d69e3c4368a8d463348bc4c217729ac265f3c9831",
+      "duration_ms": 291
+     }
+    }
+   ],
+   "verdict": {
+    "worm_records": 0,
+    "model_invocations_joined_to_spans": 0,
+    "agent_spans": 0,
+    "model_spans": 0,
+    "tool_spans": 0,
+    "gateway_requests": 0,
+    "lambda_calls": 1,
+    "lambda_calls_joined_to_evidence": 0,
+    "model_invocations": 0,
+    "model_invocations_tagged_tenant": 0,
+    "masked_before_model_all": null,
+    "sessions": [],
+    "tenants_seen": [
+     "sp-b"
+    ],
+    "single_tenant": true
+   },
+   "join_keys": {
+    "trace_id": [],
+    "session_id": [
+     "aegis-sp-b-8e49c6eb9ed24f2fb15c9da66295ca66"
+    ],
+    "mcp_session_id": [],
+    "execution_arn": [],
+    "request_id": [],
+    "tenant": []
+   }
+  }
+ },
+ "cross_tenant_worm_rows": {
+  "sp-a": 0,
+  "sp-b": 0
+ },
+ "verdict": {
+  "sp-a": {
+   "runtime_invoked_200": false,
+   "worm_records": false,
+   "agent_span_with_session": false,
+   "model_reasoning_spans": false,
+   "tool_spans": false,
+   "lambda_calls_logged": true,
+   "lambda_calls_joined_to_evidence": false,
+   "model_invocations_logged": false,
+   "model_invocations_tagged_tenant": false,
+   "model_invocations_joined_to_spans": false,
+   "masked_before_model_all": false,
+   "single_tenant_timeline": true,
+   "other_tenant_ledger_empty": true
+  },
+  "sp-b": {
+   "runtime_invoked_200": false,
+   "worm_records": false,
+   "agent_span_with_session": false,
+   "model_reasoning_spans": false,
+   "tool_spans": false,
+   "lambda_calls_logged": true,
+   "lambda_calls_joined_to_evidence": false,
+   "model_invocations_logged": false,
+   "model_invocations_tagged_tenant": false,
+   "model_invocations_joined_to_spans": false,
+   "masked_before_model_all": false,
+   "single_tenant_timeline": true,
+   "other_tenant_ledger_empty": true
+  },
+  "PASS": false
+ }
+}

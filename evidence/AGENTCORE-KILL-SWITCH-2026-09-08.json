@@ -1,0 +1,546 @@
+{
+ "env": "fp2",
+ "prefix": "ben-fp2",
+ "region": "us-east-1",
+ "parameter": "/ben-fp2-eligibility/kill-switch",
+ "tenants": [
+  "sp-a",
+  "sp-b"
+ ],
+ "engage_url": "https://emuhwy5hafmmyv2ow43mny3cse0rcshs.lambda-url.us-east-1.on.aws/",
+ "disengage_url": "https://5tjd5e7ekmewllac5vsu34isui0wrqev.lambda-url.us-east-1.on.aws/",
+ "caller": "arn:aws:iam::111122223333:user/dryder",
+ "checks": {
+  "baseline_disengaged": true,
+  "baseline_calls_allowed": true,
+  "iam_sod_disengage_only_cannot_engage": true,
+  "engage_ok": true,
+  "actor_is_iam_verified_not_body": true,
+  "engage_audited_worm": true,
+  "interceptor_denies_list_and_call": true,
+  "time_to_effect_within_2x_ttl": true,
+  "tool_lambda_refuses_direct_invoke": true,
+  "workflow_fails_at_first_state_with_kill_switch": true,
+  "runtime_refuses_new_invocation": false,
+  "runtime_stops_in_flight_session": false,
+  "disengage_by_second_identity": true,
+  "code_sod_same_identity_refused": true,
+  "code_sod_refusal_audited": true,
+  "iam_sod_engage_only_cannot_disengage": true,
+  "final_release_ok": true,
+  "recovery_calls_allowed": true,
+  "recovery_runtime_answers": false,
+  "base_ledger_state_changes": true,
+  "base_ledger_chained": true,
+  "base_worm_copies": true,
+  "denials_in_acting_tenant_ledger": true,
+  "denials_of_other_tenant_in_its_own_ledger": true,
+  "no_denials_in_base_ledger": true,
+  "denial_worm_copies": true,
+  "interceptor_log_lines": true,
+  "runtime_log_lines": false,
+  "left_disengaged": true
+ },
+ "steps": [
+  {
+   "step": "baseline",
+   "status": {
+    "status": 200,
+    "body": {
+     "mode": "engage",
+     "state": {
+      "actor": "",
+      "at": 0,
+      "engaged": false,
+      "reason": "",
+      "source": "/ben-fp2-eligibility/kill-switch"
+     }
+    }
+   },
+   "gateway": {
+    "list_status": 200,
+    "list_error": null,
+    "list_tools": 8,
+    "call_status": 200,
+    "call_error": null,
+    "call_ok": true
+   }
+  },
+  {
+   "step": "engage_by_A",
+   "b_engage_attempt": {
+    "status": 403,
+    "body": {
+     "Message": "Forbidden. For troubleshooting Function URL authorization issues, see: https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html"
+    }
+   },
+   "a_engage": {
+    "status": 200,
+    "body": {
+     "audit": {
+      "audit_id": "13a810b431a626be6ecded09f05ed74341e96904c9a7cc599614bb5104647e82",
+      "bucket": "ben-fp2-data-wormvault2878b4f9-nxahvfp6fvk0",
+      "case_id": "KILL-SWITCH",
+      "chain_hash": "04dbd431c5847be09200d1e942cf129563932834048fb50e68723f91236e1254",
+      "entry_hash": "913d6c1001ecf98b99e20817a85451c9a34df8eb308befdafdb2b1c97b45bf4f",
+      "key": "KILL-SWITCH/13a810b431a626be6ecded09f05ed74341e96904c9a7cc599614bb5104647e82.json",
+      "phase": "COMMITTED",
+      "policy_version": "cedar-534be1c676bb",
+      "prev_hash": "GENESIS",
+      "rule_version": "manifest-835adf581b0c",
+      "seq": 0,
+      "stored": true,
+      "table": "ben-fp2-audit-ledger",
+      "worm": true
+     },
+     "state": {
+      "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a",
+      "actor_user_id": "AROA4SN3H336UOAXMUQCW:ks-a",
+      "at": 1788921816,
+      "engaged": true,
+      "reason": "SEV-1 drill: runaway agent suspected",
+      "source": "/ben-fp2-eligibility/kill-switch"
+     }
+    }
+   }
+  },
+  {
+   "step": "gateway_after_engage",
+   "time_to_effect_s": 4.7,
+   "probe": {
+    "list_status": 403,
+    "list_error": "containment engaged (kill switch /ben-fp2-eligibility/kill-switch): every agent action is refused",
+    "list_tools": 0,
+    "call_status": 403,
+    "call_error": "containment engaged (kill switch /ben-fp2-eligibility/kill-switch): every agent action is refused",
+    "call_ok": false
+   },
+   "probe_other_tenant": {
+    "list_status": 403,
+    "list_error": "containment engaged (kill switch /ben-fp2-eligibility/kill-switch): every agent action is refused",
+    "list_tools": 0,
+    "call_status": 403,
+    "call_error": "containment engaged (kill switch /ben-fp2-eligibility/kill-switch): every agent action is refused",
+    "call_ok": false
+   }
+  },
+  {
+   "step": "tool_and_workflow_while_engaged",
+   "direct_invoke": {
+    "FunctionError": "Unhandled",
+    "errorType": "KillSwitchEngaged",
+    "errorMessage": "kill switch ENGAGED (/ben-fp2-eligibility/kill-switch): SEV-1 drill: runaway agent suspected"
+   },
+   "execution": {
+    "status": "FAILED",
+    "error": "KillSwitchEngaged",
+    "states_entered": [
+     "Extract"
+    ]
+   }
+  },
+  {
+   "step": "runtime_while_engaged",
+   "fresh": {
+    "session_id": "aegis-084a2568022f468295589798c082c684",
+    "status": 401,
+    "response": {
+     "jsonrpc": "2.0",
+     "error": {
+      "code": -32001,
+      "message": "Transaction token required: authorizer has AllowedWorkloadConfiguration configured"
+     }
+    },
+    "trace_id_header": null,
+    "request_id": "cb6d7438-570e-4ef8-a9ff-20a32171f4ea"
+   },
+   "in_flight": {
+    "session_id": "aegis-10b17dd3453c40b49c84d4b7dcb7689c",
+    "status": 401,
+    "response": {
+     "jsonrpc": "2.0",
+     "error": {
+      "code": -32001,
+      "message": "Transaction token required: authorizer has AllowedWorkloadConfiguration configured"
+     }
+    },
+    "trace_id_header": null,
+    "request_id": "065ae66f-45ce-48cf-b46b-2ba339c276c6"
+   }
+  },
+  {
+   "step": "sod",
+   "b_release_1": {
+    "status": 200,
+    "body": {
+     "audit": {
+      "audit_id": "1d0db73dc2d08a4571e1f81073898184da399b255310fb1a8b6387c35c936d68",
+      "bucket": "ben-fp2-data-wormvault2878b4f9-nxahvfp6fvk0",
+      "case_id": "KILL-SWITCH",
+      "chain_hash": "9cfa9c4884c352923d8eb33567ef577279f03c75081f96394e7e1d183f846f3c",
+      "entry_hash": "56bba18f4b8d30b2a6e2d526d81675891ebff6279985bad6b975caa47a180d2b",
+      "key": "KILL-SWITCH/1d0db73dc2d08a4571e1f81073898184da399b255310fb1a8b6387c35c936d68.json",
+      "phase": "COMMITTED",
+      "policy_version": "cedar-534be1c676bb",
+      "prev_hash": "04dbd431c5847be09200d1e942cf129563932834048fb50e68723f91236e1254",
+      "rule_version": "manifest-835adf581b0c",
+      "seq": 1,
+      "stored": true,
+      "table": "ben-fp2-audit-ledger",
+      "worm": true
+     },
+     "state": {
+      "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-security-lead/ks-b",
+      "actor_user_id": "AROA4SN3H336ZCOGDJTA5:ks-b",
+      "at": 1788921835,
+      "engaged": false,
+      "reason": "security lead: drill step 1 complete",
+      "released": {
+       "engaged_at": 1788921816,
+       "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a",
+       "engaged_reason": "SEV-1 drill: runaway agent suspected"
+      },
+      "source": "/ben-fp2-eligibility/kill-switch"
+     }
+    }
+   },
+   "c_engage": {
+    "status": 200,
+    "body": {
+     "audit": {
+      "audit_id": "5d7aaa7208fe869c2da488ff743020ece357eb2e1326181ed69b8c998eaf3159",
+      "bucket": "ben-fp2-data-wormvault2878b4f9-nxahvfp6fvk0",
+      "case_id": "KILL-SWITCH",
+      "chain_hash": "87194ef3e6a17adde95d61f7de09cd454526a46fef5aff3db6b3ce4aa43f900a",
+      "entry_hash": "4ccb9a6b811bba13705189e2e9e31c547548c72746369d992f1b8b01ea7906f3",
+      "key": "KILL-SWITCH/5d7aaa7208fe869c2da488ff743020ece357eb2e1326181ed69b8c998eaf3159.json",
+      "phase": "COMMITTED",
+      "policy_version": "cedar-534be1c676bb",
+      "prev_hash": "9cfa9c4884c352923d8eb33567ef577279f03c75081f96394e7e1d183f846f3c",
+      "rule_version": "manifest-835adf581b0c",
+      "seq": 2,
+      "stored": true,
+      "table": "ben-fp2-audit-ledger",
+      "worm": true
+     },
+     "state": {
+      "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c",
+      "actor_user_id": "AROA4SN3H33655NJ7L5OH:ks-c",
+      "at": 1788921836,
+      "engaged": true,
+      "reason": "over-privileged operator engages",
+      "source": "/ben-fp2-eligibility/kill-switch"
+     }
+    }
+   },
+   "c_release": {
+    "status": 403,
+    "body": {
+     "audit": {
+      "audit_id": "d2967f7dd9026df1594fc10176f198acad48ea6cbd54b9cc39ba654742df03bf",
+      "bucket": "ben-fp2-data-wormvault2878b4f9-nxahvfp6fvk0",
+      "case_id": "KILL-SWITCH",
+      "chain_hash": "f8fcea032750f7b32229f4dba08e8a0c04fddcd055c78391bdd8528da7981630",
+      "entry_hash": "0120d7b96161a0a3cdf8d03da628742ce279c5be053c58ed5b9c8e0dcbaeb986",
+      "key": "KILL-SWITCH/d2967f7dd9026df1594fc10176f198acad48ea6cbd54b9cc39ba654742df03bf.json",
+      "phase": "DENIED",
+      "policy_version": "cedar-534be1c676bb",
+      "prev_hash": "87194ef3e6a17adde95d61f7de09cd454526a46fef5aff3db6b3ce4aa43f900a",
+      "rule_version": "manifest-835adf581b0c",
+      "seq": 3,
+      "stored": true,
+      "table": "ben-fp2-audit-ledger",
+      "worm": true
+     },
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c",
+     "error": "separation of duties: the identity that engaged the kill switch cannot disengage it; a second identity must"
+    }
+   },
+   "a_release": {
+    "status": 403,
+    "body": {
+     "Message": "Forbidden. For troubleshooting Function URL authorization issues, see: https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html"
+    }
+   },
+   "b_release_2": {
+    "status": 200,
+    "body": {
+     "audit": {
+      "audit_id": "314db9df336ffe289f437910090ad4372f7d9d290c97e55b50ff6c8df79283e6",
+      "bucket": "ben-fp2-data-wormvault2878b4f9-nxahvfp6fvk0",
+      "case_id": "KILL-SWITCH",
+      "chain_hash": "6d183fd0391b486d5ae6ceffefbe77aa82131d97e346f5c8d2527cbe4b200f2e",
+      "entry_hash": "bed906dc4de895138fb863dff2c7ee53a39cdac58a8e07e98f72a3ff3a147a71",
+      "key": "KILL-SWITCH/314db9df336ffe289f437910090ad4372f7d9d290c97e55b50ff6c8df79283e6.json",
+      "phase": "COMMITTED",
+      "policy_version": "cedar-534be1c676bb",
+      "prev_hash": "f8fcea032750f7b32229f4dba08e8a0c04fddcd055c78391bdd8528da7981630",
+      "rule_version": "manifest-835adf581b0c",
+      "seq": 4,
+      "stored": true,
+      "table": "ben-fp2-audit-ledger",
+      "worm": true
+     },
+     "state": {
+      "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-security-lead/ks-b",
+      "actor_user_id": "AROA4SN3H336ZCOGDJTA5:ks-b",
+      "at": 1788921839,
+      "engaged": false,
+      "reason": "security lead: drill complete",
+      "released": {
+       "engaged_at": 1788921836,
+       "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c",
+       "engaged_reason": "over-privileged operator engages"
+      },
+      "source": "/ben-fp2-eligibility/kill-switch"
+     }
+    }
+   }
+  },
+  {
+   "step": "recovery",
+   "gateway": {
+    "list_status": 200,
+    "list_error": null,
+    "list_tools": 8,
+    "call_status": 200,
+    "call_error": null,
+    "call_ok": true
+   },
+   "runtime": {
+    "session_id": "aegis-fea607d083e048b98f946f4e976f7f03",
+    "status": 401,
+    "trace_id_header": null,
+    "request_id": "13d0d79d-a149-4fc4-b0d0-b5dfd29c6345"
+   },
+   "runtime_result_chars": 0
+  },
+  {
+   "step": "evidence",
+   "base_ledger_rows": [
+    {
+     "action": "kill_switch.engage",
+     "prev_hash": "GENESIS",
+     "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a",
+     "audit_id": "13a810b431a626be6ecded09f05ed74341e96904c9a7cc599614bb5104647e82",
+     "chain_hash": "04dbd431c5847be09200d1e942cf129563932834048fb50e68723f91236e1254",
+     "tenant_id": "__platform__",
+     "phase": "COMMITTED",
+     "seq": "0",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "at",
+      "caller_user_id",
+      "guardrail_action",
+      "parameter",
+      "reason"
+     ],
+     "execution_arn": null,
+     "engaged_by": null
+    },
+    {
+     "action": "kill_switch.disengage",
+     "prev_hash": "04dbd431c5847be09200d1e942cf129563932834048fb50e68723f91236e1254",
+     "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-security-lead/ks-b",
+     "audit_id": "1d0db73dc2d08a4571e1f81073898184da399b255310fb1a8b6387c35c936d68",
+     "chain_hash": "9cfa9c4884c352923d8eb33567ef577279f03c75081f96394e7e1d183f846f3c",
+     "phase": "COMMITTED",
+     "tenant_id": "__platform__",
+     "seq": "1",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "at",
+      "caller_user_id",
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "parameter",
+      "reason"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a"
+    },
+    {
+     "action": "kill_switch.engage",
+     "prev_hash": "9cfa9c4884c352923d8eb33567ef577279f03c75081f96394e7e1d183f846f3c",
+     "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c",
+     "audit_id": "5d7aaa7208fe869c2da488ff743020ece357eb2e1326181ed69b8c998eaf3159",
+     "chain_hash": "87194ef3e6a17adde95d61f7de09cd454526a46fef5aff3db6b3ce4aa43f900a",
+     "tenant_id": "__platform__",
+     "phase": "COMMITTED",
+     "seq": "2",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "at",
+      "caller_user_id",
+      "guardrail_action",
+      "parameter",
+      "reason"
+     ],
+     "execution_arn": null,
+     "engaged_by": null
+    },
+    {
+     "action": "kill_switch.disengage",
+     "prev_hash": "87194ef3e6a17adde95d61f7de09cd454526a46fef5aff3db6b3ce4aa43f900a",
+     "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c",
+     "audit_id": "d2967f7dd9026df1594fc10176f198acad48ea6cbd54b9cc39ba654742df03bf",
+     "chain_hash": "f8fcea032750f7b32229f4dba08e8a0c04fddcd055c78391bdd8528da7981630",
+     "tenant_id": "__platform__",
+     "phase": "DENIED",
+     "seq": "3",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "caller_user_id",
+      "engaged_by",
+      "parameter",
+      "reason",
+      "sod"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c"
+    },
+    {
+     "action": "kill_switch.disengage",
+     "prev_hash": "f8fcea032750f7b32229f4dba08e8a0c04fddcd055c78391bdd8528da7981630",
+     "actor": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-security-lead/ks-b",
+     "audit_id": "314db9df336ffe289f437910090ad4372f7d9d290c97e55b50ff6c8df79283e6",
+     "chain_hash": "6d183fd0391b486d5ae6ceffefbe77aa82131d97e346f5c8d2527cbe4b200f2e",
+     "phase": "COMMITTED",
+     "tenant_id": "__platform__",
+     "seq": "4",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "at",
+      "caller_user_id",
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "parameter",
+      "reason"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-overprivileged/ks-c"
+    }
+   ],
+   "base_worm_keys": [
+    "KILL-SWITCH/13a810b431a626be6ecded09f05ed74341e96904c9a7cc599614bb5104647e82.json",
+    "KILL-SWITCH/1d0db73dc2d08a4571e1f81073898184da399b255310fb1a8b6387c35c936d68.json",
+    "KILL-SWITCH/314db9df336ffe289f437910090ad4372f7d9d290c97e55b50ff6c8df79283e6.json",
+    "KILL-SWITCH/5d7aaa7208fe869c2da488ff743020ece357eb2e1326181ed69b8c998eaf3159.json",
+    "KILL-SWITCH/d2967f7dd9026df1594fc10176f198acad48ea6cbd54b9cc39ba654742df03bf.json"
+   ],
+   "tenant_a_denials": [
+    {
+     "action": "kill_switch.deny",
+     "prev_hash": "GENESIS",
+     "actor": "interceptor",
+     "audit_id": "8ec7a421acc6537b99e8eba466f09aea3bf39912043032a2f31fb3055d788bcc",
+     "chain_hash": "f616f1d67dd54a1ebce640a2593646dc528a6f2e400566090ea9584c37ddfb37",
+     "tenant_id": "sp-a",
+     "phase": "DENIED",
+     "seq": "0",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "guardrail_action",
+      "source",
+      "tool"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a"
+    },
+    {
+     "action": "kill_switch.deny",
+     "prev_hash": "f616f1d67dd54a1ebce640a2593646dc528a6f2e400566090ea9584c37ddfb37",
+     "actor": "interceptor",
+     "audit_id": "3bd0fc32659b775beade06ee8db4e1e2da5f04ba90abc0f429647596145d59e9",
+     "chain_hash": "d060f248be72bf4cba02d3cb0541df784cf68171d78a7d66876e76b64750cf9e",
+     "phase": "DENIED",
+     "tenant_id": "sp-a",
+     "seq": "1",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "guardrail_action",
+      "source",
+      "tool"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a"
+    }
+   ],
+   "tenant_b_rows": [
+    {
+     "action": "kill_switch.deny",
+     "prev_hash": "GENESIS",
+     "actor": "interceptor",
+     "audit_id": "d2a31fc23f3e9c6b99a9e782086d01d154e6cc9e01cfcd5cd685b0127a102c3c",
+     "chain_hash": "9e89b1e0c1cb5ecbe9da8ce9b68f0716e445aebb284c19103cf6d9a75d0f31c8",
+     "tenant_id": "sp-b",
+     "phase": "DENIED",
+     "seq": "0",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "guardrail_action",
+      "source",
+      "tool"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a"
+    },
+    {
+     "action": "kill_switch.deny",
+     "prev_hash": "9e89b1e0c1cb5ecbe9da8ce9b68f0716e445aebb284c19103cf6d9a75d0f31c8",
+     "actor": "interceptor",
+     "audit_id": "b778e7cc08de55aa1f8bd9a7f537b83b5633a3ad5eb0f327b06feb979749cebb",
+     "chain_hash": "a6e90473e4c63d04b64b92a51d53c0219a987ad96955f518cca9ac38070e0844",
+     "tenant_id": "sp-b",
+     "phase": "DENIED",
+     "seq": "1",
+     "case_id": "KILL-SWITCH",
+     "payload_keys": [
+      "engaged_at",
+      "engaged_by",
+      "engaged_reason",
+      "guardrail_action",
+      "source",
+      "tool"
+     ],
+     "execution_arn": null,
+     "engaged_by": "arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a"
+    }
+   ],
+   "tenant_a_worm_keys": [
+    "KILL-SWITCH/3bd0fc32659b775beade06ee8db4e1e2da5f04ba90abc0f429647596145d59e9.json",
+    "KILL-SWITCH/8ec7a421acc6537b99e8eba466f09aea3bf39912043032a2f31fb3055d788bcc.json"
+   ],
+   "interceptor_log_sample": [
+    "{\"aegis\": \"kill_switch\", \"audit\": {\"audit_id\": \"8ec7a421acc6537b99e8eba466f09aea3bf39912043032a2f31fb3055d788bcc\", \"stored\": true, \"table\": \"ben-fp2-sp-a-audit-ledger\", \"worm\": true}, \"component\": \"interceptor\", \"engaged_by\": \"arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a\", \"engaged_reason\": \"SEV-1 drill: runaway agent suspected\", \"outcome\": \"denied:kill_switch\", \"request_id\": \"",
+    "{\"aegis\": \"kill_switch\", \"audit\": {\"audit_id\": \"3bd0fc32659b775beade06ee8db4e1e2da5f04ba90abc0f429647596145d59e9\", \"stored\": true, \"table\": \"ben-fp2-sp-a-audit-ledger\", \"worm\": true}, \"component\": \"interceptor\", \"engaged_by\": \"arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a\", \"engaged_reason\": \"SEV-1 drill: runaway agent suspected\", \"outcome\": \"denied:kill_switch\", \"request_id\": \"",
+    "{\"aegis\": \"kill_switch\", \"audit\": {\"audit_id\": \"d2a31fc23f3e9c6b99a9e782086d01d154e6cc9e01cfcd5cd685b0127a102c3c\", \"stored\": true, \"table\": \"ben-fp2-sp-b-audit-ledger\", \"worm\": true}, \"component\": \"interceptor\", \"engaged_by\": \"arn:aws:sts::111122223333:assumed-role/ben-fp2-ks-responder/ks-a\", \"engaged_reason\": \"SEV-1 drill: runaway agent suspected\", \"outcome\": \"denied:kill_switch\", \"request_id\": \""
+   ],
+   "runtime_log_sample": []
+  }
+ ],
+ "roles": {
+  "A": "arn:aws:iam::111122223333:role/ben-fp2-ks-responder",
+  "B": "arn:aws:iam::111122223333:role/ben-fp2-ks-security-lead",
+  "C": "arn:aws:iam::111122223333:role/ben-fp2-ks-overprivileged"
+ },
+ "cleanup": {
+  "A": "deleted",
+  "B": "deleted",
+  "C": "deleted"
+ },
+ "duration_s": 87.4,
+ "PASS": false,
+ "time_to_effect_s": 4.7
+}
