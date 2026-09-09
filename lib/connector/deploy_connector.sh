@@ -23,7 +23,16 @@ BUILD="$AGENT/.build"; mkdir -p "$BUILD"
 ( unset MSYS_NO_PATHCONV; python "$LIB/engine/render.py" "$AGENT/manifest.yaml" "$BUILD" >/dev/null )
 source "$BUILD/agent.env"                                # PREFIX
 source "$AGENT/spine-state.env"                          # REGION, ACCOUNT, POOL_ID, GW_ARN, GW_URL
-REGION="${REGION:-us-east-1}"; ACC="${ACCOUNT:?}"; P="$PREFIX"
+REGION="${REGION:-us-east-1}"; ACC="${ACCOUNT:?}"
+# CONN-1 (2026-09-09, ben-fp5): every resource the CDK builds is env-scoped ("ben-fp5-..."), but
+# this script used agent.env's PREFIX ("ben"). So it looked for the tool-execution role at
+# "ben-tool-exec" when the real one is "ben-fp5-tool-exec", `create-function` failed into
+# >/dev/null, the SoR Lambda was never created, and the API in front of it answered the
+# unauthenticated probe with 500 instead of refusing it. The hosted domain was likewise shared
+# across environments, so fp5 "reused" fp4's - still bound to fp4's dead pool, which that same
+# live domain had prevented from being deleted. The gate passes CONN_PREFIX; standalone runs
+# fall back to PREFIX.
+P="${CONN_PREFIX:-$PREFIX}"
 
 # CONN-1 ROOT CAUSE, found on the 2026-09-09 ben-fp4 live run.
 # This script referenced $GW_ID at step 9, but spine-state.env has only ever carried GW_ARN and
@@ -42,6 +51,7 @@ GW_ID="${GW_ID:-${GW_ARN:-}}"; GW_ID="${GW_ID##*/}"
 command -v aws >/dev/null 2>&1 || { echo "[connector] FATAL: aws CLI not on PATH - refusing to run"; exit 1; }
 PY="$LIBRT/.venv/Scripts/python.exe"; [ -f "$PY" ] || PY="$LIBRT/.venv/bin/python"
 log(){ echo "[connector] $*"; }
+log "prefix=$P (CONN_PREFIX=${CONN_PREFIX:-<unset, falling back to agent.env PREFIX>})"
 WORK="$SELF/.work"; rm -rf "$WORK"; mkdir -p "$WORK"; cd "$WORK"
 
 DOMAIN_PREFIX="${P}-sor-$ACC"
@@ -79,8 +89,22 @@ cp "$SELF/sor_api.py" lambda_function.py
 if aws lambda get-function --function-name "$SOR_FN" --region "$REGION" >/dev/null 2>&1; then
   aws lambda update-function-code --function-name "$SOR_FN" --zip-file fileb://sor.zip --region "$REGION" >/dev/null
 else
-  aws lambda create-function --function-name "$SOR_FN" --runtime python3.12 --role "$TOOL_ROLE_ARN" \
-    --handler lambda_function.handler --zip-file fileb://sor.zip --timeout 15 --region "$REGION" >/dev/null
+  # This create used to end in `>/dev/null` with no error path. On ben-fp5 it failed - the role
+  # ARN was wrong - and the failure vanished: no Lambda, an API Gateway proxying to nothing, and
+  # a 500 on every request that the gate had to infer backwards from. Retry for IAM propagation
+  # (a freshly created role is not immediately assumable by Lambda), then report honestly.
+  CREATED=0
+  for attempt in 1 2 3 4 5 6; do
+    CREATE_ERR="$(aws lambda create-function --function-name "$SOR_FN" --runtime python3.12 \
+      --role "$TOOL_ROLE_ARN" --handler lambda_function.handler --zip-file fileb://sor.zip \
+      --timeout 15 --region "$REGION" 2>&1 >/dev/null)" && { CREATED=1; break; }
+    case "$CREATE_ERR" in
+      *"cannot be assumed"*|*InvalidParameterValueException*) sleep 5 ;;
+      *) break ;;
+    esac
+  done
+  if [ "$CREATED" -eq 1 ]; then log "created SoR Lambda $SOR_FN"
+  else err "could not create SoR Lambda $SOR_FN (role $TOOL_ROLE_ARN): ${CREATE_ERR:-unknown}"; fi
 fi
 for i in 1 2 3 4 5 6; do aws lambda update-function-configuration --function-name "$SOR_FN" \
   --environment "Variables={EXPECTED_ISS=$ISSUER,EXPECTED_CLIENT_ID=$M2M_ID,REQUIRED_SCOPE=$SCOPE,SOR_LABEL=$SOR_LABEL}" --region "$REGION" >/dev/null 2>&1 && break; sleep 4; done
@@ -166,12 +190,18 @@ cat > vitarget.json <<JSON
 {"mcp":{"lambda":{"lambdaArn":"arn:aws:lambda:$REGION:$ACC:function:$VERIFY_FN","toolSchema":{"inlinePayload":[{"name":"verify_source","description":"Verify a case against an OAuth2-protected external system of record. The outbound OAuth token is minted by AgentCore Identity (client_credentials/M2M); this tool holds no secret. Non-consequential; Cedar-authorized like every tool.","inputSchema":{"type":"object","properties":{"case_id":{"type":"string","description":"Case id to verify."}},"required":[]}}]}}}}
 JSON
 EXIST="$(aws bedrock-agentcore-control list-gateway-targets --gateway-identifier "$GW_ID" --region "$REGION" --query "items[?name=='verify-source'].targetId | [0]" --output text 2>/dev/null | tr -d '\r')"
+# Attaching the governed tool to the gateway IS the claim this connector exists to support, and
+# on ben-fp5 it failed leaving no trace at all: both branches log only on success via `&&`, with
+# no error path, so the script walked from "verify_source Lambda ready" straight to "DONE" and
+# returned 0 with no target attached. Never let the load-bearing step be the quiet one.
 if [ -n "$EXIST" ] && [ "$EXIST" != "None" ]; then
-  aws bedrock-agentcore-control update-gateway-target --gateway-identifier "$GW_ID" --target-id "$EXIST" --name verify-source \
-    --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" >/dev/null && log "updated target verify-source"
+  TGT_ERR="$(aws bedrock-agentcore-control update-gateway-target --gateway-identifier "$GW_ID" --target-id "$EXIST" --name verify-source \
+    --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" 2>&1 >/dev/null)" \
+    && log "updated target verify-source" || err "update-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 else
-  aws bedrock-agentcore-control create-gateway-target --gateway-identifier "$GW_ID" --name verify-source \
-    --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" >/dev/null && log "created target verify-source"
+  TGT_ERR="$(aws bedrock-agentcore-control create-gateway-target --gateway-identifier "$GW_ID" --name verify-source \
+    --target-configuration file://vitarget.json --credential-provider-configurations file://cred.json --region "$REGION" 2>&1 >/dev/null)" \
+    && log "created target verify-source" || err "create-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 fi
 
 cat > "$AGENT/connector-state.env" <<EOF

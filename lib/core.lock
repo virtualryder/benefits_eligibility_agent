@@ -5,12 +5,12 @@
 # 'identical core' while the trees differed is how the exactly-once finalization gap hid for weeks.
 # The 'version' below means: derived from governed-core <version>. CROSS-repo parity is a separate
 # question answered by tools/check_core_parity.py. CI runs both and fails on either.
-version: 1.11.2
+version: 1.11.1
 files: 38
-tree_sha256: 3f68e0c3da57bddadc214232874af63dd4541457056d4d7d9f70b5892166b9d1
-79ea1b5b251f3bf7e847a39e5723f6606ce22c8edef3115d9368d267382ae7e1  lib/CORE_VERSION
-451c8aaa69e6f1e6b6a9a69b39a93a0de0c663d397235d6fa5e87a0090346b88  lib/connector/deploy_connector.sh
-a1700e6bb6f6f8e2fcb687ace89ecaeb8fdca167fd4f25c3bfb2a1e02729ef3a  lib/connector/destroy_connector.sh
+tree_sha256: 620c235381cd4255f41e463a502763c180b8576a2b48efb585264c12e540ab2e
+4f9416d650bd28343244b868dfebdb11e70d7b32423536cb87b8c31fde62f993  lib/CORE_VERSION
+f9b7166384294cad73c1e003cc17de9a5a680254503ac3d1c1f982fc15b9d2e4  lib/connector/deploy_connector.sh
+f510cb4c8e3fce8baabfb133eaed0ab0e0b722d73c9dbb839c589836e683397c  lib/connector/destroy_connector.sh
 147fec0042321b321f39d81a9a016c81a1ee4a3e60e339c5cba5fa80215b4318  lib/connector/prove_connector.sh
 7278aa23b9a94ab91478b3fd03093958ed68626f719ae417c7a9d080e3c6deec  lib/connector/sor_api.py
 f62318aec4a250e07c667cefe6edc57cd18f8f3e2c5ceb4a0c2b880c0a154371  lib/connector/verify_source.py

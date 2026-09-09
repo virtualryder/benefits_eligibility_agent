@@ -26,7 +26,11 @@ AGENT="$(cd "$AGENT_DIR" && pwd)"; BUILD="$AGENT/.build"; mkdir -p "$BUILD"
 ( unset MSYS_NO_PATHCONV; python "$LIB/engine/render.py" "$AGENT/manifest.yaml" "$BUILD" >/dev/null 2>&1 || true )
 source "$BUILD/agent.env"
 [ -f "$AGENT/spine-state.env" ] && source "$AGENT/spine-state.env"
-REGION="${REGION:-us-east-1}"; P="$PREFIX"
+REGION="${REGION:-us-east-1}"
+# Must match deploy_connector.sh exactly. Connector resources are env-scoped via CONN_PREFIX; a
+# teardown that looked for "ben-sor-api" while deploy created "ben-fp6-sor-api" would report
+# "absent" for every one of them and print CLEAN - the same false all-clear, by a new route.
+P="${CONN_PREFIX:-$PREFIX}"
 
 # Same GW_ID defect as deploy_connector.sh: spine-state carries GW_ARN, never GW_ID, so the
 # gateway-target removal silently reported "absent" on every run. See the block in deploy.

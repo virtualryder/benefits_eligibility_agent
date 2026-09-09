@@ -772,6 +772,23 @@ def main():
         # was five weeks stale and named a pool and gateway that no longer existed, so the connector
         # aimed at a dead deployment while a live one sat beside it. Point it at THIS run's state.
         shutil.copyfile(state, os.path.join(AGENT, "spine-state.env"))
+        # CONN-1, found on the 2026-09-09 ben-fp5 run: the connector took its prefix from
+        # agent.env (PREFIX="ben") while EVERY resource the CDK builds is env-scoped
+        # ("ben-fp5-..."). Two consequences, both silent:
+        #   1. It looked for the tool-execution role at "ben-tool-exec". The real role is
+        #      "ben-fp5-tool-exec" (lib/runtime/deploy.sh: TOOL_ROLE="${PREFIX}-tool-exec"), so
+        #      `aws lambda create-function` failed into >/dev/null, the SoR Lambda was never
+        #      created, and the API Gateway in front of it answered every request - including the
+        #      unauthenticated probe - with 500. A 500 is not a refusal, so the "OAuth2-protected"
+        #      claim was never demonstrated.
+        #   2. The Cognito hosted domain is named "<prefix>-sor-<account>", so it was shared across
+        #      environments. fp5 logged "reusing hosted domain" and adopted the one fp4 had left
+        #      behind, still bound to fp4's dead user pool. That same live domain had blocked
+        #      deletion of fp4's pool, orphaning it.
+        # Passing the env-scoped prefix fixes both. CONN_PREFIX is appended rather than replacing
+        # PREFIX so the scripts still run standalone against a hand-built environment.
+        with open(os.path.join(AGENT, "spine-state.env"), "a", encoding="utf-8", newline="\n") as fh:
+            fh.write("CONN_PREFIX=%s\n" % prefix)
         steps["conn_deploy"] = bash(os.path.join(REPO, "lib", "connector", "deploy_connector.sh"),
                                     AGENT, conn_label, timeout=1800)
 
@@ -805,8 +822,10 @@ def main():
                 notes.append("connector-state.env absent (deploy did not complete) - probing AWS anyway")
             found["sor_url"] = cst.get("SOR_URL", "")
             lam = s.client("lambda")
-            for key, fn in (("sor_lambda", "%s-sor-api" % PACK["prefix_prefix"]),
-                            ("verify_lambda", "%s-verify-source" % PACK["prefix_prefix"])):
+            # env-scoped now (see the CONN_PREFIX note above); these must match what the
+            # connector actually creates, or the probe reports absent for a live resource.
+            for key, fn in (("sor_lambda", "%s-sor-api" % prefix),
+                            ("verify_lambda", "%s-verify-source" % prefix)):
                 try:
                     lam.get_function(FunctionName=fn)
                     found[key] = True
@@ -1074,7 +1093,7 @@ def main():
         # So this asks AWS directly, independently of destroy_connector.sh's self-report.
         def connector_residue():
             left, unchecked = [], []
-            pp = PACK["prefix_prefix"]
+            pp = prefix
             probes = (
                 ("lambda", "%s-sor-api" % pp, lambda: s.client("lambda").get_function(
                     FunctionName="%s-sor-api" % pp)),
@@ -1103,6 +1122,26 @@ def main():
                          if p.get("name") == "%s-sor-oauth" % pp]
             except Exception as exc:
                 unchecked.append("credential provider (%s)" % type(exc).__name__)
+            # THE COGNITO BLIND SPOT. On the 2026-09-09 ben-fp5 run this function returned
+            # left=[] unchecked=[] while the hosted domain "ben-sor-<account>" was still ACTIVE -
+            # because nothing here looked at Cognito. That live domain then blocked deletion of the
+            # fp4 user pool, which is why an orphaned "ben-fp4-identity" survived a gate that had
+            # certified zero residue twice. A residue check is only as good as its inventory.
+            idp = s.client("cognito-idp")
+            try:
+                dom = "%s-sor-%s" % (pp, s.client("sts").get_caller_identity()["Account"])
+                d = idp.describe_user_pool_domain(Domain=dom)
+                if (d.get("DomainDescription") or {}).get("Domain"):
+                    left.append("cognito hosted domain %s" % dom)
+            except Exception as exc:
+                if type(exc).__name__ not in ("ResourceNotFoundException", "InvalidParameterException"):
+                    unchecked.append("cognito hosted domain (%s)" % type(exc).__name__)
+            try:
+                pools = idp.list_user_pools(MaxResults=60).get("UserPools", [])
+                left += ["cognito user pool %s" % u.get("Name") for u in pools
+                         if u.get("Name", "").startswith(pp + "-")]
+            except Exception as exc:
+                unchecked.append("cognito user pools (%s)" % type(exc).__name__)
             return left, unchecked
 
         conn_left, conn_unchecked = connector_residue()
