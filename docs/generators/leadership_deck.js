@@ -383,4 +383,8 @@ function circle(s, x, y, d, fill, txt, txtColor = WHITE, fs = 16) {
   s.addNotes("Close on the strategic multiplier: one pattern, four verticals, two proven. The ask is a three-step path from internal demo to a scoped, synthetic-data pilot with an agency.");
 })();
 
-p.writeFile({ fileName: "Benefits-AgentCore-Leadership.pptx" }).then((f) => console.log("wrote", f));
+// L67: this wrote the deck to the PROCESS working directory, so running the generator from
+// docs/generators/ left the .pptx beside the generator and the tracked deck in docs/ untouched -
+// the same defect already fixed in the .docx generators. A deck that is never rewritten is a deck
+// whose numbers are whatever they were the day someone last ran this from the right folder.
+p.writeFile({ fileName: require("path").join(__dirname, "..", "Benefits-AgentCore-Leadership.pptx") }).then((f) => console.log("wrote", f));

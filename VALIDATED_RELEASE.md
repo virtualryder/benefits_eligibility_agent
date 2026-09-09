@@ -3,7 +3,23 @@
 *Single source of truth for the current release tag is the repo-root `RELEASE` file, enforced by
 `tests/test_release_consistency.py`. Authoritative counts + limitations: `RELEASE-MANIFEST.md`.*
 
-## Current release — `v0.6.0-pilot-rc1` (2026-09-07)
+## Current release — `v0.7.0-pilot-rc1` (2026-09-09)
+
+| | |
+|---|---|
+| Tag | `v0.7.0-pilot-rc1` — single source of truth: `RELEASE`. Cut from main on 2026-09-09 at `938dfe8` after the **full-portfolio gate passed 17/17 from zero** on this exact tree. |
+| Commit SHA | `git rev-list -n1 v0.7.0-pilot-rc1` |
+| Scope of the claim, exactly | ONE pack (benefits). ONE account. ONE region (us-east-1). Synthetic data. Two tenants. Deployed from zero, exercised, torn down to zero residue. `evidence/FULL-PORTFOLIO-GATE-2026-09-09.json`, env `ben-fp2`. Deploy rc=0 in 706.2s / nine stacks; runtime READY on `ben-fp2-agentcore-runtime` with MMDSv2 required; G111 rc=0 in 550.8s; kill switch rc=0 in 102.4s; budget rc=0 in 372.6s; `RT2_runtime_calls_guardrail_assessed` runtime_rows=20 guardrail_assessed=20; `LIN_zero_orphans` covered=True, orphans=0, invokes=11, aegis=11, settle 384.9s; `E2E_zero_unexpected` rc=0; both teardown checks clean. |
+| What this tag adds over `v0.6.0-pilot-rc1` | **Two checks, and the reason they exist.** `preflight_no_agentcore_residue` refuses to deploy if any gateway, policy engine or agent runtime carrying the prefix already exists, and `teardown_zero_agentcore_residue` asserts the same after teardown. v0.6.0's "zero residue" covered CloudFormation stacks only — AgentCore gateways, policy engines and runtimes are not owned by the stacks that create them. Also carried: **the policy-name prefix fix (L64)**, without which this gate cannot pass in an account that has ever hosted a second pack, because AgentCore policy names are unique per ACCOUNT and REGION rather than per policy engine; and **the RT-4 reversal (L66)**. |
+| What it took to get there | **Seven attempts, and the six failures are published in the same commit as the pass.** In order: CRLF noise that was cosmetic, and which I first diagnosed as digest corruption and was wrong (L60); three consecutive wrong diagnoses of one `ConflictException`, whose real cause — account-wide policy-name uniqueness — was stated in `lib/engine/render.py`'s own comment the whole time (L64); the CloudTrail five-trails-per-region quota, which AWS marks not adjustable (L61); and RT-4, a control that worked correctly and made the agent unreachable (L65, L66). |
+| Residue | Verified independently of the check: no `ben-fp2-` CloudFormation stacks and no AgentCore gateways, policy engines or runtimes. `teardown_zero_stack_residue` passed with `destroy_rc=1` and `stacks_clean=True` — by design (L28), the residue sweep is the claim and the CLI exit code is not. **Known gap (L37):** the toolkit's ECR repository is not pruned by teardown and grows one image per run. |
+| Reopened by this tag | **R4-2.** RT-4 closed "a token that can reach the gateway can also reach the runtime directly, past the gateway's Cedar interceptor" by restricting the runtime's authorizer to the gateway workload. It works, and it closed the intended human-to-agent path with it, because the gateway is downstream of the runtime in this architecture. RT-4 is now opt-in behind `RT4_GATEWAY_ONLY=1` and off by default (L66), so R4-2 is OPEN and is stated as open in the partner material. |
+| Still not proven live | PV / EDU / Housing full-portfolio gates (REL-5). Those three packs share the hash-locked core and received the L64 and L66 fixes with unit tests, and **none has been deployed in the AgentCore era**; the gate harness `scripts/full_portfolio_gate.py` exists only in this pack. Also: manifest signing (SIG-1), the Organizations-level SCP perimeter (PERIM-1b, blocked on an Organization), real data, multi-account, multi-region, and scale. |
+| Independence | All of this evidence is author-produced. That is the single largest credibility gap in this repository and no amount of further self-testing closes it; the protocol for a third party to reproduce it is `docs/INDEPENDENT-VERIFICATION.md`. |
+
+---
+
+## Previous release — `v0.6.0-pilot-rc1` (2026-09-07)
 
 | | |
 |---|---|
@@ -51,7 +67,7 @@
 | Tag | `v0.1.2-pilot-rc1` — cut after the live EP1 validation below. |
 | Commit SHA | the commit carrying tag `v0.1.2-pilot-rc1` (`git rev-list -n1 v0.1.2-pilot-rc1`) |
 | Test count at the tag | **101** offline tests <!-- count-gate:historical --> at the moment `v0.1.2-pilot-rc1` was cut — a record of that tag, not a claim about the current tree |
-| Test count on current main | **468 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
+| Test count on current main | **487 offline tests** (control-plane + CDK synthesis + governance gates + the doc-count gate). Authoritative matrix: [`RELEASE-MANIFEST.md`](RELEASE-MANIFEST.md). |
 | Validation date | **2026-07-27** (live EP1, env `ben-val1`, us-east-1) |
 | Region | us-east-1 |
 | Deployment | AWS CDK `deploy --all`, all Gate-B switches: `network_mode=private kms=customer-managed identity_mode=pilot tenant=ben-example-agency retention_profile=sandbox-demo` |

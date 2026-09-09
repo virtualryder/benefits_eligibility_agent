@@ -9,7 +9,7 @@ customer deployments.*
 ## 0. Supported path
 
 ```bash
-git checkout v0.6.0-pilot-rc1                 # release tag (full-portfolio gate 15/15 from zero, 2026-09-07), never main
+git checkout v0.7.0-pilot-rc1                 # release tag (full-portfolio gate 17/17 from zero, 2026-09-09), never main
 cd cdk && pip install -r requirements.txt     # PINNED: aws-cdk-lib==2.262.1, constructs==10.7.1
 npx --yes aws-cdk@2 bootstrap aws://<account>/us-east-1     # once per account
 ```
@@ -283,6 +283,6 @@ pass-by-reference it should report **PASS** (0 hits everywhere).
 ## 5. Offline verification (no AWS)
 
 ```bash
-python -m pytest tests/ -q                    # 298 pass locally (+1 CI-only gate = 468 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
+python -m pytest tests/ -q                    # 298 pass locally (+1 CI-only gate = 487 tests): control-plane + CDK synthesis + pass-by-ref + canary + doc-integrity gates
 python -m pytest tests/test_cdk_stacks.py -q  # 45 CDK assertions (synthesizes all 7 stacks + the multi-tenant variants)
 ```
