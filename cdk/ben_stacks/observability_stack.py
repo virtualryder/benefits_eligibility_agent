@@ -3,6 +3,8 @@
 Dashboards + alarms an operations team can actually run the pilot with. Sources are service metrics
 (no app instrumentation required) plus metric filters staged for the custom security signals. SNS is
 the pager seam (subscribe email/PagerDuty at deploy)."""
+import re
+
 import aws_cdk as cdk
 from aws_cdk import (aws_budgets as budgets, aws_cloudtrail as cloudtrail, aws_cloudwatch as cw,
                      aws_cloudwatch_actions as cwa, aws_iam as iam, aws_kms as kms, aws_lambda as lambda_,
@@ -41,11 +43,17 @@ def handler(event, context):
 from constructs import Construct
 
 
+def _kebab(name):
+    """`WorkflowTimedOut` -> `workflow-timed-out`. Stable, so alarm names survive a resynth."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+
+
 class ObservabilityStack(cdk.Stack):
     def __init__(self, scope: Construct, cid: str, *, prefix: str, compute, workflow,
                  data=None, gateway=None, model_logging: bool = False, tenants=("default",),
                  budget_usd: float = 0.0, runtime_role_name: str = "", lineage=None,
-                 transparency_lock_days: int = 0, approved_bedrock_principals=(), **kw):
+                 transparency_lock_days: int = 0, approved_bedrock_principals=(),
+                 latency_slo_ms: int = 5000, approval_backlog_threshold: int = 5, **kw):
         super().__init__(scope, cid, **kw)
         self._transparency(prefix, gateway, model_logging, data=data, lock_days=int(transparency_lock_days or 0))
         # Gate-B: ops alarms may carry case ids — under customer-managed KMS the topic is CMK-encrypted.
@@ -58,22 +66,36 @@ class ObservabilityStack(cdk.Stack):
         self._perimeter_bypass_alarm(prefix, lineage, compute, runtime_role_name,
                                      tuple(approved_bedrock_principals or ()), topic)
 
-        def alarm(name, metric, threshold=0, eval_periods=1, desc=""):
+        # OBS-1 (2026-09-09). Every alarm gets a deterministic, prefix-scoped name.
+        #
+        # Nine of this stack's twenty-two alarms previously carried NO AlarmName, so CloudFormation
+        # named them after the logical id plus a hash - `WorkflowFailedEDBEFEBB`. That is invisible
+        # from the source (the call sites look identical to the named ones) and it is the single
+        # most operationally damaging thing here: an incident runbook cannot reference an alarm it
+        # cannot name, and an operator paged at 3am cannot find it in the console. The name derives
+        # from the construct id, so it is stable across synths and a new alarm cannot be added
+        # without getting one. tests/test_observability_operability.py asserts zero unnamed.
+        tiers = {"p1": [], "p2": [], "p3": []}
+
+        def alarm(name, metric, threshold=0, eval_periods=1, desc="", tier="p2", **akw):
             a = cw.Alarm(self, name, metric=metric, threshold=threshold,
                          evaluation_periods=eval_periods,
-                         comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
+                         alarm_name="%s-%s" % (prefix, _kebab(name)),
+                         comparison_operator=akw.pop(
+                             "comparison_operator", cw.ComparisonOperator.GREATER_THAN_THRESHOLD),
                          treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
-                         alarm_description=desc)
+                         alarm_description=desc, **akw)
             a.add_alarm_action(cwa.SnsAction(topic))
+            tiers[tier].append(a)
             return a
 
         sm = workflow.controller
         # ── workflow health ──────────────────────────────────────────────────
-        alarm("WorkflowFailed", sm.metric_failed(period=cdk.Duration.minutes(5)),
+        alarm("WorkflowFailed", sm.metric_failed(period=cdk.Duration.minutes(5)), tier="p1",
               desc="Determination workflow execution FAILED — investigate; cases are not being processed.")
-        alarm("WorkflowTimedOut", sm.metric_timed_out(period=cdk.Duration.minutes(5)),
+        alarm("WorkflowTimedOut", sm.metric_timed_out(period=cdk.Duration.minutes(5)), tier="p2",
               desc="Execution timed out (approval older than the 24h gate?) — approval backlog or stuck state.")
-        alarm("WorkflowThrottled", sm.metric_throttled(period=cdk.Duration.minutes(5)),
+        alarm("WorkflowThrottled", sm.metric_throttled(period=cdk.Duration.minutes(5)), tier="p2",
               desc="Executions throttled — quota pressure.")
 
         # ── control-plane Lambda health (the governance-critical functions) ──
@@ -81,6 +103,9 @@ class ObservabilityStack(cdk.Stack):
                           ("Finalize", compute.finalize), ("WriteAudit", compute.write_audit),
                           ("Assess", compute.assess)):
             alarm(f"{label}Errors", fn.metric_errors(period=cdk.Duration.minutes(5)),
+                  # Mask and WriteAudit are P1: masking and the audit trail are the two
+                  # controls whose failure invalidates the EVIDENCE, not merely throughput.
+                  tier="p1" if label in ("Mask", "WriteAudit") else "p2",
                   desc=f"{label} Lambda errors — a governance-critical function is failing "
                        f"({'masking' if label == 'Mask' else 'audit trail' if label == 'WriteAudit' else 'pipeline'} impact; fail-closed but investigate).")
 
@@ -90,13 +115,57 @@ class ObservabilityStack(cdk.Stack):
         # its required advance notice — hit a guard. Page immediately.
         guard_failed = cw.Metric(namespace="Benefits/Governance", metric_name="GuardFailed",
                                  statistic="Sum", period=cdk.Duration.minutes(5))
-        alarm("GuardFailures", guard_failed,
+        alarm("GuardFailures", guard_failed, tier="p1",
               desc="A workflow guard REFUSED a transition (forged sanitized_ref, a spoofed boolean, or "
                    "an adverse benefits action lacking its advance notice). Security / due-process "
                    "signal - triage per THREAT-MODEL.md; repeated failures may indicate an active "
                    "forgery attempt or a due-process gap.")
 
         # ── dashboard: security · workflow · ops ─────────────────────────────
+        # ---- OBS-3: latency SLO alarms -------------------------------------------------
+        # p95 duration was CHARTED on the dashboard and never alarmed, so degradation was visible
+        # only to somebody already looking at it. That is what an absent SLO looks like in practice.
+        #
+        # Say this precisely: an SLO alarm is not an SLO. `latency_slo_ms` is a threshold WE chose,
+        # not an objective agreed with anyone, and until this runs under real load it is a guess
+        # informed by the gate timings. It is a parameter for exactly that reason.
+        slo_ms = int(latency_slo_ms or 0)
+        if slo_ms > 0:
+            for _lbl, _fn in (("Mask", compute.mask), ("Assess", compute.assess),
+                              ("Core", compute.core)):
+                alarm(f"{_lbl}LatencyP95",
+                      _fn.metric_duration(statistic="p95", period=cdk.Duration.minutes(5)),
+                      threshold=slo_ms, eval_periods=3, tier="p2",
+                      desc=f"{_lbl} p95 duration above the {slo_ms} ms latency objective for 15 "
+                           f"minutes. The governed path is degraded, not down - cases still "
+                           f"complete, but a caseworker is waiting. The threshold is a chosen "
+                           f"objective, not an agreed SLO: docs/ops/OBSERVABILITY-UPLIFT.md.")
+
+        # ---- OBS-4: approval backlog ---------------------------------------------------
+        # A stalled human sign-off was detected only by the 24h execution timeout. For a due-process
+        # workflow, a one-day detection window is the wrong order of magnitude.
+        #
+        # Why a math expression rather than ExecutionTime: Step Functions publishes ExecutionTime on
+        # COMPLETION, so an execution stuck at the approval gate never emits it. An alarm on that
+        # metric would be exactly the control this repository keeps finding - green and inert.
+        # Requests raised minus determinations finalised over a rolling hour does fire on a stall.
+        backlog = cw.MathExpression(
+            expression="FILL(requested, 0) - FILL(finalized, 0)",
+            using_metrics={
+                "requested": compute.signoff_register.metric_invocations(
+                    period=cdk.Duration.hours(1), statistic="Sum"),
+                "finalized": compute.finalize.metric_invocations(
+                    period=cdk.Duration.hours(1), statistic="Sum"),
+            },
+            label="Sign-offs requested but not finalised", period=cdk.Duration.hours(1))
+        alarm("ApprovalBacklog", backlog, threshold=int(approval_backlog_threshold),
+              eval_periods=2, tier="p2",
+              desc=f"More than {int(approval_backlog_threshold)} sign-off requests unfinalised for "
+                   f"two hours. Detects a stalled due-process gate in HOURS rather than at the 24h "
+                   f"execution timeout. A backlog is not necessarily a fault - it can be a staffing "
+                   f"signal - so this is P2, not a page.")
+
+
         dash = cw.Dashboard(self, "Dashboard", dashboard_name=f"{prefix}-operations")
         dash.add_widgets(
             cw.GraphWidget(title="Workflow: started / succeeded / failed / timed-out", width=12,
@@ -181,6 +250,9 @@ class ObservabilityStack(cdk.Stack):
                                  alarm_description=f"Tenant {t} has used >= {pct}% of its period budget ({metric_name}). "
                                                    f"At 100% with cap_behavior=hard the tenant is refused at the runtime and the gateway.")
                     a.add_alarm_action(cwa.SnsAction(topic))
+                    # 100% under a hard cap means tenants are being REFUSED - a degraded service,
+                    # not an advisory. 60 and 85 are advisory.
+                    tiers["p2" if pct == 100 else "p3"].append(a)
 
         # ── task 128: the USD backstop (B4) — AWS Budgets on Amazon Bedrock spend ───────────────
         # NOT real-time (AWS: budgets are "updated up to three times a day ... 8-12 hours after the
@@ -258,6 +330,48 @@ class ObservabilityStack(cdk.Stack):
             cdk.CfnOutput(self, "UsdCeilingActionId", value=action.attr_action_id)
             cdk.CfnOutput(self, "BudgetDenyPolicyArn", value=deny.managed_policy_arn)
             cdk.CfnOutput(self, "BudgetBreachFunction", value=breach.function_name)
+
+        # ---- OBS-2: severity tiering ---------------------------------------------------
+        # Before this, every alarm published to ONE topic, so a tenant crossing 60% of its budget
+        # arrived with the same urgency as the determination workflow failing. Operators learn to
+        # ignore a topic that behaves that way, which turns 22 alarms into zero.
+        #
+        # Each tier gets its own topic AND every constituent alarm still publishes to the original
+        # <prefix>-ops-alarms topic, so existing subscribers (the budget-breach function) are
+        # untouched. Subscribe a pager to p1, a ticket queue to p2, a mailbox to p3.
+        # The perimeter-bypass alarm is built by _perimeter_bypass_alarm() before `tiers`
+        # exists, so it is tiered here. A principal outside the allowlist calling Bedrock directly
+        # is a P1 by definition: the governance perimeter has been walked around.
+        if getattr(self, "bypass_alarm", None) is not None:
+            tiers["p1"].append(self.bypass_alarm)
+
+        self.tier_topics, self.tier_alarms = {}, {}
+        _TIER_DOC = {
+            "p1": ("PAGE", "The governed path is down, or evidence integrity or the perimeter is "
+                           "compromised. Cases are not being processed correctly. Wake someone."),
+            "p2": ("TICKET", "Degraded: cases still complete, but something is failing, slow, or "
+                             "backing up. Next business hour."),
+            "p3": ("ADVISORY", "Informational thresholds - spend approaching a ceiling. No action "
+                               "unless it is a surprise."),
+        }
+        for _tier in ("p1", "p2", "p3"):
+            _members = tiers[_tier]
+            if not _members:
+                continue
+            _label, _why = _TIER_DOC[_tier]
+            _tt = sns.Topic(self, f"Alarms{_tier.upper()}",
+                            topic_name=f"{prefix}-ops-{_tier}", master_key=cmk)
+            _comp = cw.CompositeAlarm(
+                self, f"Severity{_tier.upper()}",
+                composite_alarm_name=f"{prefix}-severity-{_tier}",
+                alarm_rule=cw.AlarmRule.any_of(*[cw.AlarmRule.from_alarm(a, cw.AlarmState.ALARM)
+                                                 for a in _members]),
+                alarm_description=f"{_label} - {_why} Constituents: "
+                                  + ", ".join(a.alarm_name for a in _members))
+            _comp.add_alarm_action(cwa.SnsAction(_tt))
+            self.tier_topics[_tier] = _tt
+            self.tier_alarms[_tier] = _comp
+            cdk.CfnOutput(self, f"Severity{_tier.upper()}Topic", value=_tt.topic_arn)
 
         cdk.CfnOutput(self, "AlarmTopicArn", value=topic.topic_arn,
                       description="Subscribe ops email / PagerDuty here.")
