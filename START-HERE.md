@@ -17,6 +17,14 @@ the shell engine (`lib/engine/`) is legacy/internal only.
 
 ---
 
+
+## Operations
+
+- [`docs/ops/INCIDENT-RUNBOOK.md`](docs/ops/INCIDENT-RUNBOOK.md) - every alarm this platform deploys, with a first action, an escalation trigger and a recovery check. A test fails CI if an alarm exists with no entry.
+- [`docs/ops/OBSERVABILITY-UPLIFT.md`](docs/ops/OBSERVABILITY-UPLIFT.md) - the measured baseline, what was fixed (OBS-1..OBS-4, OBS-6) and what is still open.
+- `python tools/observability_census.py` - counts what the synthesized template actually deploys: 26 alarms, all named, in 3 severity tiers. `--assert-baseline` fails when those numbers drift from what the partner documents quote. **It exists because a partner-facing document once said "three alarms" - counted from the source instead of the artifact.**
+- [`docs/ops/CLOUDTRAIL-QUOTA-REQUEST.md`](docs/ops/CLOUDTRAIL-QUOTA-REQUEST.md) - drafted, needs a human in the console.
+
 ## What this is — and what it is deliberately NOT
 
 A **governed assistant** for public-benefits intake. It:
