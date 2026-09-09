@@ -100,4 +100,4 @@ const body = [
 ];
 
 const doc = makeDoc(cover, body, "Benefits AgentCore · Maintenance & Operations Guide");
-Packer.toBuffer(doc).then((b) => { require("fs").writeFileSync("Benefits-AgentCore-Maintenance.docx", b); console.log("wrote maintenance"); });
+Packer.toBuffer(doc).then((b) => { require("fs").writeFileSync(require("path").join(__dirname, "..", "Benefits-AgentCore-Maintenance.docx"), b); console.log("wrote maintenance"); });
