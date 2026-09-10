@@ -29,11 +29,23 @@ for CAND in "$LIB/runtime/.venv/Scripts/python.exe" "$LIB/runtime/.venv/bin/pyth
 done
 [ -n "$PY" ] && [ -n "${CLIENT:-}" ] && [ -f "$CLIENT" ] || {
   echo "FAIL | no interpreter on this machine can import the pinned governed-core (tried the runtime venv and system python)"; exit 1; }
-tok(){ aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$CLIENT_ID" \
+# Use the throwaway proof client, NOT the CDK GatewayClient. The shipped client is SRP-only by
+# design (identity_stack.py: "no USER_PASSWORD_AUTH in the CDK path"), which is why fp8 failed here
+# with "USER_PASSWORD_AUTH flow not enabled for this client". Fall back to CLIENT_ID so a
+# hand-built environment (deploy_identity.sh, whose client does allow it) still works.
+AUTH_CLIENT="${PROOF_CLIENT_ID:-$CLIENT_ID}"
+[ -n "$AUTH_CLIENT" ] || { echo "FAIL | no PROOF_CLIENT_ID or CLIENT_ID to authenticate with"; exit 1; }
+tok(){ aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
         --auth-parameters "USERNAME=$1,PASSWORD=$2" --region "$REGION" --query 'AuthenticationResult.AccessToken' --output text | tr -d '\r'; }
 REV_U="$(awk -F'\t' '$3=="yes"{print $1; exit}' "$BUILD/users.tsv")"; REV_P="$(awk -F'\t' '$3=="yes"{print $2; exit}' "$BUILD/users.tsv")"
 OUT_U="$(awk -F'\t' '$3=="no"{print $1; exit}' "$BUILD/users.tsv")"; OUT_P="$(awk -F'\t' '$3=="no"{print $2; exit}' "$BUILD/users.tsv")"
 REV="$(tok "$REV_U" "$REV_P")"; OUT="$(tok "$OUT_U" "$OUT_P")"
+# An empty or "None" token is not a caller. Without this the proof would carry on and report
+# "outsider denied" for a request that was never authenticated - a pass for the wrong reason.
+for _n in REV OUT; do
+  eval "_v=\$$_n"
+  [ -n "$_v" ] && [ "$_v" != "None" ] || { echo "FAIL | could not mint a $_n token via client $AUTH_CLIENT"; exit 1; }
+done
 call(){ "$PY" "$CLIENT" "$GW_URL" "$1" "$2" "$3"; }   # same interpreter that resolved CLIENT
 pass=0; fail=0
 

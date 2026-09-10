@@ -82,6 +82,29 @@ if [ -z "$M2M_ID" ] || [ "$M2M_ID" = "None" ]; then
 else log "reusing M2M client $M2M_ID"; fi
 M2M_SECRET="$(aws cognito-idp describe-user-pool-client --user-pool-id "$POOL_ID" --client-id "$M2M_ID" --region "$REGION" --query "UserPoolClient.ClientSecret" --output text | tr -d '\r')"
 
+# ---- 3c. Throwaway PROOF client (USER_PASSWORD_AUTH) ----
+# prove_connector.sh needs a user token. The CDK GatewayClient cannot mint one for it:
+# identity_stack.py declares auth_flows=cognito.AuthFlow(user_srp=True) with the comment
+# "no USER_PASSWORD_AUTH in the CDK path", and on ben-fp8 the proof died with
+# "USER_PASSWORD_AUTH flow not enabled for this client" - twice, once per test user.
+# That exclusion is a deliberate security posture, so we do NOT weaken the shipped client.
+# The proof gets its own client instead: env-scoped, no secret, USER_PASSWORD_AUTH only,
+# created here and removed by destroy_connector.sh before the pool goes. If teardown ever
+# fails to remove it, the gate's <prefix>-* user-pool check catches the pool it lives in.
+PROOF_CLIENT_NAME="${P}-proof-client"
+PROOF_CLIENT_ID="$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --region "$REGION" --max-results 60 \
+  --query "UserPoolClients[?ClientName=='$PROOF_CLIENT_NAME'].ClientId | [0]" --output text 2>/dev/null | tr -d '\r')"
+if [ -z "$PROOF_CLIENT_ID" ] || [ "$PROOF_CLIENT_ID" = "None" ]; then
+  PC_ERR="$(aws cognito-idp create-user-pool-client --user-pool-id "$POOL_ID" --client-name "$PROOF_CLIENT_NAME" \
+    --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH --region "$REGION" \
+    --query "UserPoolClient.ClientId" --output text 2>&1 >/tmp/pcid.$$)" \
+    && PROOF_CLIENT_ID="$(tr -d '\r' </tmp/pcid.$$)" \
+    || err "could not create proof client $PROOF_CLIENT_NAME: ${PC_ERR:-unknown}"
+  rm -f /tmp/pcid.$$
+  [ -n "${PROOF_CLIENT_ID:-}" ] && [ "$PROOF_CLIENT_ID" != "None" ] \
+    && log "created proof client $PROOF_CLIENT_ID ($PROOF_CLIENT_NAME, USER_PASSWORD_AUTH, no secret)"
+else log "reusing proof client $PROOF_CLIENT_ID"; fi
+
 # ---- 3b. Connector exec role. MOVED AHEAD OF THE LAMBDAS ON PURPOSE (2026-09-09, ben-fp6).
 # The SoR Lambda used to be created with $TOOL_ROLE_ARN ("<prefix>-tool-exec"), which is the
 # AGENTCORE TOOL execution role: it trusts bedrock-agentcore, not Lambda. AWS said so plainly once
@@ -236,13 +259,18 @@ else
     || err "create-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 fi
 
+# EVERY value is quoted. SOR_LABEL is "MOCK-SOR (OAuth2, RS256/JWKS)" - spaces and parentheses -
+# and unquoted it made `source connector-state.env` a bash syntax error, which is what actually
+# killed the fp8 proof ("syntax error near unexpected token `('", then SOR_LABEL: unbound variable).
+# A state file that cannot be sourced is worse than no state file: it fails at the reader, not here.
 cat > "$AGENT/connector-state.env" <<EOF
-SOR_URL=$SOR_URL
-PROVIDER=$PROVIDER
-WI=$WI
-M2M_ID=$M2M_ID
-DOMAIN=$DOMAIN_PREFIX
-SOR_LABEL=$SOR_LABEL
-TOOL_ID=verify-source___verify_source
+SOR_URL="$SOR_URL"
+PROVIDER="$PROVIDER"
+WI="$WI"
+M2M_ID="$M2M_ID"
+PROOF_CLIENT_ID="${PROOF_CLIENT_ID:-}"
+DOMAIN="$DOMAIN_PREFIX"
+SOR_LABEL="$SOR_LABEL"
+TOOL_ID="verify-source___verify_source"
 EOF
 log "DONE. connector-state -> $AGENT/connector-state.env"

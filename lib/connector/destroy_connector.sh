@@ -156,6 +156,14 @@ if [ -n "${POOL_ID:-}" ]; then
     aws cognito-idp delete-user-pool-client --user-pool-id "$POOL_ID" --client-id "$M2M_ID" --region "$REGION" >/dev/null 2>&1 \
       && ok "m2m client $M2M_ID" || fail "m2m client $M2M_ID" "delete failed"
   else skip "m2m client $M2M_NAME"; fi
+  # the throwaway USER_PASSWORD_AUTH client deploy created for the proof
+  PROOF_CLIENT_NAME="${P}-proof-client"
+  PC_ID="$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --region "$REGION" --max-results 60 \
+    --query "UserPoolClients[?ClientName=='$PROOF_CLIENT_NAME'].ClientId | [0]" --output text 2>/dev/null | tr -d '\r')"
+  if [ -n "$PC_ID" ] && [ "$PC_ID" != "None" ]; then
+    aws cognito-idp delete-user-pool-client --user-pool-id "$POOL_ID" --client-id "$PC_ID" --region "$REGION" >/dev/null 2>&1 \
+      && ok "proof client $PC_ID" || fail "proof client $PC_ID" "delete failed"
+  else skip "proof client $PROOF_CLIENT_NAME"; fi
   aws cognito-idp delete-resource-server --user-pool-id "$POOL_ID" --identifier "$RS" --region "$REGION" >/dev/null 2>&1 \
     && ok "resource server $RS" || skip "resource server $RS"
   if aws cognito-idp describe-user-pool-domain --domain "$DOMAIN_PREFIX" --region "$REGION" \
