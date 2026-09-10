@@ -253,11 +253,67 @@ Two more things earned their place:
   run after the rewrite it caught a Git-Bash `/c/Users/...` path reaching a Windows `python.exe` as
   `C:\c\Users\...` — a defect that would otherwise have cost a full live cycle to find.
 
-**Required before CONN-1 may be claimed:** one more from-zero live run in which `CONN_deploy`,
-`CONN_governed_sor_proof` and both residue checks pass on their own. Until that exists,
-`connect_system_of_record` stays stubbed in the manifest and the connector appears in no brief,
-deck, or architecture legend.
+### 5.3 `ben-fpc` — Cedar authorized a governed caller for the first time
 
-And when it does pass, two sentences stay adjacent, as they always have: the system of record is a
-**real** OAuth2 API with RS256/JWKS signature verification, and it is **ours**. Proving the governed
-path reaches it is not the same as proving a customer's system has been governed.
+The SRP change worked. `ALLOW` for the reviewer, `DENY multi-tenant: identity carries no tenant` for
+the outsider — a **selective** denial naming a real policy, where fpb had denied both identically.
+Step 2 still failed: the tool reached the SoR and was refused `HTTP 401`, and reported only that.
+
+### 5.4 `ben-fpd` — the SoR named its reason
+
+`verify_source` now returns the SoR's own body: *"token signature not verified / signing key (kid)
+not found in issuer JWKS."* That eliminated four of five candidate causes in one line.
+
+### 5.5 `ben-fpe` — one hidden error and a comma
+
+```
+token_claims: iss=…/us-east-1_LFAS5P3TH  scope=ben-fpe-sor/read  token_use=access  alg=RS256
+sor_said:     this SoR trusts kids [] from EXPECTED_ISS=""
+```
+
+`EXPECTED_ISS` **empty**; trusted keys **empty**. The token had been perfect for four runs. The SoR
+Lambda's environment was written with the CLI shorthand `Variables={k=v,k=v}`, which splits on
+commas — and `SOR_LABEL` is `MOCK-SOR (OAuth2, RS256/JWKS)`. Every one of six retries failed into
+`>/dev/null`, and the SoR ran trusting no issuer, so it refused every governed call with a signature
+error.
+
+Both threads of this document meeting in one line: an error path that cannot speak, and a value that
+had already bitten once for the same reason (`SOR_LABEL`'s punctuation broke `source
+connector-state.env` on fp8). Both Lambda environments now go through JSON via `file://`, with
+stderr captured — **and are read back from the live function and compared.** A configuration write
+that is not verified is a configuration wish; §0's rule, applied to a Lambda env.
+
+### 5.6 `ben-fpf` (2026-09-10) — CONN-1 PROVEN
+
+**21 of 21 checks passed from zero.** `CONN_governed_sor_proof` passed **4/4 on its own merit**:
+
+```
+1. SoR rejects no-token (401) and bad-token (401) — genuinely OAuth-protected
+2. verify_source returned an authoritative record via the OAuth-protected SoR
+   (token minted by Identity)
+2. the tool holds NO client secret (it lives in the Identity token vault)
+3. outsider call to verify_source DENIED (Cedar deny-by-default)
+   -> DENY multi-tenant: identity carries no tenant (custom:tenant); refused
+```
+
+The deploy log carries the corroborating evidence: `SoR environment verified live:
+EXPECTED_ISS=https://cognito-idp.us-east-1.amazonaws.com/…`, and `outbound leg OK: verify_source
+verified CASE-1 against the OAuth-protected SoR`. Account confirmed at zero afterwards by querying
+AWS directly — no stacks, gateways, credential providers, runtimes, lambdas, pools, APIs or roles.
+
+**What this licenses, exactly.** Two sentences that must never be separated: the system of record is
+a **real** OAuth2 API with RS256/JWKS signature verification, and it is **ours**. Proving the
+governed path reaches it is not proving a customer's system has been governed.
+`connect_system_of_record` therefore **stays stubbed** in the manifest — removing it would be the
+overclaim this exercise existed to avoid, and a plan written before the proof passed said to remove
+it. The plan was wrong; the manifest records why.
+
+The disclosure this document used to owe — that the proof authenticated through a throwaway test
+client — no longer applies. It authenticates by SRP through the shipped `GatewayClient`, as a real
+caller does.
+
+**Six runs, and not one of the six failures was where it appeared to be.** The proof failed at
+authentication (users that never existed), then at the gateway (a client the authorizer did not
+trust), then at the SoR (an environment that was never written) — and each was hidden behind an
+error path that had been silenced. The fix that mattered each time was making something say what it
+already knew.

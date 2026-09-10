@@ -1,0 +1,13 @@
+{
+  "verdict": "PASS",
+  "leaks": {},
+  "marker": "CANARY-FE9F69001DA7-TELEMETRYPROBE",
+  "prefix": "ben-fpf",
+  "swept_at": "2026-09-10T19:16:37.977587+00:00",
+  "informational_model_path": {
+    "hits": {
+      "/aws/bedrock/modelinvocations/ben-fpf": 0
+    },
+    "note": "not gated: synthetic marker vs Comprehend NAME recall; the model-path control is masked_before_model (trace_case, realistic PII)"
+  }
+}

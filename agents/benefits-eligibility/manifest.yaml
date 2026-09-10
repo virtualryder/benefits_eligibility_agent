@@ -214,10 +214,20 @@ workflow:
     - "request_signoff - request caseworker sign-off to commit (a DIFFERENT qualified person must approve)."
 
 honesty_boundary:
-  # CONN-1 (2026-09-09): verify_source is no longer stubbed - it is a governed Gateway target
-  # calling a REAL OAuth2-protected system of record (RS256/JWKS verified), with the outbound
-  # token minted by AgentCore Identity so the tool holds no client secret. State the limit in
-  # the same breath: the SoR is OUR mock. A real CUSTOMER system of record is still ungoverned.
+  # CONN-1 (2026-09-10, ben-fpf): PROVEN, and the claim is narrower than it looks.
+  # CONN_governed_sor_proof passed 4/4 on its own merit in a from-zero live run - the SoR refuses
+  # anonymous and bad-token calls (401/401), a governed reviewer's call is AUTHORIZED by Cedar and
+  # returns an authoritative record fetched with an outbound OAuth2 token minted by AgentCore
+  # Identity (the tool holds no client secret), and an outsider is DENIED with
+  # "multi-tenant: identity carries no tenant (custom:tenant); refused" - a selective denial naming
+  # a real policy, not a blanket refusal.
+  #
+  # connect_system_of_record STAYS STUBBED, deliberately, and removing it would be the overclaim
+  # this whole exercise existed to avoid. Two sentences that must never be separated:
+  #   The system of record is a REAL OAuth2 API with RS256/JWKS signature verification.
+  #   It is OURS.
+  # Proving the governed path reaches it is not proving a CUSTOMER's system of record has been
+  # governed. That remains customer engagement work and is not done.
   stubbed: [connect_system_of_record]
   connectors: "state benefits system / eligibility system integration is customer engagement work"
   not_certified: true
