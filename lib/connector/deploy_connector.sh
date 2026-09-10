@@ -318,6 +318,26 @@ else
     || err "create-gateway-target failed on $GW_ID: ${TGT_ERR:-unknown}"
 fi
 
+# ---- 10. Smoke-test the OUTBOUND leg, here, where a failure is attributable to the deploy.
+# ben-fpc was the first run ever to get a governed caller through Cedar and into this tool: the
+# gateway said ALLOW and the tool answered {"verified":false,"error":"system-of-record returned
+# HTTP 401"}. That message names a symptom with five possible causes in sor_api.py and
+# distinguishes none of them, so twenty minutes of live deploy bought one string the response had
+# already contained. Invoking the tool directly puts the SoR's OWN words into CONN_deploy.
+INV_OUT="$WORK/verify-invoke.json"
+if aws lambda invoke --function-name "$VERIFY_FN" --region "$REGION" \
+     --cli-binary-format raw-in-base64-out --payload '{"case_id":"CASE-1"}' "$INV_OUT" >/dev/null 2>&1; then
+  INV="$(tr -d '\r\n' < "$INV_OUT" 2>/dev/null)"
+  case "$INV" in
+    *'"verified": true'*|*'"verified":true'*)
+      log "outbound leg OK: verify_source verified CASE-1 against the OAuth-protected SoR" ;;
+    *)
+      err "outbound leg FAILED - the tool reached the SoR and was refused: $(printf '%s' "$INV" | cut -c1-600)" ;;
+  esac
+else
+  err "could not invoke $VERIFY_FN to smoke-test the outbound leg"
+fi
+
 # EVERY value is quoted. SOR_LABEL is "MOCK-SOR (OAuth2, RS256/JWKS)" - spaces and parentheses -
 # and unquoted it made `source connector-state.env` a bash syntax error, which is what actually
 # killed the fp8 proof ("syntax error near unexpected token `('", then SOR_LABEL: unbound variable).

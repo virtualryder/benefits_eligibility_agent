@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import urllib.request
@@ -59,6 +60,26 @@ def _oauth_token():
     return r.get("accessToken")
 
 
+def _claims_for_diagnosis(tok):
+    """The token's NON-SECRET claims, so a rejection can be attributed to the right check.
+
+    Deliberately never the token itself. A claim set cannot be replayed; a bearer token can, and
+    this value travels through the gate log into committed evidence. These six fields are exactly
+    what sor_api.py tests - kid/alg for the signature, iss/client_id/scope for the claims - so the
+    rejection reason and the reason it was rejected land side by side in one output.
+    """
+    try:
+        hdr_b64, payload_b64, _sig = tok.split(".")
+        def _d(seg):
+            return json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
+        hdr, payload = _d(hdr_b64), _d(payload_b64)
+        return {"kid": hdr.get("kid"), "alg": hdr.get("alg"), "iss": payload.get("iss"),
+                "client_id": payload.get("client_id"), "scope": payload.get("scope"),
+                "token_use": payload.get("token_use"), "exp": payload.get("exp")}
+    except Exception:                                              # noqa: BLE001
+        return {"parse": "the value returned by AgentCore Identity is not a readable JWT"}
+
+
 def handler(event, context):
     e = _coerce(event)
     case_id = e.get("case_id") or "_default"
@@ -81,10 +102,24 @@ def handler(event, context):
         with urllib.request.urlopen(req, timeout=8) as resp:  # nosec B310 - scheme checked above
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as ex:
+        # READ THE BODY. sor_api.py answers every rejection with a JSON reason - "token signature
+        # verification failed", "malformed token", "insufficient scope", "wrong issuer", "token
+        # expired" - and this handler used to discard all of it and report only the status code.
+        # On ben-fpc that left the entire diagnosis at "system-of-record returned HTTP 401", which
+        # names a symptom with five possible causes and distinguishes none of them. Same defect
+        # class as L70's 2>/dev/null and fpa's discarded stderr: an error path that cannot speak
+        # turns a specific failure into an unattributable one, and costs a full live cycle to learn
+        # what the response already said.
+        try:
+            said = ex.read().decode("utf-8", "replace")[:400]
+        except Exception:                                          # noqa: BLE001
+            said = "<no body>"
         return {"verified": False, "error": "system-of-record returned HTTP %s" % ex.code,
-                "sor_auth_enforced": ex.code in (401, 403)}
+                "sor_said": said, "sor_auth_enforced": ex.code in (401, 403),
+                "token_claims": _claims_for_diagnosis(token)}
     except (urllib.error.URLError, TimeoutError, ValueError) as ex:
-        return {"verified": False, "error": "system-of-record call failed: %s" % type(ex).__name__}
+        return {"verified": False, "error": "system-of-record call failed: %s" % type(ex).__name__,
+                "detail": str(ex)[:200]}
 
     return {
         "verified": bool(data.get("verified")),
