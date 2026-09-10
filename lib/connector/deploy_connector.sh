@@ -82,28 +82,14 @@ if [ -z "$M2M_ID" ] || [ "$M2M_ID" = "None" ]; then
 else log "reusing M2M client $M2M_ID"; fi
 M2M_SECRET="$(aws cognito-idp describe-user-pool-client --user-pool-id "$POOL_ID" --client-id "$M2M_ID" --region "$REGION" --query "UserPoolClient.ClientSecret" --output text | tr -d '\r')"
 
-# ---- 3c. Throwaway PROOF client (USER_PASSWORD_AUTH) ----
-# prove_connector.sh needs a user token. The CDK GatewayClient cannot mint one for it:
-# identity_stack.py declares auth_flows=cognito.AuthFlow(user_srp=True) with the comment
-# "no USER_PASSWORD_AUTH in the CDK path", and on ben-fp8 the proof died with
-# "USER_PASSWORD_AUTH flow not enabled for this client" - twice, once per test user.
-# That exclusion is a deliberate security posture, so we do NOT weaken the shipped client.
-# The proof gets its own client instead: env-scoped, no secret, USER_PASSWORD_AUTH only,
-# created here and removed by destroy_connector.sh before the pool goes. If teardown ever
-# fails to remove it, the gate's <prefix>-* user-pool check catches the pool it lives in.
-PROOF_CLIENT_NAME="${P}-proof-client"
-PROOF_CLIENT_ID="$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --region "$REGION" --max-results 60 \
-  --query "UserPoolClients[?ClientName=='$PROOF_CLIENT_NAME'].ClientId | [0]" --output text 2>/dev/null | tr -d '\r')"
-if [ -z "$PROOF_CLIENT_ID" ] || [ "$PROOF_CLIENT_ID" = "None" ]; then
-  PC_ERR="$(aws cognito-idp create-user-pool-client --user-pool-id "$POOL_ID" --client-name "$PROOF_CLIENT_NAME" \
-    --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH --region "$REGION" \
-    --query "UserPoolClient.ClientId" --output text 2>&1 >/tmp/pcid.$$)" \
-    && PROOF_CLIENT_ID="$(tr -d '\r' </tmp/pcid.$$)" \
-    || err "could not create proof client $PROOF_CLIENT_NAME: ${PC_ERR:-unknown}"
-  rm -f /tmp/pcid.$$
-  [ -n "${PROOF_CLIENT_ID:-}" ] && [ "$PROOF_CLIENT_ID" != "None" ] \
-    && log "created proof client $PROOF_CLIENT_ID ($PROOF_CLIENT_NAME, USER_PASSWORD_AUTH, no secret)"
-else log "reusing proof client $PROOF_CLIENT_ID"; fi
+# ---- 3c. Proof authentication: NO throwaway client. ben-fpb proved that road is closed: a test client with USER_PASSWORD_AUTH
+# minted tokens perfectly and the gateway rejected every one, denying the REVIEWER and the OUTSIDER
+# with the same "insufficient_scope". gateway_stack.py's customJWTAuthorizer carries
+# allowedClients = [identity.client.user_pool_client_id] - an allow-list of exactly one. Admitting a
+# test client meant editing the PRODUCTION authorizer, which is a worse compromise than the one the
+# throwaway client existed to avoid. The proof now authenticates by SRP through the shipped client,
+# as cedar_perimeter_proof.py and mt_two_tenant_proof.py always have. See mint_token.py.
+log "proof auth: SRP through the shipped GatewayClient $CLIENT_ID (no test-only client is created)"
 
 # ---- 3c-2. Proof USERS. Root cause of the ben-fpa failure, and MEASURED rather than assumed: a
 # synth of the identity stack carries UserPool=1, UserPoolClient=1, UserPoolGroup=4 and ZERO
@@ -155,16 +141,28 @@ mkuser "$PROOF_OUT_U" "$PROOF_OUT_P" ""
 # Smoke-test the auth path HERE, where a failure is attributable to the deploy, instead of letting it
 # surface three steps later as a proof failure with no cause attached. This is the exact call that
 # died on ben-fpa; if it cannot mint now, CONN_deploy says so in AWS's own words.
-for _pu in "$PROOF_REV_U:$PROOF_REV_P" "$PROOF_OUT_U:$PROOF_OUT_P"; do
-  _u="${_pu%%:*}"; _p="${_pu#*:}"
-  MERR="$(aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$PROOF_CLIENT_ID" \
-          --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
-          --query 'AuthenticationResult.AccessToken' --output text 2>&1 | tr -d '\r')"
-  if [ $? -ne 0 ] || [ -z "$MERR" ] || [ "$MERR" = "None" ]; then
-    err "proof user $_u cannot mint a token via client $PROOF_CLIENT_ID: ${MERR:-<no output>}"
-  else log "proof user $_u mints a token OK"; fi
+MINT_PY=""
+for CAND in "$PY" "$LIBRT/.venv/Scripts/python.exe" "$LIBRT/.venv/bin/python" python; do
+  if [ -n "$CAND" ] && { [ -f "$CAND" ] || command -v "$CAND" >/dev/null 2>&1; }; then
+    "$CAND" -c 'import pycognito' >/dev/null 2>&1 && { MINT_PY="$CAND"; break; }
+  fi
 done
-unset MERR _pu _u _p
+# Git-Bash /c/Users/... paths reach a Windows python.exe verbatim under MSYS_NO_PATHCONV and resolve
+# to C:\c\Users\... - caught by selftest_proof_auth.sh on 2026-09-10, not by a live run.
+MINT_SCRIPT="$SELF/mint_token.py"
+command -v cygpath >/dev/null 2>&1 && MINT_SCRIPT="$(cygpath -w "$MINT_SCRIPT")"
+if [ -z "$MINT_PY" ]; then
+  err "no interpreter here can import pycognito, so the proof cannot do SRP - install it or the proof will fail"
+else
+  for _pu in "$PROOF_REV_U:$PROOF_REV_P" "$PROOF_OUT_U:$PROOF_OUT_P"; do
+    _u="${_pu%%:*}"; _p="${_pu#*:}"
+    MERR="$("$MINT_PY" "$MINT_SCRIPT" "$POOL_ID" "$CLIENT_ID" "$REGION" "$_u" "$_p" 2>&1 | tr -d '\r')"
+    if [ $? -ne 0 ] || [ -z "$MERR" ]; then
+      err "proof user $_u cannot mint a token by SRP via the shipped client $CLIENT_ID: ${MERR:-<no output>}"
+    else log "proof user $_u mints a token by SRP OK"; fi
+  done
+  unset MERR _pu _u _p
+fi
 
 # ---- 3b. Connector exec role. MOVED AHEAD OF THE LAMBDAS ON PURPOSE (2026-09-09, ben-fp6).
 # The SoR Lambda used to be created with $TOOL_ROLE_ARN ("<prefix>-tool-exec"), which is the
@@ -329,7 +327,6 @@ SOR_URL="$SOR_URL"
 PROVIDER="$PROVIDER"
 WI="$WI"
 M2M_ID="$M2M_ID"
-PROOF_CLIENT_ID="${PROOF_CLIENT_ID:-}"
 PROOF_REV_U="${PROOF_REV_U:-}"
 PROOF_OUT_U="${PROOF_OUT_U:-}"
 DOMAIN="$DOMAIN_PREFIX"

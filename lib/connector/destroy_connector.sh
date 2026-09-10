@@ -160,7 +160,10 @@ if [ -n "${POOL_ID:-}" ]; then
     aws cognito-idp delete-user-pool-client --user-pool-id "$POOL_ID" --client-id "$M2M_ID" --region "$REGION" >/dev/null 2>&1 \
       && ok "m2m client $M2M_ID" || fail "m2m client $M2M_ID" "delete failed"
   else skip "m2m client $M2M_NAME"; fi
-  # the throwaway USER_PASSWORD_AUTH client deploy created for the proof
+  # LEGACY CLEANUP. deploy_connector.sh no longer creates a throwaway proof client - the proof now
+  # authenticates by SRP through the shipped GatewayClient, because the gateway's customJWTAuthorizer
+  # allow-lists exactly one client (see mint_token.py). This removal stays because ben-fpa and ben-fpb
+  # DID create one, and a teardown that stops recognising yesterday's residue is how residue survives.
   PROOF_CLIENT_NAME="${P}-proof-client"
   PC_ID="$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --region "$REGION" --max-results 60 \
     --query "UserPoolClients[?ClientName=='$PROOF_CLIENT_NAME'].ClientId | [0]" --output text 2>/dev/null | tr -d '\r')"

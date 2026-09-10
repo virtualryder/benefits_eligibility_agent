@@ -1,0 +1,310 @@
+{
+ "prefix": "ben-fpb",
+ "since_minutes": 41,
+ "log_groups": {
+  "/aws/lambda/ben-fpb-approve-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-assess-eligibility": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-budget-breach": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-core-tools": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-finalize": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-gateway-AttachmentProviderEF56056D-uW2cE58YkCeq": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-ingest-application": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-intake-application": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789052668546,
+     "stream": "2026/09/10/ben-fpb-intake-application[$LATEST]7edf221c899d47",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "[ERROR] KillSwitchEngaged: kill switch ENGAGED (/ben-fpb-eligibility/kill-switch): SEV-1 drill: runaway agent suspected Traceback (most recent call last): \u00a0\u00a0File \"/var/task/telemetry.py\", line 234, in wrapped \u00a0\u00a0\u00a0\u00a0raise kill_switch.KillSwitchEngaged(engaged)"
+    },
+    {
+     "ts": 1789052669120,
+     "stream": "2026/09/10/ben-fpb-intake-application[$LATEST]7edf221c899d47",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "[ERROR] KillSwitchEngaged: kill switch ENGAGED (/ben-fpb-eligibility/kill-switch): SEV-1 drill: runaway agent suspected Traceback (most recent call last): \u00a0\u00a0File \"/var/task/telemetry.py\", line 234, in wrapped \u00a0\u00a0\u00a0\u00a0raise kill_switch.KillSwitchEngaged(engaged)"
+    }
+   ]
+  },
+  "/aws/lambda/ben-fpb-kill-switch-disengage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-kill-switch-engage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-mask-pii": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-observability-CustomS3AutoDeleteObjectsCus-nxpvWbFTtXwA": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789051916472,
+     "stream": "2026/09/10/[$LATEST]70404a7f23fc462a88c480753fa687a7",
+     "kind": "expected",
+     "why": "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure",
+     "excerpt": "2026-09-10T14:51:56.472Z\td7937b49-ccb9-45e9-8dcb-619be0fa9758\tERROR\t(node:2) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `"
+    },
+    {
+     "ts": 1789051916529,
+     "stream": "2026/09/10/[$LATEST]af60c7fd3a594b75b79dda81b6f7f647",
+     "kind": "expected",
+     "why": "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure",
+     "excerpt": "2026-09-10T14:51:56.529Z\t5b269076-4965-4848-aa8f-82ef879db2e9\tERROR\t(node:2) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `"
+    }
+   ]
+  },
+  "/aws/lambda/ben-fpb-observability-ModelLoggingProviderFn261BCF-KGa6Jt9lQfB9": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-observability-ModelLoggingProviderframewor-YgY8ymn1QZSl": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-overpayment": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-redetermine": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-request-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-signoff-register": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-tenant-interceptor": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-workflow-guards": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpb-write-audit": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/states/ben-fpb-determination-workflow": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789052669128,
+     "stream": "states/ben-fpb-determination-workflow/2026-09-10-15/00000000",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"details\":{\"cause\":\"{\\\"errorMessage\\\":\\\"kill switch ENGAGED (/ben-fpb-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\\\",\\\"errorType\\\":\\\"KillSwitchEngaged\\\",\\\"requestId\\\":\\\"8a042b01-324a-484b-a2a6-966e82b032ca\\\",\\\"stackTrace\\\":[\\\"  File \\\\\\\"/var"
+    },
+    {
+     "ts": 1789052669162,
+     "stream": "states/ben-fpb-determination-workflow/2026-09-10-15/00000000",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"details\":{\"cause\":\"{\\\"errorMessage\\\":\\\"kill switch ENGAGED (/ben-fpb-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\\\",\\\"errorType\\\":\\\"KillSwitchEngaged\\\",\\\"requestId\\\":\\\"8a042b01-324a-484b-a2a6-966e82b032ca\\\",\\\"stackTrace\\\":[\\\"  File \\\\\\\"/var"
+    }
+   ]
+  },
+  "/aws/vendedlogs/bedrock-agentcore/gateway/ben-fpb": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-TK3V2HDzbG-DEFAULT": {
+   "events": 20,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789052646586,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789052646587,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789052646589,
+     "stream": "otel-rt-logs",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"telemetry.sdk.language\":\"python\",\"telemetry.sdk.name\":\"opentelemetry\",\"telemetry.sdk.version\":\"1.42.1\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"aws.log.group.names\":\"/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-TK3"
+    },
+    {
+     "ts": 1789052646589,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789052646589,
+     "stream": "2026/09/10/[runtime-logs]60dd46e5-723a-43b9-bf78-d97aad1f118",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "2026-09-10 15:04:06,589 ERROR [strands.event_loop.event_loop] [event_loop.py:394] [trace_id=6aa2c6d579b8f6a270deb9df62c46b29 span_id=7baa87c2aa7c5183 resource.service.name=benefits_runtime_agent.DEFAULT trace_sampled=True] - exception=<KillSwitchEngaged> | eve"
+    },
+    {
+     "ts": 1789052646592,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    }
+   ]
+  }
+ },
+ "executions": [
+  {
+   "name": "lineage-lin-f2ebc1",
+   "status": "ABORTED",
+   "kind": "expected",
+   "why": "stopped by the harness at the sign-off pause",
+   "cause": "lineage isolated case: signoff pause reached "
+  },
+  {
+   "name": "bgproof-bg-wf-56ad3d",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  },
+  {
+   "name": "ksproof-ks-1ad967",
+   "status": "FAILED",
+   "kind": "expected",
+   "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+   "cause": "{\"errorMessage\":\"kill switch ENGAGED (/ben-fpb-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\",\"errorType\":\"KillSwitchEngaged\",\"requestId\":\"8a042b01-324a-484b-a2a6-966e82b032ca\",\"stack"
+  },
+  {
+   "name": "pii-canary-f086f52f221e",
+   "status": "RUNNING",
+   "kind": "running",
+   "why": "still at the sign-off pause (24h wait) - stop before teardown",
+   "cause": " "
+  },
+  {
+   "name": "mtproof-nobind-mt-wf-6c701a",
+   "status": "FAILED",
+   "kind": "expected",
+   "why": "fail-closed: execution started WITHOUT the signed pair fails at Extract",
+   "cause": "An error occurred while executing the state 'Extract' (entered at the event id #2). The JSONPath '$.__aegis_tenant' specified for the field '__aegis_tenant.$' could not be found in the input '{\"case_i"
+  },
+  {
+   "name": "mtproof-mt-wf-6c701a",
+   "status": "ABORTED",
+   "kind": "expected",
+   "why": "harness stopped the execution at the sign-off pause",
+   "cause": "mt proof complete (sign-off pause reached) "
+  }
+ ],
+ "alarms": [],
+ "dlqs": {},
+ "lambda_errors_metric": {
+  "ben-fpb-observability-ModelLoggingProviderframewor-YgY8ymn1QZSl": 0,
+  "ben-fpb-workflow-guards": 0,
+  "ben-fpb-gateway-AttachmentProviderEF56056D-uW2cE58YkCeq": 0,
+  "ben-fpb-assess-eligibility": 0,
+  "ben-fpb-core-tools": 0,
+  "ben-fpb-kill-switch-disengage": 0,
+  "ben-fpb-write-audit": 0,
+  "ben-fpb-finalize": 0,
+  "ben-fpb-signoff-register": 0,
+  "ben-fpb-mask-pii": 0,
+  "ben-fpb-observability-ModelLoggingProviderFn261BCF-KGa6Jt9lQfB9": 0,
+  "ben-fpb-tenant-interceptor": 0,
+  "ben-fpb-budget-breach": 0,
+  "ben-fpb-ingest-application": 0,
+  "ben-fpb-redetermine": 0,
+  "ben-fpb-intake-application": 2,
+  "ben-fpb-approve-signoff": 0,
+  "ben-fpb-observability-CustomS3AutoDeleteObjectsCus-nxpvWbFTtXwA": 0,
+  "ben-fpb-request-signoff": 0,
+  "ben-fpb-overpayment": 0,
+  "ben-fpb-kill-switch-engage": 0
+ },
+ "lambda_errors_note": "Errors>0 on intake-application/assess-eligibility/write-audit are the deliberate fail-closed TenantError refusals; see log_groups classification",
+ "unexpected_total": 0,
+ "verdict": "PASS"
+}

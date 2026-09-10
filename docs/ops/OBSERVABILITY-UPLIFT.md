@@ -139,11 +139,19 @@ account over a live secret.
 
 ### 5.1 `ben-fpa` (2026-09-10) — 20 of 21, and the one that failed is the one that counts
 
-A from-zero run cleared **twenty** checks, including every teardown check, with the account
-independently verified at zero afterwards (0 stacks, 0 gateways, 0 credential providers, 0 lambdas,
+A from-zero run cleared **twenty** checks, including every teardown check, with the account confirmed
+at zero afterwards by querying AWS directly (0 stacks, 0 gateways, 0 credential providers, 0 lambdas,
 no `ben-fpa` pools — asked of AWS, not read off the gate's verdict). `CONN_deploy` passed on its own
 merit: SoR Lambda up, verify Lambda up, credential provider created, gateway target attached, and
 the SoR answering an anonymous probe with **401**.
+
+*(An earlier draft of this paragraph reached for the repository's reserved phrase for third-party
+verification and used it to mean "I ran the query myself", and
+`test_no_document_claims_independent_verification_while_unclaimed` failed the build for it — twice,
+the second time because the apology quoted the offending words back. The control was right on both
+passes: that phrase is reserved for an outside party's verification, which is UNCLAIMED. Recorded
+rather than quietly reworded, because the near-miss is the point — it would have read as a
+third-party claim to any partner, and no human reviewer caught it.)*
 
 `CONN_governed_sor_proof` **failed**, and CONN-1 therefore remains unproven and uncited.
 
@@ -184,6 +192,66 @@ is decoration), that both users mint, that the reviewer's decoded token carries 
 Cedar reads, that the outsider's carries none, and that teardown removes them. 15/15 on
 2026-09-10 in about thirty seconds. Ten hours of live deploy had been the only way to learn one fact
 about two API calls; that is now a design defect with a fix, not a cost of doing business.
+
+### 5.2 `ben-fpb` (2026-09-10) — the throwaway client was the wrong answer all along
+
+Attempt 1 died 119 seconds in and was **my** fault, not the code's: the scheduled task was created
+with a start time two minutes out *and* run immediately, so two `cdk deploy --all` processes raced
+and the second met `Stack:…ben-fpb-data is in CREATE_IN_PROGRESS state and can not be updated`.
+CloudFormation logged no `CREATE_FAILED` at all. Worth recording for one reason: the console log
+carried only a truncated symptom, and the real error was in `steps.deploy.err` in the evidence JSON.
+A log that shows the check but not the cause will send a reader to the wrong file.
+
+Attempt 2 cleared **17** checks — deploy `rc=0` in 691.8s, runtime READY, G111, kill switch, budget,
+guardrail 19/19, `LIN_zero_orphans` 11/11, E2E, `CONN_deploy`, and all four teardown checks — and
+the proof users worked exactly as designed: minted, used, and removed by name at teardown.
+
+`CONN_governed_sor_proof` failed again, and the full output is why this section exists:
+
+```
+-- 2. governed tool: reviewer calls verify_source ... --
+  FAIL | verify_source -> DENY insufficient_scope - The request requires higher privileges ...
+-- 3. deny-by-default extends to the new connector (outsider denied) --
+  FAIL | outsider not denied -> DENY insufficient_scope - The request requires higher privileges ...
+```
+
+**The reviewer and the outsider were denied identically.** The check line that reached the console was
+only step 3's, and read `outsider not denied -> DENY …` — which invites exactly one fix: teach the
+pattern to match `DENY`. That change would have turned step 3 **green while the gateway was refusing
+every caller alive**. It was one edit away, and only reading the whole proof output stopped it. This
+is L60's shape a fourth time: a check that passes for a reason unrelated to the thing it names.
+
+Root cause, from `gateway_stack.py`:
+
+```python
+"AuthorizerConfigJson": json.dumps({"customJWTAuthorizer": {
+    "discoveryUrl": discovery,
+    "allowedClients": [identity.client.user_pool_client_id]}})
+```
+
+`allowedClients` is an allow-list of **one** — the shipped `GatewayClient`. Tokens from the throwaway
+proof client were refused before Cedar was ever consulted. Making that client work would have meant
+adding a test identity to the **production authorizer**: a far worse compromise than the one the
+throwaway client was invented to avoid, and an excellent illustration of a workaround that quietly
+costs more than the problem.
+
+**The proof now authenticates by SRP through the shipped client**, as `cedar_perimeter_proof.py` and
+`mt_two_tenant_proof.py` always have (`lib/connector/mint_token.py`). No test-only client exists, the
+gateway authorizer is untouched, and the token the proof carries is the same *kind* a caseworker
+carries — which also retires the disclosure caveat this document used to owe about a test client.
+The proof users remain, because the CDK path still creates none.
+
+Two more things earned their place:
+
+- Step 3 now tests the **dangerous case first and on substance**: if the outsider ever receives
+  `"verified": true`, that fails regardless of wording; only then is denial vocabulary consulted. A
+  denial is proved by the absence of the record, not the presence of a word.
+- `selftest_proof_auth.sh` had gone 15/15 green over this same broken path, because its fixture
+  client allowed `USER_PASSWORD_AUTH` — something the shipped client cannot do. **A fixture more
+  permissive than production does not validate production.** It now mirrors the shipped client
+  (SRP-only), asserts the token's `client_id` is the one it was handed, and went 17/17. On its first
+  run after the rewrite it caught a Git-Bash `/c/Users/...` path reaching a Windows `python.exe` as
+  `C:\c\Users\...` — a defect that would otherwise have cost a full live cycle to find.
 
 **Required before CONN-1 may be claimed:** one more from-zero live run in which `CONN_deploy`,
 `CONN_governed_sor_proof` and both residue checks pass on their own. Until that exists,

@@ -70,13 +70,31 @@ for g in benefits_caseworker tools_granted tenant_sp-a; do
     || err "could not create group $g"
 done
 
-PROOF_CLIENT_ID="$(aws cognito-idp create-user-pool-client --user-pool-id "$POOL_ID" \
-  --client-name "selftest-proof-client" --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+# SRP ONLY, exactly like the shipped GatewayClient (identity_stack.py: AuthFlow(user_srp=True)).
+# On ben-fpb this client was created with ALLOW_USER_PASSWORD_AUTH, and that is precisely why the
+# self-test went 15/15 green over a connector the gateway would reject: the test client could do
+# something the real one cannot, so the test was not testing the shipped path. A fixture that is
+# more permissive than production does not validate production.
+AUTH_CLIENT="$(aws cognito-idp create-user-pool-client --user-pool-id "$POOL_ID" \
+  --client-name "selftest-gateway-client" --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH \
   --region "$REGION" --query 'UserPoolClient.ClientId' --output text 2>&1 | tr -d '\r')"
-[ -n "$PROOF_CLIENT_ID" ] && [ "$PROOF_CLIENT_ID" != "None" ] \
-  || { echo "SELFTEST FATAL: could not create the proof client: $PROOF_CLIENT_ID"; exit 1; }
-AUTH_CLIENT="$PROOF_CLIENT_ID"   # mint() reads this, exactly as prove_connector.sh sets it
-log "created proof client $PROOF_CLIENT_ID"
+[ -n "$AUTH_CLIENT" ] && [ "$AUTH_CLIENT" != "None" ] \
+  || { echo "SELFTEST FATAL: could not create the SRP client: $AUTH_CLIENT"; exit 1; }
+log "created SRP-only client $AUTH_CLIENT (mirrors the shipped GatewayClient)"
+
+# mint() shells out to mint_token.py through $MINT_PY, and resolves the script via $SELF - both are
+# set by prove_connector.sh at run time, so set them the same way here.
+MINT_PY=""
+LIB="$(cd "$SELF/.." && pwd)"
+for CAND in python "$LIB/runtime/.venv/Scripts/python.exe" "$LIB/runtime/.venv/bin/python"; do
+  if [ -n "$CAND" ] && { [ -f "$CAND" ] || command -v "$CAND" >/dev/null 2>&1; }; then
+    "$CAND" -c 'import pycognito' >/dev/null 2>&1 && { MINT_PY="$CAND"; break; }
+  fi
+done
+[ -n "$MINT_PY" ] || { echo "SELFTEST FATAL: no interpreter here can import pycognito"; exit 1; }
+MINT_SCRIPT="$SELF/mint_token.py"
+command -v cygpath >/dev/null 2>&1 && MINT_SCRIPT="$(cygpath -w "$MINT_SCRIPT")"
+log "mint interpreter: $MINT_PY  script: $MINT_SCRIPT"
 
 # ---- 2. NEGATIVE FIRST: reproduce the ben-fpa failure ---------------------------------------------
 # Before proving the fix works, prove the test can SEE the bug. A user that does not exist is exactly
@@ -141,6 +159,23 @@ for unwanted in benefits_caseworker tools_granted tenant_; do
   echo "$OUT_CLAIMS" | grep -q "$unwanted" \
     && bad "outsider token carries $unwanted - the deny half of the proof is not testing anything" \
     || ok "outsider token does NOT carry $unwanted"
+done
+
+# ---- 5b. THE ben-fpb CHECK: minted through the client the GATEWAY trusts -------------------------
+# fpb failed with the reviewer AND the outsider both getting "DENY insufficient_scope". Nothing about
+# users or groups was wrong; the tokens came from a throwaway client, and gateway_stack.py allow-lists
+# exactly one - customJWTAuthorizer.allowedClients = [identity.client.user_pool_client_id]. A token
+# minted through any other client is refused before Cedar is consulted, so every caller looks denied
+# and the deny-by-default check passes for entirely the wrong reason. Assert the issuing client on
+# the token itself: this cannot prove the GATEWAY's allow-list from a throwaway pool, but it does
+# prove the proof authenticates through the client it was handed, which is the half that broke.
+for _pair in "reviewer:$REV_CLAIMS" "outsider:$OUT_CLAIMS"; do
+  _who="${_pair%%:*}"; _cl="${_pair#*:}"
+  if echo "$_cl" | grep -q "\"client_id\": *\"$AUTH_CLIENT\""; then
+    ok "$_who token was minted through the intended client ($AUTH_CLIENT)"
+  else
+    bad "$_who token's client_id is NOT $AUTH_CLIENT - the gateway allow-lists one client and would refuse this -> $(echo "$_cl" | cut -c1-160)"
+  fi
 done
 
 # ---- 6. teardown removes the users ---------------------------------------------------------------

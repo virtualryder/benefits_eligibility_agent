@@ -29,12 +29,32 @@ for CAND in "$LIB/runtime/.venv/Scripts/python.exe" "$LIB/runtime/.venv/bin/pyth
 done
 [ -n "$PY" ] && [ -n "${CLIENT:-}" ] && [ -f "$CLIENT" ] || {
   echo "FAIL | no interpreter on this machine can import the pinned governed-core (tried the runtime venv and system python)"; exit 1; }
-# Use the throwaway proof client, NOT the CDK GatewayClient. The shipped client is SRP-only by
-# design (identity_stack.py: "no USER_PASSWORD_AUTH in the CDK path"), which is why fp8 failed here
-# with "USER_PASSWORD_AUTH flow not enabled for this client". Fall back to CLIENT_ID so a
-# hand-built environment (deploy_identity.sh, whose client does allow it) still works.
-AUTH_CLIENT="${PROOF_CLIENT_ID:-$CLIENT_ID}"
-[ -n "$AUTH_CLIENT" ] || { echo "FAIL | no PROOF_CLIENT_ID or CLIENT_ID to authenticate with"; exit 1; }
+# Authenticate through the SHIPPED GatewayClient, by SRP, exactly as a real caller does.
+# ben-fpb settled this. The proof used to mint through a throwaway USER_PASSWORD_AUTH client so as
+# not to weaken the SRP-only shipped one; that client minted tokens fine and the gateway rejected
+# every one of them, denying the REVIEWER and the OUTSIDER identically with "insufficient_scope".
+# gateway_stack.py: customJWTAuthorizer.allowedClients = [identity.client.user_pool_client_id] - an
+# allow-list of ONE. Admitting a test client would have meant editing the production authorizer.
+# See mint_token.py for the full account.
+AUTH_CLIENT="$CLIENT_ID"
+[ -n "$AUTH_CLIENT" ] || { echo "FAIL | no CLIENT_ID in spine-state to authenticate with"; exit 1; }
+[ -n "${POOL_ID:-}" ] || { echo "FAIL | no POOL_ID in spine-state - SRP needs the pool"; exit 1; }
+# The interpreter that can do SRP is not necessarily the one that can import governed_core, so ask
+# each candidate the question that matters instead of assuming. Same lesson as $PY above: existing
+# is not the same as being able to do the job.
+MINT_PY=""
+for CAND in "$PY" "$LIB/runtime/.venv/Scripts/python.exe" "$LIB/runtime/.venv/bin/python" python; do
+  if [ -n "$CAND" ] && { [ -f "$CAND" ] || command -v "$CAND" >/dev/null 2>&1; }; then
+    "$CAND" -c 'import pycognito' >/dev/null 2>&1 && { MINT_PY="$CAND"; break; }
+  fi
+done
+[ -n "$MINT_PY" ] || { echo "FAIL | no interpreter on this machine can import pycognito, so SRP is impossible"; exit 1; }
+# Git-Bash hands out /c/Users/... paths. With MSYS_NO_PATHCONV set they reach a Windows python.exe
+# verbatim, which resolves them against the current drive as C:\c\Users\... and dies with ENOENT.
+# selftest_proof_auth.sh caught this on 2026-09-10 before any live run paid for it.
+MINT_SCRIPT="$SELF/mint_token.py"
+command -v cygpath >/dev/null 2>&1 && MINT_SCRIPT="$(cygpath -w "$MINT_SCRIPT")"
+[ -n "$MINT_SCRIPT" ] || { echo "FAIL | could not resolve a usable path to mint_token.py"; exit 1; }
 # MINT, and say WHY when it fails. The previous tok() piped stderr nowhere and was called inside a
 # command substitution, so on ben-fpa the whole diagnosis of a real failure was
 #   "FAIL | could not mint a REV token via client 3mejbkk... | "
@@ -42,23 +62,12 @@ AUTH_CLIENT="${PROOF_CLIENT_ID:-$CLIENT_ID}"
 # let destroy_connector.sh certify CLEAN over live resources (L70): an error path that cannot speak.
 # mint() is called WITHOUT command substitution so the assignment lands in this shell, not a subshell.
 mint(){   # $1=variable to set  $2=username  $3=password
-  local _n="$1" _u="$2" _p="$3" _o _rc _why
-  _o="$(aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
-        --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
-        --query 'AuthenticationResult.AccessToken' --output text 2>&1 | tr -d '\r')"; _rc=$?
+  local _n="$1" _u="$2" _p="$3" _o _rc
+  # mint_token.py prints the token on stdout OR the reason on stderr, never both. 2>&1 folds them
+  # together deliberately: on success $_o is the token, on failure it is AWS's own words.
+  _o="$("$MINT_PY" "$MINT_SCRIPT" "$POOL_ID" "$AUTH_CLIENT" "$REGION" "$_u" "$_p" 2>&1 | tr -d '\r')"; _rc=$?
   if [ "$_rc" -ne 0 ] || [ -z "$_o" ] || [ "$_o" = "None" ]; then
-    _why="$_o"
-    if [ "$_rc" -eq 0 ] && [ "$_o" = "None" ]; then
-      # rc=0 with no token means Cognito answered with a CHALLENGE rather than an error. Ask for the
-      # challenge NAME only - never re-run without --query and dump the whole response, because on a
-      # later success that would put a live access token into the gate log and from there into
-      # committed evidence.
-      _why="rc=0, no AccessToken - ChallengeName=$(aws cognito-idp initiate-auth \
-            --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
-            --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
-            --query 'ChallengeName' --output text 2>&1 | tr -d '\r')"
-    fi
-    echo "FAIL | could not mint a $_n token for user '$_u' via client $AUTH_CLIENT (rc=$_rc): ${_why:-<no output>}"
+    echo "FAIL | could not mint a $_n token for user '$_u' by SRP via client $AUTH_CLIENT (rc=$_rc): ${_o:-<no output>}"
     return 1
   fi
   eval "$_n=\$_o"
@@ -93,7 +102,21 @@ if echo "$VI" | grep -q '"tool_holds_secret": *false'; then echo "  PASS | the t
 
 echo "-- 3. deny-by-default extends to the new connector (outsider denied) --"
 OD="$(call "$OUT" "$TOOL_ID" '{"case_id":"CASE-1"}')"
-if echo "$OD" | grep -qiE 'denied|not allowed|policy enforcement'; then echo "  PASS | outsider call to verify_source DENIED (Cedar deny-by-default)"; pass=$((pass+1)); else echo "  FAIL | outsider not denied -> $OD"; fail=$((fail+1)); fi
+# Order matters, and it is the opposite of the obvious one. On ben-fpb this step read
+#   FAIL | outsider not denied -> DENY insufficient_scope - The request requires higher privileges...
+# and the tempting fix was to add DENY to the pattern - which would have turned this check GREEN while
+# the gateway was refusing the REVIEWER with the identical string. A vocabulary match cannot tell
+# "denied because unauthorized" from "denied because nothing works". So the dangerous case is tested
+# FIRST and on substance: if the outsider ever receives an authoritative record, no wording makes
+# that a pass. Only then is the denial vocabulary consulted - and step 2 above is what proves the
+# denial is selective rather than universal.
+if echo "$OD" | grep -q '"verified": *true'; then
+  echo "  FAIL | outsider RECEIVED AN AUTHORITATIVE RECORD - deny-by-default is broken -> $OD"; fail=$((fail+1))
+elif echo "$OD" | grep -qiE 'deny|denied|not allowed|policy enforcement|insufficient_scope|accessdenied|unauthorized|forbidden'; then
+  echo "  PASS | outsider call to verify_source DENIED (Cedar deny-by-default) -> $(echo "$OD" | cut -c1-110)"; pass=$((pass+1))
+else
+  echo "  FAIL | outsider neither denied nor recognisable as a denial -> $OD"; fail=$((fail+1))
+fi
 
 echo "=== CONNECTOR PROOF: $pass passed, $fail failed ==="
 [ "$fail" -eq 0 ] && echo "CONNECTOR PROOF: PASS" || { echo "CONNECTOR PROOF: FAIL"; exit 1; }
