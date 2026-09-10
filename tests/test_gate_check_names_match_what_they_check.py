@@ -66,3 +66,25 @@ def test_the_evidence_renderer_still_describes_the_old_key():
         assert '"%s"' % key in src, (
             "render_gate_evidence.py no longer describes %r; historical evidence carrying that key "
             "would render without a description" % key)
+
+
+def test_conn_deploy_outbound_marker_is_pinned_to_what_the_deploy_actually_logs():
+    """The gate greps the deploy output for a sentence another file prints. Pin them together.
+
+    CONN_deploy used to pass on artifacts alone, which is how it went green on the ben-fpd and
+    ben-fpe runs over a connector whose system of record trusted nothing. It now also requires
+    that the outbound leg was exercised, which it decides by looking for a marker string in the
+    deploy output. Nothing else ties that string to the `log` line in deploy_connector.sh that
+    emits it, so a harmless reword there would silently turn a good run red and the message would
+    blame the connector. This test is the tie.
+    """
+    marker = "outbound leg OK"
+    gate = (ROOT / "scripts" / "full_portfolio_gate.py").read_text(encoding="utf-8")
+    deploy = (ROOT / "lib" / "connector" / "deploy_connector.sh").read_text(encoding="utf-8")
+    assert '"%s"' % marker in gate, (
+        "the gate no longer looks for %r; if the outbound check moved, move this test with it"
+        % marker)
+    assert marker in deploy, (
+        "lib/connector/deploy_connector.sh no longer logs %r, but scripts/full_portfolio_gate.py "
+        "still requires it to declare CONN_deploy a pass. Every real run would fail there, and the "
+        "failure would read as a connector defect rather than a reworded log line." % marker)
