@@ -37,15 +37,27 @@ if [ "$CTRL_SIGNOFF" = "1" ]; then
   SO_ICSR="ICSR-GEN-$RANDOM"
   # approve is the approver's OUT-OF-BAND action: it derives the approver from a VALIDATED Cognito access
   # token (P0-5), never from an 'approver' string. soapprove passes a real token.
-  soapprove(){ aws lambda invoke --function-name "${PREFIX}-approve" --cli-binary-format raw-in-base64-out \
-    --payload "{\"icsr_id\":\"$SO_ICSR\",\"access_token\":\"$1\"}" --region "$REGION" /tmp/_soap.json >/dev/null 2>&1; cat /tmp/_soap.json; }
+  # Found by tools/scan_silenced_errors.py on its first run, 2026-09-10. The invoke discarded its
+  # status AND both calls shared /tmp/_soap.json, so a failed invoke printed whatever the PREVIOUS
+  # call - or a previous RUN - had left there. That is a reachable FALSE PASS in the
+  # separation-of-duties assertion below: stale '"approved": true' in the file plus a failing invoke
+  # reads as a successful approval by a different qualified person. A per-call file and a spoken
+  # failure remove both halves.
+  soapprove(){ SOAP_OUT="/tmp/_soap.$$.$RANDOM.json"; SOAP_ERR="$(aws lambda invoke \
+    --function-name "${PREFIX}-approve" --cli-binary-format raw-in-base64-out \
+    --payload "{\"icsr_id\":\"$SO_ICSR\",\"access_token\":\"$1\"}" --region "$REGION" \
+    "$SOAP_OUT" 2>&1 >/dev/null)" || { echo "INVOKE-FAILED: ${SOAP_ERR:-no stderr}"; rm -f "$SOAP_OUT"; return 1; }
+    cat "$SOAP_OUT"; rm -f "$SOAP_OUT"; }
   # request_signoff also binds the requester to the verified token identity (not the event body).
   RSO="$(call "$REV" "request-signoff___request_signoff" "{\"icsr_id\":\"$SO_ICSR\",\"access_token\":\"$REV\"}")"
   check "reviewer  request_signoff"  ALLOW "$RSO"
   EXEC="$(printf '%s' "$RSO" | tr -d '\r' | grep -o 'arn:aws:states:[A-Za-z0-9:_-]*' | head -1)"
   for i in $(seq 1 15); do ST="$(aws dynamodb get-item --table-name "$PENDING_TABLE" --key "{\"case_id\":{\"S\":\"$SO_ICSR\"}}" --region "$REGION" --query "Item.status.S" --output text 2>/dev/null)"; [ "$ST" = "PENDING" ] && break; sleep 2; done
   # P0-5: a spoofed approver STRING with no validated token must be REJECTED (identity is not taken from the body).
-  SPOOF="$(aws lambda invoke --function-name "${PREFIX}-approve" --cli-binary-format raw-in-base64-out --payload "{\"icsr_id\":\"$SO_ICSR\",\"approver\":\"$APP_U\"}" --region "$REGION" /tmp/_sospoof.json >/dev/null 2>&1; cat /tmp/_sospoof.json)"
+  SPOOF_OUT="/tmp/_sospoof.$$.$RANDOM.json"
+  SPOOF="$(SP_ERR="$(aws lambda invoke --function-name "${PREFIX}-approve" --cli-binary-format raw-in-base64-out \
+    --payload "{\"icsr_id\":\"$SO_ICSR\",\"approver\":\"$APP_U\"}" --region "$REGION" "$SPOOF_OUT" 2>&1 >/dev/null)" \
+    && cat "$SPOOF_OUT" || echo "INVOKE-FAILED: ${SP_ERR:-no stderr}")"; rm -f "$SPOOF_OUT"
   if echo "$SPOOF" | grep -qi 'not verified' && ! echo "$SPOOF" | grep -q '"approved": *true'; then echo "  PASS | P0-5: spoofed approver string (no validated token) REJECTED"; pass=$((pass+1)); else echo "  FAIL | spoofed approver accepted -> $SPOOF"; fail=$((fail+1)); fi
   SELFA="$(soapprove "$REV")"
   if echo "$SELFA" | grep -qi 'separation-of-duties'; then echo "  PASS | requester CANNOT self-approve (SoD on verified identity)"; pass=$((pass+1)); else echo "  FAIL | self-approval not blocked -> $SELFA"; fail=$((fail+1)); fi

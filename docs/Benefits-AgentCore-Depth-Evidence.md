@@ -141,18 +141,28 @@ The template shipped system-of-record connectors as **labeled stubs**. This item
 
 ### Proof (live)
 
-```
-bash agents/benefits-eligibility/connector/prove_connector.sh agents/benefits-eligibility
+Verbatim from the `ben-fpf` from-zero gate run, 2026-09-10, in which all **21** checks passed and
+the account was confirmed empty afterwards by querying AWS directly:
 
+```
+bash lib/connector/prove_connector.sh agents/benefits-eligibility
+
+=== CONNECTOR PROOF (benefits-eligibility): governed verify_source via AgentCore Identity outbound OAuth ===
 -- 1. the system of record REALLY requires OAuth (no token / bad token are rejected) --
-  PASS | SOR rejects no-token (401) and bad-token (401) — the dependency is genuinely OAuth-protected
--- 2. governed tool: caseworker calls verify_income; AgentCore Identity mints the outbound token --
-  PASS | verify_income returned authoritative income via the OAuth-protected SOR (token minted by Identity)
+  PASS | SoR rejects no-token (401) and bad-token (401) — genuinely OAuth-protected
+-- 2. governed tool: reviewer calls verify_source; AgentCore Identity mints the outbound token --
+  PASS | verify_source returned an authoritative record via the OAuth-protected SoR (token minted by Identity)
   PASS | the tool holds NO client secret (it lives in the Identity token vault)
 -- 3. deny-by-default extends to the new connector (outsider denied) --
-  PASS | outsider call to verify_income DENIED (Cedar deny-by-default, no new policy needed)
+  PASS | outsider call to verify_source DENIED (Cedar deny-by-default)
+         -> DENY multi-tenant: identity carries no tenant (custom:tenant); refused
 === CONNECTOR PROOF: 4 passed, 0 failed ===  CONNECTOR PROOF: PASS
 ```
+
+Note what step 3 prints. The denial names `require_tenant` — a **specific** policy. An earlier run
+denied the reviewer and the outsider with the same string, and "outsider denied" proved nothing at
+all, because everything was denied. A deny-by-default claim is only evidence when the denial is
+selective.
 
 Tool result (through the governed gateway):
 
@@ -163,7 +173,32 @@ Tool result (through the governed gateway):
     "token_minted_by_identity": true, "tool_holds_secret": false } }
 ```
 
-What this demonstrates for an adopter: swapping the mock system of record for a real one (EIV, The Work Number, a state benefits SoR) is a **configuration change** — point the credential provider at the real IdP/token endpoint and the tool at the real API. The governance (Cedar authorization, audit, deny-by-default) and the **secret-handling posture (secret in the Identity token vault, never in the tool)** are already in place. One honest hardening note: the mock SoR validates the token's claims (issuer, client_id, scope, expiry); JWKS/RS256 signature verification is the obvious production add.
+**What this demonstrates for an adopter — and what it does not.**
+
+In place and proven: Cedar authorization, audit, deny-by-default that denies *selectively*, and the
+secret-handling posture — the client secret lives in the AgentCore Identity token vault and never in
+the tool. The system of record performs **full RS256/JWKS signature verification** against the
+issuer's published keys, in addition to checking issuer, `client_id`, scope and expiry. (An earlier
+version of this page called signature verification "the obvious production add." That was true when
+written and is now out of date: it is implemented, and a token whose signature does not verify
+against the live public key is refused.)
+
+Two sentences that belong together, and should never be quoted apart:
+
+> The system of record is a **real** OAuth2 API with RS256/JWKS signature verification.
+> **It is ours.**
+
+Proving the governed path reaches it is not proving a customer's system of record has been governed.
+`connect_system_of_record` remains **stubbed** in the manifest for exactly that reason.
+
+An earlier version of this page described swapping in a real system of record as "a configuration
+change." We are retiring that phrase. Standing up this connector against our *own* mock took six
+from-zero live runs to get right, and the failures were: users the IaC path never creates, a gateway
+authorizer that allow-lists exactly one client, and a Lambda environment silently left empty because
+a label contained a comma. None of those were visible in a design diagram. A real customer
+integration adds their IdP, their network boundary, their token lifetimes and their change control on
+top of that. The *governance* is genuinely reusable and that is the claim worth making; the
+integration is engineering work, and anyone who has done one will trust the page more for saying so.
 
 ## Why these three matter for adoption
 

@@ -879,16 +879,38 @@ def main():
         art, art_err = conn_artifacts()
         steps["conn_artifacts"] = art
         # `is True` on purpose: None (unmeasured) must never satisfy this, and a truthy-but-wrong
-        # value must never sneak through. conn_ok is the claim "the connector demonstrably stood up".
-        conn_ok = (art["sor_lambda"] is True and art["verify_lambda"] is True
-                   and art["credential_provider"] is True and art["gateway_target"] is True
-                   and art["sor_rejects_anonymous"] in (401, 403))
+        # value must never sneak through.
+        artifacts_ok = (art["sor_lambda"] is True and art["verify_lambda"] is True
+                        and art["credential_provider"] is True and art["gateway_target"] is True
+                        and art["sor_rejects_anonymous"] in (401, 403))
+        # ARTIFACTS ALONE ARE NOT ENOUGH, and it cost two live runs to learn that. On ben-fpd and
+        # ben-fpe every artifact above was present and CONN_deploy went green over a connector
+        # whose system of record trusted nothing: EXPECTED_ISS was empty because the deploy's
+        # `--environment Variables={...}` shorthand splits on commas and the SoR label contains
+        # one, six retries failed into /dev/null, and so the resources existed while the outbound
+        # leg did not work. Existence is not function. The claim therefore now also requires that
+        # the deploy script itself exited 0, and that the outbound leg was actually exercised -
+        # step 10 of deploy_connector.sh invokes verify_source against the live OAuth-protected
+        # SoR and logs "outbound leg OK" only when a record came back verified.
+        #
+        # This rule was not guessed. tools/replay_conn_deploy.py replays it against the COMMITTED
+        # evidence of the three runs whose real outcome we know: it fails fpd and fpe and passes
+        # fpf, where the artifacts-only rule passes all three. A rule that cannot fail a run we
+        # know was broken is not a control.
+        conn_rc_ok = steps["conn_deploy"]["rc"] == 0
+        conn_outbound_ok = "outbound leg OK" in (steps["conn_deploy"].get("out", "")
+                                                 + steps["conn_deploy"].get("err", ""))
+        # Recorded into the artifact set so the evidence file carries the REASON for the verdict
+        # and not merely the verdict.
+        art["outbound_ok"] = conn_outbound_ok
+        conn_ok = artifacts_ok and conn_rc_ok and conn_outbound_ok
         # NOTE: teardown does NOT key on any of these values. It keys on whether the deploy step
         # ran at all (see the guard in section 4), because "did it create anything" is precisely
         # the question this function can fail to answer.
         check("CONN_deploy", conn_ok,
-              "rc=%s in %ss artifacts=%s %s" % (steps["conn_deploy"]["rc"],
-                                                steps["conn_deploy"]["secs"], art, art_err))
+              "rc=%s(ok=%s) outbound_ok=%s artifacts_ok=%s in %ss artifacts=%s %s"
+              % (steps["conn_deploy"]["rc"], conn_rc_ok, conn_outbound_ok, artifacts_ok,
+                 steps["conn_deploy"]["secs"], art, art_err))
         if conn_ok:
             steps["conn_proof"] = bash(os.path.join(REPO, "lib", "connector", "prove_connector.sh"),
                                        AGENT, timeout=900)
