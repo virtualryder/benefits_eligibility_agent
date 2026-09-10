@@ -26,6 +26,10 @@ AGENT="$(cd "$AGENT_DIR" && pwd)"; BUILD="$AGENT/.build"; mkdir -p "$BUILD"
 ( unset MSYS_NO_PATHCONV; python "$LIB/engine/render.py" "$AGENT/manifest.yaml" "$BUILD" >/dev/null 2>&1 || true )
 source "$BUILD/agent.env"
 [ -f "$AGENT/spine-state.env" ] && source "$AGENT/spine-state.env"
+# Optional: names the proof users/client this deploy actually created. Everything this file sets is
+# either re-derived below from $P (RS/PROVIDER/WI/...) or read only as a hint, so a stale copy cannot
+# misdirect the teardown - and its absence is handled by the users.tsv fallback in step 6.
+[ -f "$AGENT/connector-state.env" ] && source "$AGENT/connector-state.env"
 REGION="${REGION:-us-east-1}"
 # Must match deploy_connector.sh exactly. Connector resources are env-scoped via CONN_PREFIX; a
 # teardown that looked for "ben-sor-api" while deploy created "ben-fp6-sor-api" would report
@@ -164,6 +168,19 @@ if [ -n "${POOL_ID:-}" ]; then
     aws cognito-idp delete-user-pool-client --user-pool-id "$POOL_ID" --client-id "$PC_ID" --region "$REGION" >/dev/null 2>&1 \
       && ok "proof client $PC_ID" || fail "proof client $PC_ID" "delete failed"
   else skip "proof client $PROOF_CLIENT_NAME"; fi
+  # the proof USERS deploy created in this pool. They are named in connector-state.env; if that file
+  # is missing (a deploy that died before writing it) fall back to users.tsv, because a user left in
+  # a pool that outlives the run is exactly the kind of residue this script exists to remove.
+  PU_LIST="${PROOF_REV_U:-} ${PROOF_OUT_U:-}"
+  if [ -z "$(echo "$PU_LIST" | tr -d ' ')" ] && [ -f "$AGENT/.build/users.tsv" ]; then
+    PU_LIST="$(awk -F'\t' '{print $1}' "$AGENT/.build/users.tsv" | tr -d '\r' | tr '\n' ' ')"
+  fi
+  for PU in $PU_LIST; do
+    if aws cognito-idp admin-get-user --user-pool-id "$POOL_ID" --username "$PU" --region "$REGION" >/dev/null 2>&1; then
+      DU_ERR="$(aws cognito-idp admin-delete-user --user-pool-id "$POOL_ID" --username "$PU" --region "$REGION" 2>&1 >/dev/null)" \
+        && ok "proof user $PU" || fail "proof user $PU" "${DU_ERR:-delete failed, no stderr}"
+    else skip "proof user $PU"; fi
+  done
   aws cognito-idp delete-resource-server --user-pool-id "$POOL_ID" --identifier "$RS" --region "$REGION" >/dev/null 2>&1 \
     && ok "resource server $RS" || skip "resource server $RS"
   if aws cognito-idp describe-user-pool-domain --domain "$DOMAIN_PREFIX" --region "$REGION" \

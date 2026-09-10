@@ -1,0 +1,325 @@
+{
+ "prefix": "ben-fpa",
+ "since_minutes": 527,
+ "log_groups": {
+  "/aws/lambda/ben-fpa-approve-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-assess-eligibility": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-budget-breach": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-core-tools": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-finalize": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-gateway-AttachmentProviderEF56056D-nJVtyDYL9xhS": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-ingest-application": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-intake-application": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789024761732,
+     "stream": "2026/09/10/ben-fpa-intake-application[$LATEST]63e28c0dfc8b4b",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "[ERROR] KillSwitchEngaged: kill switch ENGAGED (/ben-fpa-eligibility/kill-switch): SEV-1 drill: runaway agent suspected Traceback (most recent call last): \u00a0\u00a0File \"/var/task/telemetry.py\", line 234, in wrapped \u00a0\u00a0\u00a0\u00a0raise kill_switch.KillSwitchEngaged(engaged)"
+    },
+    {
+     "ts": 1789024762445,
+     "stream": "2026/09/10/ben-fpa-intake-application[$LATEST]63e28c0dfc8b4b",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "[ERROR] KillSwitchEngaged: kill switch ENGAGED (/ben-fpa-eligibility/kill-switch): SEV-1 drill: runaway agent suspected Traceback (most recent call last): \u00a0\u00a0File \"/var/task/telemetry.py\", line 234, in wrapped \u00a0\u00a0\u00a0\u00a0raise kill_switch.KillSwitchEngaged(engaged)"
+    }
+   ]
+  },
+  "/aws/lambda/ben-fpa-kill-switch-disengage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-kill-switch-engage": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-mask-pii": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-observability-CustomS3AutoDeleteObjectsCus-NG9Je3vKtYeI": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789024027581,
+     "stream": "2026/09/10/[$LATEST]d8f1f9550b4c491da2301663fa2667fa",
+     "kind": "expected",
+     "why": "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure",
+     "excerpt": "2026-09-10T07:07:07.581Z\tda5959f6-bb4c-4173-b1fb-eb040bfbea31\tERROR\t(node:2) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `"
+    },
+    {
+     "ts": 1789024027660,
+     "stream": "2026/09/10/[$LATEST]bdae1836029f49e8958fe784f7c8a178",
+     "kind": "expected",
+     "why": "CDK custom-resource framework (Node) deprecation warning logged at ERROR level - AWS-provided provider code, not a failure",
+     "excerpt": "2026-09-10T07:07:07.660Z\t7ee5f98c-e944-4126-8afb-c9dc9f2abea6\tERROR\t(node:2) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `"
+    }
+   ]
+  },
+  "/aws/lambda/ben-fpa-observability-ModelLoggingProviderFn261BCF-osagCkET1b3f": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-observability-ModelLoggingProviderframewor-7Id6JXvATie9": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-overpayment": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-redetermine": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-request-signoff": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-signoff-register": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-tenant-interceptor": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-workflow-guards": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/lambda/ben-fpa-write-audit": {
+   "events": 0,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": []
+  },
+  "/aws/states/ben-fpa-determination-workflow": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789024762452,
+     "stream": "states/ben-fpa-determination-workflow/2026-09-10-07/00000000",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"details\":{\"cause\":\"{\\\"errorMessage\\\":\\\"kill switch ENGAGED (/ben-fpa-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\\\",\\\"errorType\\\":\\\"KillSwitchEngaged\\\",\\\"requestId\\\":\\\"65ad174d-6d66-4604-922d-7cd9bc945998\\\",\\\"stackTrace\\\":[\\\"  File \\\\\\\"/var"
+    },
+    {
+     "ts": 1789024762492,
+     "stream": "states/ben-fpa-determination-workflow/2026-09-10-07/00000000",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"details\":{\"cause\":\"{\\\"errorMessage\\\":\\\"kill switch ENGAGED (/ben-fpa-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\\\",\\\"errorType\\\":\\\"KillSwitchEngaged\\\",\\\"requestId\\\":\\\"65ad174d-6d66-4604-922d-7cd9bc945998\\\",\\\"stackTrace\\\":[\\\"  File \\\\\\\"/var"
+    }
+   ]
+  },
+  "/aws/vendedlogs/bedrock-agentcore/gateway/ben-fpa": {
+   "events": 2,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789024895953,
+     "stream": "BedrockAgentCoreGateway_ApplicationLogs",
+     "kind": "expected",
+     "why": "Cedar DENY at the gateway (the request never reached the tool) - the enforcement point working",
+     "excerpt": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fpa-ben-gw-ny0fwotz9q\",\"event_timestamp\":1789024895953,\"body\":{\"isError\":true,\"log\":\"Policy evaluation denied request\",\"id\":\"8\",\"policy\":{\"decision\":\"DENY\",\"reason\":\"Policy evaluatio"
+    },
+    {
+     "ts": 1789024895953,
+     "stream": "BedrockAgentCoreGateway_ApplicationLogs",
+     "kind": "expected",
+     "why": "Cedar DENY at the gateway (the request never reached the tool) - the enforcement point working",
+     "excerpt": "{\"resource_arn\":\"arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/ben-fpa-ben-gw-ny0fwotz9q\",\"event_timestamp\":1789024895953,\"body\":{\"isError\":true,\"log\":\"Tool Execution Denied: Tool call not allowed due to policy enforcement [Policy evaluation denied "
+    }
+   ]
+  },
+  "/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-NxyHC6D4Ml-DEFAULT": {
+   "events": 24,
+   "unexpected": 0,
+   "warnings": 0,
+   "rows": [
+    {
+     "ts": 1789024744669,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789024744671,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789024744673,
+     "stream": "otel-rt-logs",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"telemetry.sdk.language\":\"python\",\"telemetry.sdk.name\":\"opentelemetry\",\"telemetry.sdk.version\":\"1.42.1\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"aws.log.group.names\":\"/aws/bedrock-agentcore/runtimes/benefits_runtime_agent-Nxy"
+    },
+    {
+     "ts": 1789024744673,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    },
+    {
+     "ts": 1789024744673,
+     "stream": "2026/09/10/[runtime-logs]278a21fa-45df-4408-b051-17a5bbaa154",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "2026-09-10 07:19:04,673 ERROR [strands.event_loop.event_loop] [event_loop.py:394] [trace_id=6aa259d658a9a070361c3705310a381f span_id=2b2f8a6d0a60dc47 resource.service.name=benefits_runtime_agent.DEFAULT trace_sampled=True] - exception=<KillSwitchEngaged> | eve"
+    },
+    {
+     "ts": 1789024744677,
+     "stream": "spans",
+     "kind": "expected",
+     "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+     "excerpt": "{\"resource\":{\"attributes\":{\"deployment.environment.name\":\"bedrock-agentcore:default\",\"aws.local.service\":\"benefits_runtime_agent.DEFAULT\",\"service.name\":\"benefits_runtime_agent.DEFAULT\",\"cloud.region\":\"us-east-1\",\"aws.log.stream.names\":\"otel-rt-logs\",\"telemetr"
+    }
+   ]
+  }
+ },
+ "executions": [
+  {
+   "name": "lineage-lin-e1f1be",
+   "status": "ABORTED",
+   "kind": "expected",
+   "why": "stopped by the harness at the sign-off pause",
+   "cause": "lineage isolated case: signoff pause reached "
+  },
+  {
+   "name": "bgproof-bg-wf-6b80db",
+   "status": "SUCCEEDED",
+   "kind": "ok",
+   "why": "",
+   "cause": " "
+  },
+  {
+   "name": "ksproof-ks-257fb3",
+   "status": "FAILED",
+   "kind": "expected",
+   "why": "task 127: kill-switch containment provoked by scripts/kill_switch_proof.py (engaged => refused everywhere; released by a second identity)",
+   "cause": "{\"errorMessage\":\"kill switch ENGAGED (/ben-fpa-eligibility/kill-switch): SEV-1 drill: runaway agent suspected\",\"errorType\":\"KillSwitchEngaged\",\"requestId\":\"65ad174d-6d66-4604-922d-7cd9bc945998\",\"stack"
+  },
+  {
+   "name": "pii-canary-85c1b5fcd5e0",
+   "status": "RUNNING",
+   "kind": "running",
+   "why": "still at the sign-off pause (24h wait) - stop before teardown",
+   "cause": " "
+  },
+  {
+   "name": "mtproof-nobind-mt-wf-d7036a",
+   "status": "FAILED",
+   "kind": "expected",
+   "why": "fail-closed: execution started WITHOUT the signed pair fails at Extract",
+   "cause": "An error occurred while executing the state 'Extract' (entered at the event id #2). The JSONPath '$.__aegis_tenant' specified for the field '__aegis_tenant.$' could not be found in the input '{\"case_i"
+  },
+  {
+   "name": "mtproof-mt-wf-d7036a",
+   "status": "ABORTED",
+   "kind": "expected",
+   "why": "harness stopped the execution at the sign-off pause",
+   "cause": "mt proof complete (sign-off pause reached) "
+  }
+ ],
+ "alarms": [],
+ "dlqs": {},
+ "lambda_errors_metric": {
+  "ben-fpa-ingest-application": 0,
+  "ben-fpa-overpayment": 0,
+  "ben-fpa-request-signoff": 0,
+  "ben-fpa-finalize": 0,
+  "ben-fpa-intake-application": 2,
+  "ben-fpa-observability-ModelLoggingProviderframewor-7Id6JXvATie9": 0,
+  "ben-fpa-observability-CustomS3AutoDeleteObjectsCus-NG9Je3vKtYeI": 0,
+  "ben-fpa-approve-signoff": 0,
+  "ben-fpa-tenant-interceptor": 0,
+  "ben-fpa-observability-ModelLoggingProviderFn261BCF-osagCkET1b3f": 0,
+  "ben-fpa-redetermine": 0,
+  "ben-fpa-gateway-AttachmentProviderEF56056D-nJVtyDYL9xhS": 0,
+  "ben-fpa-mask-pii": 0,
+  "ben-fpa-workflow-guards": 0,
+  "ben-fpa-core-tools": 0,
+  "ben-fpa-kill-switch-engage": 0,
+  "ben-fpa-signoff-register": 0,
+  "ben-fpa-write-audit": 0,
+  "ben-fpa-kill-switch-disengage": 0,
+  "ben-fpa-budget-breach": 0,
+  "ben-fpa-assess-eligibility": 0
+ },
+ "lambda_errors_note": "Errors>0 on intake-application/assess-eligibility/write-audit are the deliberate fail-closed TenantError refusals; see log_groups classification",
+ "unexpected_total": 0,
+ "verdict": "PASS"
+}

@@ -137,6 +137,54 @@ role, http api and credential provider, and **counts "could not check" as a fail
 existing residue checks had no opinion on any of these, which is how the gate certified a clean
 account over a live secret.
 
+### 5.1 `ben-fpa` (2026-09-10) — 20 of 21, and the one that failed is the one that counts
+
+A from-zero run cleared **twenty** checks, including every teardown check, with the account
+independently verified at zero afterwards (0 stacks, 0 gateways, 0 credential providers, 0 lambdas,
+no `ben-fpa` pools — asked of AWS, not read off the gate's verdict). `CONN_deploy` passed on its own
+merit: SoR Lambda up, verify Lambda up, credential provider created, gateway target attached, and
+the SoR answering an anonymous probe with **401**.
+
+`CONN_governed_sor_proof` **failed**, and CONN-1 therefore remains unproven and uncited.
+
+The whole diagnosis it produced was:
+
+```
+rc=1 FAIL | could not mint a REV token via client 3mejbkk… |
+```
+
+— my own guard's words, then an empty string where AWS's words belonged. `tok()` discarded stderr
+and ran inside a command substitution, so the real error could not reach the log. **Same defect
+class as L70**: an error path that cannot speak turns a specific failure into an unattributable one.
+
+**Root cause, measured rather than read.** The first draft of this diagnosis came from reading
+`identity_stack.py`'s header — the exact method §0 of this document exists to forbid. Re-derived
+from the artifact: a synth of the identity stack carries `AWS::Cognito::UserPool` = 1,
+`UserPoolClient` = 1, `UserPoolGroup` = 4 and **`AWS::Cognito::UserPoolUser` = 0**, with the client's
+`ExplicitAuthFlows` = `ALLOW_USER_SRP_AUTH | ALLOW_REFRESH_TOKEN_AUTH`. The CDK path creates no
+users. `users.tsv` is rendered from the manifest and is only ever pushed into a pool by
+`lib/engine/deploy_identity.sh`, which belongs to the hand-built spine path and never runs in a CDK
+environment. The proof was authenticating two identities that had never existed. fp8's
+"USER_PASSWORD_AUTH flow not enabled" was Cognito rejecting on the client's allowed flows *before*
+it ever looked up the user — which is what hid this second layer for two runs.
+
+**Fixed:** `deploy_connector.sh` now creates both proof users beside the throwaway proof client
+(reviewer in `benefits_caseworker` + `tools_granted` + the tenant group read off the live pool;
+outsider in none, because that absence is what makes the deny half real) and smoke-tests the mint
+where a failure is attributable to the deploy; `destroy_connector.sh` removes them;
+`prove_connector.sh`'s `mint()` reports rc and AWS's own message, and asks for `ChallengeName` alone
+— never the full response, which on a later success would put a live access token into the gate log
+and from there into committed evidence.
+
+**And a test that does not need ten hours.** `lib/connector/selftest_proof_auth.sh` stands up a
+throwaway user pool, `sed`s `mkuser()` and `mint()` **out of the shipped scripts** rather than
+reimplementing them, and asserts what a 10-hour run would have: that a nonexistent user fails *and
+names UserNotFoundException* (the negation test — a suite that cannot see the bug it was written for
+is decoration), that both users mint, that the reviewer's decoded token carries all three claims
+Cedar reads, that the outsider's carries none, and that teardown removes them. 15/15 on
+2026-09-10 in about thirty seconds. Ten hours of live deploy had been the only way to learn one fact
+about two API calls; that is now a design defect with a fix, not a cost of doing business.
+
 **Required before CONN-1 may be claimed:** one more from-zero live run in which `CONN_deploy`,
 `CONN_governed_sor_proof` and both residue checks pass on their own. Until that exists,
 `connect_system_of_record` stays stubbed in the manifest and the connector appears in no brief,

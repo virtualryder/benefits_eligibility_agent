@@ -6,12 +6,13 @@
 # The 'version' below means: derived from governed-core <version>. CROSS-repo parity is a separate
 # question answered by tools/check_core_parity.py. CI runs both and fails on either.
 version: 1.11.1
-files: 38
-tree_sha256: 04a4d43d52f3729e953915cdc48ddfd8d417c381b1f71c521f624f46db586acf
+files: 39
+tree_sha256: ebb43c8a2065970f2e7318b0f0330ad21d836a1b4a159e25e24c8de83ce01a62
 4f9416d650bd28343244b868dfebdb11e70d7b32423536cb87b8c31fde62f993  lib/CORE_VERSION
-dba5be95a71d7aa83855520700ee0771fdedeb5250ad28d6d744a1c5ea3041cf  lib/connector/deploy_connector.sh
-c280c3e10d20acfd6e6a92d8d274abb0b0b4bb5ca776e6f2685e4b497591a13d  lib/connector/destroy_connector.sh
-c83b20b76fbe75ec43f250fb5e21b522752df97f000eb1ca0dbb68ed1ccf4f5f  lib/connector/prove_connector.sh
+7d048ab07dd1474100e3de47a09419e66a874e99ebb595ba8d150808a4b3ec4a  lib/connector/deploy_connector.sh
+184ee6f81ffb09d20e0784966849dc1f3b23deaf9aafd69c500434de7231fb7b  lib/connector/destroy_connector.sh
+d8251cd1794bd8bbde65a90ddaabb69989f4295560eeea696e7f3ba1930eb6f1  lib/connector/prove_connector.sh
+d8113ea2ebd2632568ba97ae3db72639b2b56aba20549601e732cb4b6fbe9103  lib/connector/selftest_proof_auth.sh
 7278aa23b9a94ab91478b3fd03093958ed68626f719ae417c7a9d080e3c6deec  lib/connector/sor_api.py
 f62318aec4a250e07c667cefe6edc57cd18f8f3e2c5ceb4a0c2b880c0a154371  lib/connector/verify_source.py
 5060f8478ed2729ba57a4cf98914f319f21450cc107dfae7f95d54b29b46a55a  lib/controls/authoritative_context.py

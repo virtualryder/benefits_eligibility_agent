@@ -35,17 +35,43 @@ done
 # hand-built environment (deploy_identity.sh, whose client does allow it) still works.
 AUTH_CLIENT="${PROOF_CLIENT_ID:-$CLIENT_ID}"
 [ -n "$AUTH_CLIENT" ] || { echo "FAIL | no PROOF_CLIENT_ID or CLIENT_ID to authenticate with"; exit 1; }
-tok(){ aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
-        --auth-parameters "USERNAME=$1,PASSWORD=$2" --region "$REGION" --query 'AuthenticationResult.AccessToken' --output text | tr -d '\r'; }
+# MINT, and say WHY when it fails. The previous tok() piped stderr nowhere and was called inside a
+# command substitution, so on ben-fpa the whole diagnosis of a real failure was
+#   "FAIL | could not mint a REV token via client 3mejbkk... | "
+# - my guard's words and an empty string where AWS's were. Same defect class as the 2>/dev/null that
+# let destroy_connector.sh certify CLEAN over live resources (L70): an error path that cannot speak.
+# mint() is called WITHOUT command substitution so the assignment lands in this shell, not a subshell.
+mint(){   # $1=variable to set  $2=username  $3=password
+  local _n="$1" _u="$2" _p="$3" _o _rc _why
+  _o="$(aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
+        --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
+        --query 'AuthenticationResult.AccessToken' --output text 2>&1 | tr -d '\r')"; _rc=$?
+  if [ "$_rc" -ne 0 ] || [ -z "$_o" ] || [ "$_o" = "None" ]; then
+    _why="$_o"
+    if [ "$_rc" -eq 0 ] && [ "$_o" = "None" ]; then
+      # rc=0 with no token means Cognito answered with a CHALLENGE rather than an error. Ask for the
+      # challenge NAME only - never re-run without --query and dump the whole response, because on a
+      # later success that would put a live access token into the gate log and from there into
+      # committed evidence.
+      _why="rc=0, no AccessToken - ChallengeName=$(aws cognito-idp initiate-auth \
+            --auth-flow USER_PASSWORD_AUTH --client-id "$AUTH_CLIENT" \
+            --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
+            --query 'ChallengeName' --output text 2>&1 | tr -d '\r')"
+    fi
+    echo "FAIL | could not mint a $_n token for user '$_u' via client $AUTH_CLIENT (rc=$_rc): ${_why:-<no output>}"
+    return 1
+  fi
+  eval "$_n=\$_o"
+}
 REV_U="$(awk -F'\t' '$3=="yes"{print $1; exit}' "$BUILD/users.tsv")"; REV_P="$(awk -F'\t' '$3=="yes"{print $2; exit}' "$BUILD/users.tsv")"
 OUT_U="$(awk -F'\t' '$3=="no"{print $1; exit}' "$BUILD/users.tsv")"; OUT_P="$(awk -F'\t' '$3=="no"{print $2; exit}' "$BUILD/users.tsv")"
-REV="$(tok "$REV_U" "$REV_P")"; OUT="$(tok "$OUT_U" "$OUT_P")"
-# An empty or "None" token is not a caller. Without this the proof would carry on and report
-# "outsider denied" for a request that was never authenticated - a pass for the wrong reason.
-for _n in REV OUT; do
-  eval "_v=\$$_n"
-  [ -n "$_v" ] && [ "$_v" != "None" ] || { echo "FAIL | could not mint a $_n token via client $AUTH_CLIENT"; exit 1; }
-done
+[ -n "$REV_U" ] && [ -n "$OUT_U" ] \
+  || { echo "FAIL | users.tsv at $BUILD/users.tsv has no reviewer (yes) / outsider (no) rows"; exit 1; }
+# An unminted token is not a caller. Without this guard the proof would carry on and report
+# "outsider denied" for a request that was never authenticated - a pass for the wrong reason. mint()
+# fails loudly and names the cause, so this exits with a diagnosis rather than a symptom.
+mint REV "$REV_U" "$REV_P" || exit 1
+mint OUT "$OUT_U" "$OUT_P" || exit 1
 call(){ "$PY" "$CLIENT" "$GW_URL" "$1" "$2" "$3"; }   # same interpreter that resolved CLIENT
 pass=0; fail=0
 

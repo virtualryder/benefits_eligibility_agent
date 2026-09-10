@@ -105,6 +105,67 @@ if [ -z "$PROOF_CLIENT_ID" ] || [ "$PROOF_CLIENT_ID" = "None" ]; then
     && log "created proof client $PROOF_CLIENT_ID ($PROOF_CLIENT_NAME, USER_PASSWORD_AUTH, no secret)"
 else log "reusing proof client $PROOF_CLIENT_ID"; fi
 
+# ---- 3c-2. Proof USERS. Root cause of the ben-fpa failure, and MEASURED rather than assumed: a
+# synth of the identity stack carries UserPool=1, UserPoolClient=1, UserPoolGroup=4 and ZERO
+# AWS::Cognito::UserPoolUser resources. users.tsv is rendered from the manifest and is only ever
+# pushed into a pool by lib/engine/deploy_identity.sh, which belongs to the hand-built spine path and
+# never runs in a CDK environment. So the proof was authenticating two identities that had never
+# existed in that pool. fp8's "USER_PASSWORD_AUTH flow not enabled" was Cognito rejecting on the
+# client's allowed flows BEFORE it ever looked up the user, which is what hid this second layer.
+# Every other live proof (cedar_perimeter_proof.py, mt_two_tenant_proof.py) creates its own users and
+# removes them; this now does the same. Groups follow the policy set exactly: caseworker_permit needs
+# benefits_caseworker, require_entitlement needs tools_granted, require_tenant needs a tenant_*
+# group. The outsider gets NONE of them - that absence is what makes the deny half of the proof real,
+# so it must never be "fixed" by granting the outsider anything.
+UTSV="$BUILD/users.tsv"
+[ -f "$UTSV" ] || err "no users.tsv at $UTSV - cannot create the proof users"
+PROOF_REV_U="$(awk -F'\t' '$3=="yes"{print $1; exit}' "$UTSV" | tr -d '\r')"
+PROOF_REV_P="$(awk -F'\t' '$3=="yes"{print $2; exit}' "$UTSV" | tr -d '\r')"
+PROOF_OUT_U="$(awk -F'\t' '$3=="no"{print $1; exit}' "$UTSV" | tr -d '\r')"
+PROOF_OUT_P="$(awk -F'\t' '$3=="no"{print $2; exit}' "$UTSV" | tr -d '\r')"
+[ -n "$PROOF_REV_U" ] && [ -n "$PROOF_OUT_U" ] \
+  || err "users.tsv at $UTSV has no in-group (yes) and out-of-group (no) rows"
+# Read the tenant group off the LIVE pool instead of hardcoding one: the group is env-scoped
+# (tenant_sp-a in the full-portfolio envs, tenant_a elsewhere) and a name invented here would fail
+# closed at require_tenant with no clue why. Empty is legitimate - a silo deployment attaches no
+# require_tenant policy and has no tenant_* group to join.
+TENANT_G="$(aws cognito-idp list-groups --user-pool-id "$POOL_ID" --region "$REGION" \
+  --query "Groups[?starts_with(GroupName,'tenant_')].GroupName | [0]" --output text 2>/dev/null | tr -d '\r')"
+[ "$TENANT_G" = "None" ] && TENANT_G=""
+mkuser(){   # $1=username  $2=password  $3=space-separated groups (may be empty)
+  # admin-create-user is allowed to fail quietly ONLY because UsernameExistsException is the normal
+  # re-run case and the very next call is a hard check: if the user genuinely does not exist,
+  # admin-set-user-password fails and says so. The check that can fail is downstream of the one that
+  # is allowed to - that ordering is the whole point, and is what 2>/dev/null must never hide.
+  aws cognito-idp admin-create-user --user-pool-id "$POOL_ID" --username "$1" \
+    --message-action SUPPRESS --region "$REGION" >/dev/null 2>&1
+  UERR="$(aws cognito-idp admin-set-user-password --user-pool-id "$POOL_ID" --username "$1" \
+          --password "$2" --permanent --region "$REGION" 2>&1 >/dev/null)" \
+    || { err "could not set a permanent password for proof user $1: ${UERR:-unknown}"; return 1; }
+  for g in $3; do
+    GERR="$(aws cognito-idp admin-add-user-to-group --user-pool-id "$POOL_ID" --username "$1" \
+            --group-name "$g" --region "$REGION" 2>&1 >/dev/null)" \
+      || err "could not add proof user $1 to group $g: ${GERR:-unknown}"
+  done
+  log "proof user $1 ready (groups: ${3:-<none, by design>})"
+}
+mkuser "$PROOF_REV_U" "$PROOF_REV_P" "benefits_caseworker tools_granted${TENANT_G:+ $TENANT_G}"
+mkuser "$PROOF_OUT_U" "$PROOF_OUT_P" ""
+
+# Smoke-test the auth path HERE, where a failure is attributable to the deploy, instead of letting it
+# surface three steps later as a proof failure with no cause attached. This is the exact call that
+# died on ben-fpa; if it cannot mint now, CONN_deploy says so in AWS's own words.
+for _pu in "$PROOF_REV_U:$PROOF_REV_P" "$PROOF_OUT_U:$PROOF_OUT_P"; do
+  _u="${_pu%%:*}"; _p="${_pu#*:}"
+  MERR="$(aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$PROOF_CLIENT_ID" \
+          --auth-parameters "USERNAME=$_u,PASSWORD=$_p" --region "$REGION" \
+          --query 'AuthenticationResult.AccessToken' --output text 2>&1 | tr -d '\r')"
+  if [ $? -ne 0 ] || [ -z "$MERR" ] || [ "$MERR" = "None" ]; then
+    err "proof user $_u cannot mint a token via client $PROOF_CLIENT_ID: ${MERR:-<no output>}"
+  else log "proof user $_u mints a token OK"; fi
+done
+unset MERR _pu _u _p
+
 # ---- 3b. Connector exec role. MOVED AHEAD OF THE LAMBDAS ON PURPOSE (2026-09-09, ben-fp6).
 # The SoR Lambda used to be created with $TOOL_ROLE_ARN ("<prefix>-tool-exec"), which is the
 # AGENTCORE TOOL execution role: it trusts bedrock-agentcore, not Lambda. AWS said so plainly once
@@ -269,6 +330,8 @@ PROVIDER="$PROVIDER"
 WI="$WI"
 M2M_ID="$M2M_ID"
 PROOF_CLIENT_ID="${PROOF_CLIENT_ID:-}"
+PROOF_REV_U="${PROOF_REV_U:-}"
+PROOF_OUT_U="${PROOF_OUT_U:-}"
 DOMAIN="$DOMAIN_PREFIX"
 SOR_LABEL="$SOR_LABEL"
 TOOL_ID="verify-source___verify_source"
