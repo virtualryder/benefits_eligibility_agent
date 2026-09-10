@@ -145,7 +145,16 @@ def _verify_signature(tok):
         if jwk is None:
             jwk = _jwk_for(kid, force=True)  # key rotation: refresh once on a kid miss
         if jwk is None:
-            return False, "signing key (kid) not found in issuer JWKS"
+            # NAME THE KEYS. "not found in issuer JWKS" is true and useless: it cannot distinguish
+            # a rotated key from a token minted by an entirely different issuer, which is the live
+            # question after ben-fpd. The token's own iss and kid, and the kids this SoR trusts,
+            # settle it in one line - and none of them are secrets: a kid is a public key
+            # identifier and iss is a URL. The token itself is never logged.
+            claims = _seg(tok, 1) or {}
+            return False, ("signing key (kid) not found in issuer JWKS: token kid=%s iss=%s "
+                           "client_id=%s; this SoR trusts kids %s from EXPECTED_ISS=%s"
+                           % (kid, claims.get("iss"), claims.get("client_id"),
+                              sorted(_JWKS_CACHE.get("keys", {}).keys()), EXPECTED_ISS))
         n = int.from_bytes(_b64url(jwk["n"]), "big")
         e = int.from_bytes(_b64url(jwk["e"]), "big")
     except urllib.error.URLError:

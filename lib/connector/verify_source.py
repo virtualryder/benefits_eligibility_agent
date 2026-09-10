@@ -114,9 +114,13 @@ def handler(event, context):
             said = ex.read().decode("utf-8", "replace")[:400]
         except Exception:                                          # noqa: BLE001
             said = "<no body>"
+        # token_claims comes BEFORE sor_said on purpose. On ben-fpd the gateway truncated this
+        # response mid-string and ate the claims, leaving the SoR's verdict ("signing key (kid) not
+        # found in issuer JWKS") with nothing to attribute it to. The diagnosis has to survive the
+        # transport, so the scarcest field goes first.
         return {"verified": False, "error": "system-of-record returned HTTP %s" % ex.code,
-                "sor_said": said, "sor_auth_enforced": ex.code in (401, 403),
-                "token_claims": _claims_for_diagnosis(token)}
+                "token_claims": _claims_for_diagnosis(token),
+                "sor_said": said, "sor_auth_enforced": ex.code in (401, 403)}
     except (urllib.error.URLError, TimeoutError, ValueError) as ex:
         return {"verified": False, "error": "system-of-record call failed: %s" % type(ex).__name__,
                 "detail": str(ex)[:200]}

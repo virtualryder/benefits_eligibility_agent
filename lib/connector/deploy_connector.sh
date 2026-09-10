@@ -324,18 +324,29 @@ fi
 # HTTP 401"}. That message names a symptom with five possible causes in sor_api.py and
 # distinguishes none of them, so twenty minutes of live deploy bought one string the response had
 # already contained. Invoking the tool directly puts the SoR's OWN words into CONN_deploy.
+# The output path must be a WINDOWS path: MSYS_NO_PATHCONV=1 is exported at the top of this script,
+# so a Git-Bash /c/Users/... path reaches the Windows aws.exe verbatim and it cannot write there.
+# On ben-fpd this step reported only "could not invoke ben-fpd-verify-source" - because I wrote
+# `>/dev/null 2>&1` on the invoke and threw away the reason. That is the THIRD time in one session
+# I have hidden an error path while fixing hidden error paths. The stderr is captured now.
 INV_OUT="$WORK/verify-invoke.json"
-if aws lambda invoke --function-name "$VERIFY_FN" --region "$REGION" \
-     --cli-binary-format raw-in-base64-out --payload '{"case_id":"CASE-1"}' "$INV_OUT" >/dev/null 2>&1; then
-  INV="$(tr -d '\r\n' < "$INV_OUT" 2>/dev/null)"
+INV_OUT_W="$INV_OUT"
+command -v cygpath >/dev/null 2>&1 && INV_OUT_W="$(cygpath -w "$INV_OUT")"
+INV_ERR="$(aws lambda invoke --function-name "$VERIFY_FN" --region "$REGION" \
+             --cli-binary-format raw-in-base64-out --payload '{"case_id":"CASE-1"}' \
+             "$INV_OUT_W" 2>&1 >/dev/null)"
+if [ -s "$INV_OUT" ]; then
+  INV="$(tr -d '\r\n' < "$INV_OUT")"
   case "$INV" in
     *'"verified": true'*|*'"verified":true'*)
       log "outbound leg OK: verify_source verified CASE-1 against the OAuth-protected SoR" ;;
     *)
-      err "outbound leg FAILED - the tool reached the SoR and was refused: $(printf '%s' "$INV" | cut -c1-600)" ;;
+      # 900 chars: token_claims (kid/iss/client_id/scope) has to survive alongside sor_said, because
+      # together they say WHICH check rejected the token and WHY it would.
+      err "outbound leg FAILED - the tool reached the SoR and was refused: $(printf '%s' "$INV" | cut -c1-900)" ;;
   esac
 else
-  err "could not invoke $VERIFY_FN to smoke-test the outbound leg"
+  err "could not invoke $VERIFY_FN to smoke-test the outbound leg: ${INV_ERR:-no stderr, and no output file at $INV_OUT}"
 fi
 
 # EVERY value is quoted. SOR_LABEL is "MOCK-SOR (OAuth2, RS256/JWKS)" - spaces and parentheses -
