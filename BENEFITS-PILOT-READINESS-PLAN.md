@@ -4,7 +4,7 @@
 (never an adjudicator; never denies, reduces, terminates, refers fraud, or writes to a system of record).
 **Repo:** `github.com/virtualryder/benefits_eligibility_agent`. **Tag:** `v0.1.2-pilot-rc1` (cut after the
 live EP1 run, 2026-07-27). **Build state:** control plane hardened + full CDK/Gate-B IaC, **live
-EP1-validated**; **513 offline tests** on current main (control-plane + 45 CDK synthesis). **Owner:** David Ryder (AWS SA).
+EP1-validated**; **514 offline tests** on current main (control-plane + 45 CDK synthesis). **Owner:** David Ryder (AWS SA).
 
 ---
 

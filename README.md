@@ -69,8 +69,8 @@ from a reusable, manifest-driven template.
 > EP1-validated** (2026-07-27, env `ben-val1`, us-east-1): `validate_deployment.py` PASS, the deterministic
 > controller ran to the human sign-off gate, the **AdverseNoticeHold** due-process gate held an adverse
 > redetermination, and the **strict PII canary passed with 0 leaks**, then torn down + residual-swept.
-> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **513 offline tests**;
-> tag `v0.5.2-pilot-rc1` was cut from this tree (2026-09-06, after the Tier-1 live re-gate; `v0.5.1-pilot-rc1` of 2026-09-05 preceded it, `v0.3.0-pilot-rc1` of 2026-09-02 preceded the kill switch + budget); `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
+> Evidence: `evidence/EP1-VALIDATION.md`; tag `v0.1.2-pilot-rc1`. Current suite: **514 offline tests**;
+> the current release is `v0.7.0-pilot-rc1` (2026-09-09; `RELEASE` is the single source of truth for that). It follows `v0.6.0-pilot-rc1` of 2026-09-07 and `v0.5.2-pilot-rc1` of 2026-09-06 (cut after the Tier-1 live re-gate); `v0.5.1-pilot-rc1` of 2026-09-05 and `v0.3.0-pilot-rc1` of 2026-09-02 preceded the kill switch + budget; `v0.2.0-pilot-rc1` marked the governed-core dependency migration. This pack runs on **governed-core** (hash-pinned wheel + `lib/core.lock`), not on the platform repo's `platform_core` (the offline reference + conformance oracle) — see the platform's `docs/DEPENDENCY-MODEL.md` for the two-implementation model and the compatibility matrix.
 >
 > **2026-09-02 — AgentCore repositioning, hybrid multi-tenant SaaS, full transparency (all live, all torn down).**
 > Fresh from-zero ENFORCE re-proof (`evidence/AGENTCORE-E2E-FROMZERO-2026-09-02.md`); **hybrid multi-tenant**
@@ -138,7 +138,7 @@ SSM and validates the caseworker's Cognito JWT.
 
 ## Tests — proven live in ENFORCE
 
-> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 513 tests**
+> **Two distinct artifacts — do not conflate them.** (1) The **offline suite: 514 tests**
 > (control-plane + 45 CDK synthesis) — the authoritative CI number (`RELEASE-MANIFEST.md`).
 > (2) The **legacy shell governance demo below: 29 live checks** against a deployed system in Cedar
 > ENFORCE. The demo is an internal reference; the supported deployment path is CDK.
@@ -151,7 +151,7 @@ python -m pip install --require-hashes -r requirements-core.txt   # governed-cor
 python -m pip install -r cdk/requirements.txt pytest pyyaml cryptography
 python lib/verify_core.py            # governance-core integrity lock (CI gate)
 bash tools/install_hooks.sh          # REL-4: pre-commit refuses a lib/ change whose core.lock does not verify
-python -m pytest -q                  # 513 collected on Python 3.12
+python -m pytest -q                  # 514 collected on Python 3.12
 ```
 
 > **Parity note (2026-09-06).** This is the lead pack: every platform control lands and is live-gated here first. Which of them are wired in the other packs is recorded in the platform's generated matrix [`WOGplatform/docs/PACK-PARITY.md`](https://github.com/virtualryder/WOGplatform/blob/main/docs/PACK-PARITY.md) — a claim about "the platform" is a claim about this pack unless that matrix shows the check mark for the pack in question.
@@ -439,6 +439,23 @@ than configuring silently, because asking for the restriction and not getting it
 asking. It is correct for a deployment where the runtime IS exposed as a gateway target.
 **Live-proven: the default posture deploys and the agent is invocable. The opt-in posture is
 unit-tested, not live-proven.**
+
+## Where things stand, in one place
+
+`MATURITY.yaml` at the repo root is the machine-readable single source of truth for what this pack
+claims. Every control in it is marked `proven` (a from-zero live run demonstrated it, and the gate
+check that demonstrated it is named), `shipped` (the code exists and is unit-tested; no live run has
+demonstrated it) or `blocked` (it cannot be demonstrated here, and the reason is stated). Prose in
+this repository should agree with that file; **on drift, that file governs.** Its suite count is
+gated by `tests/test_doc_counts.py` like every other counted document, so it cannot go stale quietly.
+
+Two companion artifacts read from the same evidence:
+
+| Artifact | What it is |
+|---|---|
+| [`docs/Aegis-Architecture-Verified.drawio`](docs/Aegis-Architecture-Verified.drawio) | The architecture with every element coloured by verdict — green proven live and labelled with its gate check, amber shipped-but-unproven, grey adopter-owned or stubbed. The grey boxes are drawn at the same size as the green ones on purpose. `docs/Aegis-Architecture-Verified.svg` is the same picture rendered from the same source. |
+| [`docs/Aegis-Partner-Brief.docx`](docs/Aegis-Partner-Brief.docx) | The partner-facing version: what is proven and by which check, what is deliberately not proven, and the ranked list of what a partner can actually do. Its headline is the honest one — all of this evidence is author-produced, and someone else's run is the only thing that closes that. The PDF is rendered beside it and is gitignored as a byproduct. |
+| [`docs/generators/`](docs/generators/) | Both artifacts above are **generated**, not hand-maintained. `partner_brief.js` reads the committed gate-evidence file and refuses to build from a run that did not pass; `architecture_diagram.py` emits the `.drawio` and the `.svg` from one model so they cannot disagree. Re-run them when a newer gate run supersedes this one — and re-check each verdict against that run rather than carrying the old ones forward. |
 
 ## Honesty boundary
 

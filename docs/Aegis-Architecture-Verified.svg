@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1660" height="1180" viewBox="0 0 1660 1180" font-family="Helvetica,Arial,sans-serif">
+<rect width="1660" height="1180" fill="#ffffff"/>
+<text text-anchor="middle" x="820" y="35" font-size="17.0" font-weight="bold" fill="#1f3a56">Aegis governed-agent architecture — what is actually verified</text>
+<text text-anchor="middle" x="820" y="49" font-size="10.5"  fill="#1f3a56">Benefits eligibility pack · from-zero gate run ben-fpg (2026-09-10), us-east-1, single account · AWS account id redacted to 111122223333 throughout</text>
+<rect x="40" y="74" width="1560" height="30" fill="#f4f7fa" stroke="#b8c6d4" rx="3"/>
+<text x="48" y="89" font-size="10.0"  fill="#1f3a56">How to read this. Green = demonstrated on a from-zero live run and named by the gate check that proves it. Amber = the code exists and is unit-tested, but no live run has demonstrated it. Grey = deliberately not ours: stubbed in the manifest, or the adopter&#x27;s to own. A picture that showed</text>
+<text x="48" y="102" font-size="10.0"  fill="#1f3a56">only the green boxes would be a sales diagram, not an architecture.</text>
+<rect x="40" y="130" width="330" height="330" fill="none" stroke="#8fa3b8" stroke-dasharray="7 5" rx="6"/>
+<text x="50" y="147" font-size="13" font-weight="bold" fill="#33546f">Identity plane</text>
+<g stroke="#33546f" stroke-width="1.6" fill="none"><circle cx="170" cy="366" r="7" fill="#33546f"/><line x1="170" y1="373" x2="170" y2="396"/><line x1="157" y1="380" x2="183" y2="380"/><line x1="170" y1="396" x2="159" y2="412"/><line x1="170" y1="396" x2="181" y2="412"/></g>
+<text x="170" y="428" font-size="10" text-anchor="middle" fill="#222">Caseworker / reviewer</text>
+<text x="68" y="449" font-size="10.0"  fill="#1f3a56">Two proof users per run, removed at teardown.</text>
+<rect x="400" y="130" width="700" height="600" fill="none" stroke="#8fa3b8" stroke-dasharray="7 5" rx="6"/>
+<text x="410" y="147" font-size="13" font-weight="bold" fill="#33546f">Workload account — VPC, private subnets</text>
+<rect x="400" y="760" width="700" height="250" fill="none" stroke="#8fa3b8" stroke-dasharray="7 5" rx="6"/>
+<text x="410" y="777" font-size="13" font-weight="bold" fill="#33546f">CONN-1 — governed outbound to a system of record</text>
+<rect x="1130" y="130" width="470" height="440" fill="none" stroke="#8fa3b8" stroke-dasharray="7 5" rx="6"/>
+<text x="1140" y="147" font-size="13" font-weight="bold" fill="#33546f">Governance &amp; evidence</text>
+<rect x="1130" y="600" width="470" height="410" fill="none" stroke="#8fa3b8" stroke-dasharray="7 5" rx="6"/>
+<text x="1140" y="617" font-size="13" font-weight="bold" fill="#33546f">Observability &amp; containment</text>
+<path d="M40 490 h315 l15 15 v235 h-330 z" fill="#fff8d5" stroke="#d6b656"/>
+<text x="49" y="507" font-size="9.5" fill="#4a4020">THE RULE THIS DIAGRAM OBEYS</text>
+<text x="49" y="518" font-size="9.5" fill="#4a4020"></text>
+<text x="49" y="529" font-size="9.5" fill="#4a4020">Measure the artifact, not the source.</text>
+<text x="49" y="541" font-size="9.5" fill="#4a4020"></text>
+<text x="49" y="552" font-size="9.5" fill="#4a4020">Every green box was read back from AWS after the</text>
+<text x="49" y="564" font-size="9.5" fill="#4a4020">run, or from the synthesized template - never from</text>
+<text x="49" y="575" font-size="9.5" fill="#4a4020">the code that was supposed to produce it. Three</text>
+<text x="49" y="586" font-size="9.5" fill="#4a4020">separate defects in this build were invisible in</text>
+<text x="49" y="598" font-size="9.5" fill="#4a4020">the source and obvious in the artifact: users the</text>
+<text x="49" y="609" font-size="9.5" fill="#4a4020">IaC path never creates, an authorizer that trusts</text>
+<text x="49" y="621" font-size="9.5" fill="#4a4020">exactly one client, and a Lambda environment left</text>
+<text x="49" y="632" font-size="9.5" fill="#4a4020">empty because a label contained a comma.</text>
+<path d="M40 760 h315 l15 15 v235 h-330 z" fill="#fff8d5" stroke="#d6b656"/>
+<text x="49" y="777" font-size="9.5" fill="#4a4020">WHAT THE OUTBOUND LEG COST</text>
+<text x="49" y="788" font-size="9.5" fill="#4a4020"></text>
+<text x="49" y="799" font-size="9.5" fill="#4a4020">CONN-1 took six from-zero live runs. Not one of</text>
+<text x="49" y="811" font-size="9.5" fill="#4a4020">the six failures was where it appeared to be:</text>
+<text x="49" y="822" font-size="9.5" fill="#4a4020"></text>
+<text x="49" y="834" font-size="9.5" fill="#4a4020">  fpa  authentication - proof users the CDK</text>
+<text x="49" y="845" font-size="9.5" fill="#4a4020">       path never creates</text>
+<text x="49" y="856" font-size="9.5" fill="#4a4020">  fpb  the gateway - the authorizer allow-lists</text>
+<text x="49" y="868" font-size="9.5" fill="#4a4020">       exactly ONE client</text>
+<text x="49" y="879" font-size="9.5" fill="#4a4020">  fpd  no diagnosis at all - the error went</text>
+<text x="49" y="891" font-size="9.5" fill="#4a4020">       to /dev/null</text>
+<text x="49" y="902" font-size="9.5" fill="#4a4020">  fpe  the SoR trusted nothing - EXPECTED_ISS</text>
+<text x="49" y="913" font-size="9.5" fill="#4a4020">       was empty; six retries failed silently</text>
+<text x="49" y="925" font-size="9.5" fill="#4a4020">  fpf  proven, 21 of 21</text>
+<text x="49" y="936" font-size="9.5" fill="#4a4020"></text>
+<text x="49" y="948" font-size="9.5" fill="#4a4020">Each was hidden behind a silenced error path. CI</text>
+<text x="49" y="959" font-size="9.5" fill="#4a4020">now fails when a new one appears.</text>
+<path d="M400 1030 h685 l15 15 v115 h-700 z" fill="#fff8d5" stroke="#d6b656"/>
+<text x="409" y="1047" font-size="9.5" fill="#4a4020">THE TWO SENTENCES THAT BELONG TOGETHER, AND SHOULD NEVER BE QUOTED APART</text>
+<text x="409" y="1058" font-size="9.5" fill="#4a4020"></text>
+<text x="409" y="1069" font-size="9.5" fill="#4a4020">The system of record is a REAL OAuth2 API with RS256/JWKS signature verification.   IT IS OURS.</text>
+<text x="409" y="1081" font-size="9.5" fill="#4a4020"></text>
+<text x="409" y="1092" font-size="9.5" fill="#4a4020">Proving the governed path reaches it is not proving a customer&#x27;s system of record has been governed.</text>
+<text x="409" y="1104" font-size="9.5" fill="#4a4020">connect_system_of_record stays stubbed in the manifest for exactly that reason. Standing this connector up</text>
+<text x="409" y="1115" font-size="9.5" fill="#4a4020">against our own mock took six live runs; a real integration adds the customer&#x27;s IdP, network boundary, token</text>
+<text x="409" y="1126" font-size="9.5" fill="#4a4020">lifetimes and change control on top of that. The governance is reusable. The integration is engineering work.</text>
+<path d="M1130 1030 h455 l15 15 v115 h-470 z" fill="#fff8d5" stroke="#d6b656"/>
+<text x="1139" y="1047" font-size="9.5" fill="#4a4020">ON DENY-BY-DEFAULT</text>
+<text x="1139" y="1058" font-size="9.5" fill="#4a4020"></text>
+<text x="1139" y="1069" font-size="9.5" fill="#4a4020">Step 3 of the connector proof denies an outsider, and</text>
+<text x="1139" y="1081" font-size="9.5" fill="#4a4020">the denial NAMES require_tenant - a specific policy.</text>
+<text x="1139" y="1092" font-size="9.5" fill="#4a4020">An earlier run denied the outsider and the legitimate</text>
+<text x="1139" y="1104" font-size="9.5" fill="#4a4020">reviewer with the same string. &#x27;Outsider denied&#x27; proved</text>
+<text x="1139" y="1115" font-size="9.5" fill="#4a4020">nothing then, because everything was denied.</text>
+<text x="1139" y="1126" font-size="9.5" fill="#4a4020"></text>
+<text x="1139" y="1138" font-size="9.5" fill="#4a4020">A deny-by-default claim is only evidence when the</text>
+<text x="1139" y="1149" font-size="9.5" fill="#4a4020">denial is selective.</text>
+<polyline points="205,232 205,245 205,245 205,258" fill="none" stroke="#aa1111" stroke-width="1.1" stroke-dasharray="5 4" opacity="0.8"/>
+<polyline points="170,356 170,340 205,340 205,324" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="205,324 205,340 170,340 170,356" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="190,391 308,391 308,205 425,205" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="725,205 742,205 742,205 760,205" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="760,205 742,205 742,205 725,205" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="725,205 575,205 575,299 425,299" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="425,299 575,299 575,393 725,393" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="725,393 575,393 575,496 425,496" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="725,393 742,393 742,393 760,393" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="425,496 582,496 582,597 740,597" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="1075,496 1112,496 1112,203 1150,203" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="1075,496 1112,496 1112,277 1150,277" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="1075,496 1112,496 1112,351 1150,351" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="1075,496 1112,496 1112,673 1150,673" fill="none" stroke="#43536b" stroke-width="1.1" opacity="0.8"/>
+<polyline points="575,426 575,613 575,613 575,800" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="725,835 742,835 742,835 760,835" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="760,835 742,835 742,835 725,835" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="575,870 575,885 575,885 575,900" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="575,900 575,885 575,885 575,870" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="575,900 575,612 205,612 205,324" fill="none" stroke="#1a7f37" stroke-width="1.8" opacity="0.8"/>
+<polyline points="760,940 742,940 742,940 725,940" fill="none" stroke="#aa1111" stroke-width="1.1" stroke-dasharray="5 4" opacity="0.8"/>
+<rect x="60" y="170" width="290" height="62" fill="#eeeeee" stroke="#8a8a8a" rx="5"/>
+<text x="205" y="193.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Corporate IdP</text>
+<text x="205" y="207.0" font-size="8.8"  text-anchor="middle" fill="#1a2a38">Okta / Entra / Ping — OIDC or SAML</text>
+<text x="205" y="218.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">○ ADOPTER-OWNED / STUBBED · reference: deploy_federation.sh</text>
+<rect x="60" y="258" width="290" height="66" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="205" y="283.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Cognito user pool + groups</text>
+<text x="205" y="297.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">benefits_caseworker · tools_granted · tenant_*</text>
+<text x="205" y="308.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · outputs_present</text>
+<rect x="425" y="172" width="300" height="66" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="575" y="197.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">AgentCore Gateway (MCP)</text>
+<text x="575" y="211.0" font-size="8.8"  text-anchor="middle" fill="#1a2a38">CUSTOM_JWT authorizer · allow-lists exactly one client</text>
+<text x="575" y="222.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · G111_consolidated_gate</text>
+<rect x="760" y="172" width="315" height="66" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="917" y="197.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Cedar policy engine</text>
+<text x="917" y="211.0" font-size="8.8"  text-anchor="middle" fill="#1a2a38">deny-by-default · forbid wins over permit</text>
+<text x="917" y="222.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · CONN_governed_sor_proof</text>
+<rect x="425" y="268" width="650" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="750" y="286.2" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Gateway request interceptor</text>
+<text x="750" y="299.4" font-size="8.8"  text-anchor="middle" fill="#1a2a38">tenant DERIVED from the verified identity · consent / purpose / budget_ok stripped from the caller and injected server-side · kill</text>
+<text x="750" y="310.8" font-size="8.8"  text-anchor="middle" fill="#1a2a38">switch read FIRST, fail-closed</text>
+<text x="750" y="322.1" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · KS_kill_switch_proof · BUD_budget_proof</text>
+<rect x="425" y="360" width="300" height="66" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="575" y="385.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">AgentCore Runtime</text>
+<text x="575" y="399.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">Strands agent · IaC-provisioned role · MMDSv2 required</text>
+<text x="575" y="410.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · RT2_runtime_ready · RT2_runtime_mmdsv2</text>
+<rect x="760" y="360" width="315" height="66" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="917" y="385.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Bedrock model + Guardrail</text>
+<text x="917" y="399.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">every runtime row guardrail-assessed (20 of 20)</text>
+<text x="917" y="410.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · RT2_runtime_calls_guardrail_assessed</text>
+<rect x="425" y="456" width="650" height="80" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="750" y="483.2" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Tool Lambdas (private subnets)</text>
+<text x="750" y="496.4" font-size="8.8"  text-anchor="middle" fill="#1a2a38">intake_application · mask_pii (Comprehend) · assess_eligibility · redetermine · overpayment · write_audit · request_signoff /</text>
+<text x="750" y="507.8" font-size="8.8"  text-anchor="middle" fill="#1a2a38">approve_signoff</text>
+<text x="750" y="519.1" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · E2E_zero_unexpected · LIN_case_driven</text>
+<rect x="425" y="566" width="315" height="62" fill="#ffe6cc" stroke="#b06a00" rx="5"/>
+<text x="582" y="590.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">VPC endpoints (PrivateLink)</text>
+<text x="582" y="603.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">bedrock-runtime · comprehend · states · kms · ssm · ddb · s3</text>
+<text x="582" y="614.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">● SHIPPED, NOT PROVEN LIVE · private mode gated separately (ben-t1)</text>
+<rect x="760" y="566" width="315" height="62" fill="#eeeeee" stroke="#8a8a8a" rx="5"/>
+<text x="917" y="584.6" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Org SCP + VPC-endpoint policy</text>
+<text x="917" y="597.8" font-size="8.8"  text-anchor="middle" fill="#1a2a38">denies direct model calls and evidence deletion org-wide</text>
+<text x="917" y="609.1" font-size="8.0"  text-anchor="middle" fill="#1a2a38">○ ADOPTER-OWNED / STUBBED · ships under org/; org enforcement is the</text>
+<text x="917" y="619.8" font-size="8.0"  text-anchor="middle" fill="#1a2a38">adopter&#x27;s</text>
+<rect x="425" y="800" width="300" height="70" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="575" y="828.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">verify_source Lambda</text>
+<text x="575" y="841.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">holds NO client secret · exposed as a gateway target</text>
+<text x="575" y="852.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · CONN_deploy (artifacts + rc + outbound)</text>
+<rect x="760" y="800" width="315" height="70" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="917" y="828.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">AgentCore Identity</text>
+<text x="917" y="841.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">token vault · workload identity → M2M client_credentials</text>
+<text x="917" y="852.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · CONN_governed_sor_proof</text>
+<rect x="425" y="900" width="300" height="80" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="575" y="927.2" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">MOCK system of record</text>
+<text x="575" y="940.4" font-size="8.8"  text-anchor="middle" fill="#1a2a38">API Gateway + Lambda · OAuth2 · full RS256/JWKS signature</text>
+<text x="575" y="951.8" font-size="8.8"  text-anchor="middle" fill="#1a2a38">verification against the live public keys</text>
+<text x="575" y="963.1" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · rejects no-token and bad-token 401</text>
+<rect x="760" y="900" width="315" height="80" fill="#eeeeee" stroke="#8a8a8a" rx="5"/>
+<text x="917" y="927.2" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">connect_system_of_record</text>
+<text x="917" y="940.4" font-size="8.8"  text-anchor="middle" fill="#1a2a38">the real state benefits SoR — EIV, The Work Number, a state</text>
+<text x="917" y="951.8" font-size="8.8"  text-anchor="middle" fill="#1a2a38">system</text>
+<text x="917" y="963.1" font-size="8.0"  text-anchor="middle" fill="#1a2a38">○ ADOPTER-OWNED / STUBBED · STUBBED in the manifest, on purpose</text>
+<rect x="1150" y="172" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="195.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">DynamoDB audit ledger</text>
+<text x="1365" y="209.0" font-size="8.8"  text-anchor="middle" fill="#1a2a38">append-only hash chain · CMK · per-tenant store</text>
+<text x="1365" y="220.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · G111_consolidated_gate</text>
+<rect x="1150" y="246" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="269.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">S3 WORM bucket</text>
+<text x="1365" y="283.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">Object Lock COMPLIANCE · CMK · a commit requires the WORM copy</text>
+<text x="1365" y="294.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · evidence.is_durable, core 1.10.1</text>
+<rect x="1150" y="320" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="343.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Step Functions sign-off</text>
+<text x="1365" y="357.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">separation of duties · exactly-once FINAL# marker · no self-commit</text>
+<text x="1365" y="368.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · G111_consolidated_gate</text>
+<rect x="1150" y="394" width="430" height="54" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="413.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Customer-managed KMS key</text>
+<text x="1365" y="427.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">rotate · audit · revoke</text>
+<text x="1365" y="438.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · ben-t1 CMK re-gate</text>
+<rect x="1150" y="462" width="430" height="62" fill="#eeeeee" stroke="#8a8a8a" rx="5"/>
+<text x="1365" y="485.9" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Separate governance / audit account</text>
+<text x="1365" y="499.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">operators of the agent cannot rewrite history</text>
+<text x="1365" y="510.4" font-size="8.0"  text-anchor="middle" fill="#1a2a38">○ ADOPTER-OWNED / STUBBED · target topology; this gate runs single-account</text>
+<rect x="1150" y="642" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="666.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">aegis.call structured log</text>
+<text x="1365" y="679.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">one line per tool invocation, correlation set hashed into every WORM record</text>
+<text x="1365" y="690.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · LIN_zero_orphans</text>
+<rect x="1150" y="716" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="740.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">CloudTrail management events</text>
+<text x="1365" y="753.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">InvokeModel / Converse captured account-wide</text>
+<text x="1365" y="764.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · LIN_zero_orphans: 11 invokes, 11 aegis, 0 orphans</text>
+<rect x="1150" y="790" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="814.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Kill switch (SSM, 15 s TTL)</text>
+<text x="1365" y="827.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">containment precedes evaluation · 403 + DENIED WORM record</text>
+<text x="1365" y="838.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · KS_kill_switch_proof</text>
+<rect x="1150" y="864" width="430" height="62" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="888.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Per-tenant budget meter</text>
+<text x="1365" y="901.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">reserve-before / commit-after · hard cap fails closed</text>
+<text x="1365" y="912.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · BUD_budget_proof</text>
+<rect x="1150" y="938" width="430" height="54" fill="#d5e8d4" stroke="#4d7c3a" rx="5"/>
+<text x="1365" y="958.0" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#1a2a38">Teardown — zero residue</text>
+<text x="1365" y="971.1" font-size="8.8"  text-anchor="middle" fill="#1a2a38">asked of AWS directly, not taken from the script&#x27;s own verdict</text>
+<text x="1365" y="982.5" font-size="8.0"  text-anchor="middle" fill="#1a2a38">✓ VERIFIED LIVE · teardown_zero_*_residue (4 checks)</text>
+<rect x="137" y="236" width="137" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="205" y="245" font-size="7.6" text-anchor="middle" fill="#aa1111">OIDC / SAML  (adopter wires this)</text>
+<rect x="148" y="331" width="78" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="188" y="340" font-size="7.6" text-anchor="middle" fill="#43536b">authenticate (SRP)</text>
+<rect x="148" y="345" width="78" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="188" y="354" font-size="7.6" text-anchor="middle" fill="#43536b">RS256 access token</text>
+<rect x="208" y="289" width="199" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="308" y="298" font-size="7.6" text-anchor="middle" fill="#43536b">MCP tool call · bearer = the caseworker&#x27;s own JWT</text>
+<rect x="633" y="196" width="219" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="205" font-size="7.6" text-anchor="middle" fill="#43536b">principal · action · resource · server-derived context</text>
+<rect x="713" y="210" width="59" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="219" font-size="7.6" text-anchor="middle" fill="#43536b">PERMIT / DENY</text>
+<rect x="542" y="243" width="66" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="252" font-size="7.6" text-anchor="middle" fill="#43536b">authorized call</text>
+<rect x="559" y="337" width="31" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="346" font-size="7.6" text-anchor="middle" fill="#43536b">invoke</text>
+<rect x="542" y="436" width="66" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="444" font-size="7.6" text-anchor="middle" fill="#43536b">tool invocation</text>
+<rect x="674" y="384" width="137" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="393" font-size="7.6" text-anchor="middle" fill="#43536b">model call (metered, guardrailed)</text>
+<rect x="528" y="538" width="109" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="582" y="546" font-size="7.6" text-anchor="middle" fill="#43536b">AWS APIs, no public egress</text>
+<rect x="1058" y="340" width="109" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="1112" y="350" font-size="7.6" text-anchor="middle" fill="#43536b">append-only evidence write</text>
+<rect x="1019" y="378" width="187" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="1112" y="386" font-size="7.6" text-anchor="middle" fill="#43536b">durable WORM copy — required before any commit</text>
+<rect x="1058" y="414" width="109" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="1112" y="424" font-size="7.6" text-anchor="middle" fill="#43536b">request / approve sign-off</text>
+<rect x="1052" y="576" width="121" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="1112" y="584" font-size="7.6" text-anchor="middle" fill="#43536b">one aegis.call per invocation</text>
+<rect x="491" y="604" width="168" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="613" font-size="7.6" text-anchor="middle" fill="#1a7f37">verify_source, through the gateway target</text>
+<rect x="635" y="826" width="215" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="835" font-size="7.6" text-anchor="middle" fill="#1a7f37">get_workload_access_token → get_resource_oauth2_token</text>
+<rect x="666" y="840" width="152" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="849" font-size="7.6" text-anchor="middle" fill="#1a7f37">M2M bearer — never stored in the tool</text>
+<rect x="526" y="876" width="98" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="885" font-size="7.6" text-anchor="middle" fill="#1a7f37">Authorization: Bearer …</text>
+<rect x="516" y="890" width="117" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="575" y="899" font-size="7.6" text-anchor="middle" fill="#1a7f37">authoritative record, or 401</text>
+<rect x="318" y="603" width="144" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="390" y="612" font-size="7.6" text-anchor="middle" fill="#1a7f37">fetch JWKS · verify RS256 signature</text>
+<rect x="698" y="931" width="90" height="12" fill="#ffffff" opacity="0.95" stroke="#dfe6ee" rx="2"/><text x="742" y="940" font-size="7.6" text-anchor="middle" fill="#aa1111">what would replace it</text>
+</svg>

@@ -23,6 +23,9 @@ COUNTED_DOCS = [
     "README.md", "START-HERE.md", "RELEASE-MANIFEST.md", "VALIDATED_RELEASE.md",
     "PILOT-SCOPE.md", "BENEFITS-PILOT-READINESS-PLAN.md", "DEPLOYMENT-GUIDE.md",
     "docs/GATE-B-CHECKLIST.md", "docs/VALIDATED-MATRIX.md", "evidence/EP1-VALIDATION.md",
+    # Added 2026-09-10 with the file itself. MATURITY.yaml declares that it governs on drift, so
+    # it is the last document in the repo that should be allowed to quote a stale suite size.
+    "MATURITY.yaml",
 ]
 
 # The GTM deck/doc generators. These were NOT gated until 2026-08-03, which is exactly how the

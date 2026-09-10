@@ -1,0 +1,152 @@
+# MATURITY.yaml — machine-readable single source of truth for this repo's maturity claims.
+#
+# Prose (README, START-HERE, RELEASE-MANIFEST, decks, partner briefs) should agree with this file;
+# THIS FILE GOVERNS ON DRIFT. It exists because the honest answer to "how mature is this?" was
+# previously spread across five markdown documents that could disagree with each other, and twice
+# did. The taxonomy is the portfolio's own: docs/CONNECTOR-MATURITY.md in `slg-ai-agents`.
+#
+# The rule this file obeys, which is also the rule the gate obeys: MEASURE THE ARTIFACT, NOT THE
+# SOURCE. Nothing below is marked proven because the code looks right. It is marked proven because
+# a from-zero live run demonstrated it and the check that demonstrated it is named.
+
+schema_version: 1
+repo: benefits_eligibility_agent
+display_name: Benefits Eligibility Agent (SLG pack)
+governance_pattern: "Aegis Governance Pattern (AGP) v1.0"
+positioning: reference-accelerator          # NOT a production-certified system
+updated: 2026-09-10
+
+release:
+  tag: v0.7.0-pilot-rc1                     # single source of truth: the repo-root RELEASE file
+  governance_core: 1.11.1                   # pinned by URL + sha256 in requirements-core.txt
+
+tests:
+  offline_total: 514                        # 514 tests collected; gated by tests/test_doc_counts.py
+  reproduce: "python -m pytest -q"
+  last_verified: 2026-09-10
+  note: >-
+    Machine-checked. tests/test_doc_counts.py runs a real pytest collection and fails CI when any
+    counted document quotes a number the suite no longer has, so this figure cannot go stale
+    silently. The skip set is platform-dependent (Windows vs Linux), so the honest statement is
+    "514 collected, all passing on both platforms" and not "all local tests pass".
+
+# ---------------------------------------------------------------------------------------------
+# What a from-zero live run means here: the AWS account is empty when the run starts and empty
+# when it ends, and BOTH facts are established by asking AWS directly rather than by trusting the
+# teardown script's own verdict. That distinction is not pedantry - a teardown once reported CLEAN
+# over a live credential provider.
+# ---------------------------------------------------------------------------------------------
+clean_account_deploy:
+  status: deploy-validated
+  env: ben-fpg
+  date: 2026-09-10
+  scope: "ONE pack. ONE account. ONE region (us-east-1). Synthetic data. Two tenants."
+  evidence: evidence/FULL-PORTFOLIO-GATE-benefits_runtime_agent.json
+
+maturity_scale: [documented, demonstrated, deployable, deploy-validated, production-ready]
+maturity: deploy-validated
+
+controls:
+  # proven: a from-zero live run demonstrated it, and the gate check is named.
+  # shipped: the code exists and is unit-tested; no live run has demonstrated it.
+  # blocked: cannot be demonstrated here, and the reason is stated.
+  - {id: cedar_deny_by_default, status: proven, check: CONN_governed_sor_proof,
+     note: "the denial names a SPECIFIC policy; a denial that refuses everyone alike proves nothing"}
+  - {id: gateway_custom_jwt_authorizer, status: proven, check: G111_consolidated_gate}
+  - {id: authoritative_cedar_context, status: proven, check: G111_consolidated_gate,
+     note: "consent / purpose / budget_ok stripped from the caller, injected server-side"}
+  - {id: agentcore_runtime_on_iac_role, status: proven, check: RT2_runtime_uses_iac_role}
+  - {id: runtime_imdsv2_required, status: proven, check: RT2_runtime_mmdsv2}
+  - {id: guardrail_on_every_model_call, status: proven, check: RT2_runtime_calls_guardrail_assessed}
+  - {id: hash_chained_worm_evidence, status: proven, check: G111_consolidated_gate}
+  - {id: durable_before_commit, status: proven, check: G111_consolidated_gate,
+     note: "governed-core 1.10.1 evidence.is_durable = ledger AND WORM copy"}
+  - {id: separation_of_duties_signoff, status: proven, check: G111_consolidated_gate}
+  - {id: exactly_once_finalize, status: proven, check: G111_consolidated_gate}
+  - {id: hybrid_multi_tenant_isolation, status: proven, check: G111_consolidated_gate}
+  - {id: kill_switch, status: proven, check: KS_kill_switch_proof}
+  - {id: per_tenant_budget_meter, status: proven, check: BUD_budget_proof}
+  - {id: capture_every_api_call_lineage, status: proven, check: LIN_zero_orphans}
+  - {id: zero_residue_teardown, status: proven,
+     check: "teardown_zero_stack_residue · teardown_zero_agentcore_residue · teardown_zero_connector_residue"}
+  - {id: private_networking_cmk, status: proven, check: "TIER1-REGATE-2026-09-06 (ben-t1)",
+     note: "gated on its own run, not on ben-fpg"}
+  - {id: manifest_signing, status: shipped,
+     note: "Ed25519, verify_ok offline; SIG-1 - the signing path has never run on a live gate"}
+  - {id: org_scp_perimeter, status: blocked,
+     note: "PERIM-1b - the SCP and VPC-endpoint policy ship under org/; demonstrating them needs an
+            AWS Organization we do not have. A hard blocker, not a backlog item."}
+
+# ---------------------------------------------------------------------------------------------
+# CONNECTORS. Tiers are docs/CONNECTOR-MATURITY.md in slg-ai-agents, and the bright line there
+# holds here: TIER 4 IS NOT DONE IN THIS REPOSITORY and is never implied to be.
+#
+# Read tier 2+ below carefully. The mock system of record is a REAL OAuth2 API on real API Gateway
+# with real RS256/JWKS signature verification against a real Cognito issuer - which is more than
+# the taxonomy's "local HTTP stand-in" - but IT IS OURS. That is why it is not tier 3: tier 3
+# requires a real, EXTERNAL system of record. Proving the governed path reaches our own SoR is not
+# proving a customer's system of record has been governed.
+# ---------------------------------------------------------------------------------------------
+connectors:
+  - kind: system_of_record
+    tool: verify_source
+    source: "MOCK-SOR — our own OAuth2 API (API Gateway + Lambda), RS256/JWKS verified"
+    tier: 2+-deployed-stand-in
+    status: proven
+    check: "CONN_deploy · CONN_governed_sor_proof · CONN_teardown_zero_residue"
+    proves:
+      - "outbound M2M token minted by AgentCore Identity; the tool holds no client secret"
+      - "the system of record refuses an unauthenticated caller (401) and a bad token (401)"
+      - "RS256 signature verified against the issuer's live published keys"
+      - "Cedar deny-by-default reaches a newly added tool, and the denial is selective"
+    does_not_prove:
+      - "anything about a customer's real system of record, its schema, entitlements or latency"
+    cost_to_get_here: >-
+      Six from-zero live runs. Not one of the six failures was where it appeared to be:
+      authentication (proof users the IaC path never creates), the gateway (an authorizer that
+      allow-lists exactly one client), then the SoR itself (an environment silently left empty
+      because a label contained a comma). Each was hidden behind an error written to /dev/null.
+      Treat a production integration as engineering work, not configuration.
+  - kind: system_of_record
+    tool: connect_system_of_record
+    source: "the real state benefits SoR — EIV, The Work Number, a state eligibility system"
+    tier: 4-not-done
+    status: stubbed
+    note: "STUBBED in agents/benefits-eligibility/manifest.yaml, on purpose, for the reason above."
+
+not_claimed:
+  - "GxP, 21 CFR Part 11, HIPAA, FedRAMP or StateRAMP compliance or authorization"
+  - "an official AWS solution or an AWS-supported product"
+  - "adjudication: the agent does not award, deny, reduce or terminate anything"
+  - "multi-region, multi-account, real data, or anything about scale"
+  - "independent verification — see the block below, which is the honest headline"
+
+independence:
+  status: not-obtained
+  detail: >-
+    Every piece of evidence in this repository was produced by the author on the author's own AWS
+    account. An independent review named this the single biggest credibility gap in the project and
+    was right to. No amount of further self-testing closes it. The protocol for a third party to
+    reproduce the release without contacting the author is docs/INDEPENDENT-VERIFICATION.md, and a
+    FAILURE recorded there is a useful result.
+  protocol: docs/INDEPENDENT-VERIFICATION.md
+  harness: scripts/independent_verify.py
+
+siblings:
+  note: >-
+    REL-5. The pharmacovigilance, financial-aid and housing packs share this hash-locked core and
+    received the same fixes with unit tests, but NONE has had an AgentCore-era live gate, and the
+    full-portfolio gate harness exists only in this pack. Their maturity is not this pack's
+    maturity and must not be reported as if it were.
+
+references:
+  readme: README.md
+  start_here: START-HERE.md
+  release_record: VALIDATED_RELEASE.md
+  validated_matrix: docs/VALIDATED-MATRIX.md
+  authoritative_counts: RELEASE-MANIFEST.md
+  connector_taxonomy: "docs/CONNECTOR-MATURITY.md in slg-ai-agents"
+  depth_evidence: docs/Benefits-AgentCore-Depth-Evidence.md
+  architecture: docs/Aegis-Architecture-Verified.drawio
+  partner_brief: docs/Aegis-Partner-Brief.docx   # the PDF is rendered beside it, gitignored
+  generators: docs/generators/                    # both artifacts are generated, not maintained

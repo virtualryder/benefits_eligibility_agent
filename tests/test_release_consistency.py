@@ -34,6 +34,9 @@ def test_anchor_documents_name_the_release():
         ("START-HERE.md", f"releases/tag/{TAG}"),
         ("VALIDATED_RELEASE.md", f"`{TAG}`"),
         ("cdk/README.md", f"`{TAG}`"),
+        # Added 2026-09-10. This file opens by declaring itself correct whenever two documents
+        # disagree - and it named a release four tags behind while doing so.
+        ("docs/VALIDATED-MATRIX.md", f"`{TAG}`"),
     ]
     for name, needle in checks:
         p = ROOT / name
@@ -88,3 +91,39 @@ def test_the_row_that_asserts_the_current_release_names_THE_release():
         "a row that asserts the CURRENT release disagrees with the RELEASE file:\n  "
         + "\n  ".join(offenders)
         + "\n\nUpdate the row, or move it under a 'Previous release' heading if it is history.")
+
+
+def test_no_document_anywhere_instructs_a_stale_checkout():
+    """The four-file allow-list above is not the whole repository, and that gap had a victim.
+
+    `docs/INDEPENDENT-VERIFICATION.md` told a THIRD PARTY - the one reader whose independence is the
+    point of the document - to `git checkout v0.3.0-pilot-rc1`, four releases behind, and it sat there
+    green because that file was not on the list. The audience that matters most was being handed the
+    stalest instruction in the repo.
+
+    So this scans every tracked markdown file instead of a list someone has to remember to extend. A
+    document that does not want to name a specific tag can write `git checkout "$(cat RELEASE)"`, which
+    cannot go stale and is not matched here.
+    """
+    import subprocess
+
+    rc = subprocess.run(["git", "ls-files", "*.md"], cwd=ROOT,
+                        capture_output=True, text=True, encoding="utf-8")
+    if rc.returncode != 0:          # not a git checkout (e.g. an exported tarball) - nothing to scan
+        return
+    offenders = []
+    for rel in rc.stdout.split():
+        p = ROOT / rel
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            m = re.search(r"git checkout (v\d+\.\d+\.\d+[^\s`\"]*)", line)
+            if m and m.group(1) != TAG:
+                offenders.append("%s:%d instructs a checkout of %s; RELEASE says %s"
+                                 % (rel, i, m.group(1), TAG))
+    assert not offenders, (
+        "stale checkout instructions outside the anchor documents:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nEither name the current tag, or write: git checkout \"$(cat RELEASE)\"")
