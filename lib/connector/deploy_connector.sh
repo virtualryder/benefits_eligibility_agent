@@ -206,8 +206,42 @@ else
   if [ "$CREATED" -eq 1 ]; then log "created SoR Lambda $SOR_FN"
   else err "could not create SoR Lambda $SOR_FN (role $CONN_ROLE_ARN): ${CREATE_ERR:-unknown}"; fi
 fi
-for i in 1 2 3 4 5 6; do aws lambda update-function-configuration --function-name "$SOR_FN" \
-  --environment "Variables={EXPECTED_ISS=$ISSUER,EXPECTED_CLIENT_ID=$M2M_ID,REQUIRED_SCOPE=$SCOPE,SOR_LABEL=$SOR_LABEL}" --region "$REGION" >/dev/null 2>&1 && break; sleep 4; done
+# ---- SoR environment. ROOT CAUSE of the ben-fpe outbound failure, and it was this one line.
+# It used to pass the variables with the CLI shorthand, Variables={k=v,k=v,...}, and retry six times
+# with `>/dev/null 2>&1`. The shorthand splits on COMMAS, and SOR_LABEL is
+#     MOCK-SOR (OAuth2, RS256/JWKS)
+# - which contains one. So " RS256/JWKS)" parsed as a key, every attempt failed, all six failures
+# went to /dev/null, and the SoR Lambda kept an EMPTY environment. EXPECTED_ISS="" means it trusts
+# no issuer and therefore no key, so it answered every governed call with
+#     token signature not verified / signing key (kid) not found in issuer JWKS
+# while the token from AgentCore Identity was perfect: right issuer, scope ben-fpe-sor/read,
+# token_use access, RS256. Four runs chased a token that was never the problem.
+# The same SOR_LABEL string, for the same reason - spaces and punctuation - broke
+# `source connector-state.env` on fp8. A value that has bitten twice gets a quoted, escaped format
+# both times, not a third shorthand.
+# JSON via file://, stderr captured, and then the value is READ BACK. A configuration write that is
+# not verified is a configuration wish: this whole session's lesson, applied to a Lambda env.
+_json_esc(){ printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+cat > sor-env.json <<EOF
+{"Variables":{"EXPECTED_ISS":"$(_json_esc "$ISSUER")","EXPECTED_CLIENT_ID":"$(_json_esc "$M2M_ID")","REQUIRED_SCOPE":"$(_json_esc "$SCOPE")","SOR_LABEL":"$(_json_esc "$SOR_LABEL")"}}
+EOF
+SORENV_ERR=""
+for i in 1 2 3 4 5 6; do
+  SORENV_ERR="$(aws lambda update-function-configuration --function-name "$SOR_FN" \
+    --environment file://sor-env.json --region "$REGION" 2>&1 >/dev/null)" && { SORENV_ERR=""; break; }
+  sleep 4
+done
+[ -z "$SORENV_ERR" ] || err "could not set the SoR environment on $SOR_FN: $SORENV_ERR"
+# Measure it. The update above can report success and still be superseded by an in-flight update,
+# and an empty EXPECTED_ISS is indistinguishable from a healthy SoR until a governed call is refused.
+sleep 3
+SOR_ISS_LIVE="$(aws lambda get-function-configuration --function-name "$SOR_FN" --region "$REGION" \
+  --query 'Environment.Variables.EXPECTED_ISS' --output text 2>&1 | tr -d '\r')"
+if [ "$SOR_ISS_LIVE" = "$ISSUER" ]; then
+  log "SoR environment verified live: EXPECTED_ISS=$SOR_ISS_LIVE"
+else
+  err "SoR environment did NOT take: EXPECTED_ISS is '$SOR_ISS_LIVE', expected '$ISSUER' - the SoR would trust no issuer and refuse every governed call"
+fi
 SOR_LARN="arn:aws:lambda:$REGION:$ACC:function:$SOR_FN"
 API_ID="$(aws apigatewayv2 get-apis --region "$REGION" --query "Items[?Name=='$SOR_FN'].ApiId | [0]" --output text | tr -d '\r')"
 if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
@@ -266,8 +300,25 @@ else
   aws lambda create-function --function-name "$VERIFY_FN" --runtime python3.12 --role "$CONN_ROLE_ARN" \
     --handler lambda_function.handler --zip-file fileb://vi.zip --timeout 30 --region "$REGION" >/dev/null
 fi
-for i in 1 2 3 4 5 6; do aws lambda update-function-configuration --function-name "$VERIFY_FN" \
-  --environment "Variables={SOR_URL=$SOR_URL,PROVIDER_NAME=$PROVIDER,WI_NAME=$WI,SCOPE=$SCOPE}" --region "$REGION" >/dev/null 2>&1 && break; sleep 4; done
+# Same treatment as the SoR environment above. These four values happen to contain no commas today,
+# which is the only reason this line has been working - it is the identical shorthand that silently
+# left the SoR trusting nothing on ben-fpe. Not left as a trap for the next value that grows a comma.
+cat > vi-env.json <<EOF
+{"Variables":{"SOR_URL":"$(_json_esc "$SOR_URL")","PROVIDER_NAME":"$(_json_esc "$PROVIDER")","WI_NAME":"$(_json_esc "$WI")","SCOPE":"$(_json_esc "$SCOPE")"}}
+EOF
+VIENV_ERR=""
+for i in 1 2 3 4 5 6; do
+  VIENV_ERR="$(aws lambda update-function-configuration --function-name "$VERIFY_FN" \
+    --environment file://vi-env.json --region "$REGION" 2>&1 >/dev/null)" && { VIENV_ERR=""; break; }
+  sleep 4
+done
+[ -z "$VIENV_ERR" ] || err "could not set the verify_source environment on $VERIFY_FN: $VIENV_ERR"
+sleep 3
+VI_URL_LIVE="$(aws lambda get-function-configuration --function-name "$VERIFY_FN" --region "$REGION" \
+  --query 'Environment.Variables.SOR_URL' --output text 2>&1 | tr -d '\r')"
+[ "$VI_URL_LIVE" = "$SOR_URL" ] \
+  && log "verify_source environment verified live: SOR_URL=$VI_URL_LIVE" \
+  || err "verify_source environment did NOT take: SOR_URL is '$VI_URL_LIVE', expected '$SOR_URL'"
 aws lambda get-function --function-name "$VERIFY_FN" --region "$REGION" >/dev/null 2>&1 \
   || err "verify_source Lambda $VERIFY_FN does not exist after create/update"
 log "verify_source Lambda ready"

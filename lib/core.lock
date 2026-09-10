@@ -7,9 +7,9 @@
 # question answered by tools/check_core_parity.py. CI runs both and fails on either.
 version: 1.11.1
 files: 40
-tree_sha256: c7cf044569060a1259f23cec125a625683216e501b231596da1f8329dfee9a79
+tree_sha256: b305c5ae7fd606bee71df27c85b9fdb0036740f5793df6832236362b64c48e52
 4f9416d650bd28343244b868dfebdb11e70d7b32423536cb87b8c31fde62f993  lib/CORE_VERSION
-c19976017532b603b44f8a2037a50a0e3db74e5038ae2386426f4d4e023e6ce3  lib/connector/deploy_connector.sh
+d17114eb6995e362943287f8fa1d21b6f0643add7995b25b387dfaa5dc28ec00  lib/connector/deploy_connector.sh
 6d5cc8f5d6264acf7ee9892e90772842a7e46adcd866fb974b9b2a119dd2968a  lib/connector/destroy_connector.sh
 89ac348b51ec25d6ec3cc1d7fcdc6f6007c683ffe848e95d7c597cb45eed4ebb  lib/connector/mint_token.py
 eeed79f42956b4402e7f60e1ce01a578fa1c4567ee0b2aef3937c8a25718ee5a  lib/connector/prove_connector.sh
