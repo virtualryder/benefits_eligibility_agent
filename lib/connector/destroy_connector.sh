@@ -63,8 +63,16 @@ if [ -n "${GW_ID:-}" ]; then
   TID="$(aws bedrock-agentcore-control list-gateway-targets --gateway-identifier "$GW_ID" --region "$REGION" \
         --query "items[?name=='verify-source'].targetId | [0]" --output text 2>/dev/null | tr -d '\r')"
   if [ -n "$TID" ] && [ "$TID" != "None" ]; then
-    aws bedrock-agentcore-control delete-gateway-target --gateway-identifier "$GW_ID" --target-id "$TID" \
-      --region "$REGION" >/dev/null 2>&1 && ok "gateway target verify-source" || fail "gateway target verify-source" "delete failed"
+    # Capture the REASON. On ben-fp7 this step reported 'LEFT gateway target verify-source
+    # delete failed <- delete failed' - a failure message that says nothing twice, because the
+    # call hid its own stderr in 2>/dev/null. (No residue resulted: cdk destroy removed the
+    # gateway and the target with it, confirmed independently at zero. But a teardown step that
+    # cannot say WHY it failed is the same defect that made this script certify CLEAN over live
+    # resources, just quieter.)
+    TGT_DEL_ERR="$(aws bedrock-agentcore-control delete-gateway-target --gateway-identifier "$GW_ID" \
+      --target-id "$TID" --region "$REGION" 2>&1 >/dev/null)" \
+      && ok "gateway target verify-source" \
+      || fail "gateway target verify-source" "${TGT_DEL_ERR:-delete failed, no stderr}"
   else skip "gateway target verify-source"; fi
 else skip "gateway target (no GW_ID in spine-state)"; fi
 

@@ -13,15 +13,28 @@ source "$BUILD/agent.env"; source "$AGENT/spine-state.env"; source "$AGENT/conne
 # tree, and copying it here would shadow the core module - which tests/test_core_dependency.py
 # exists to forbid. Resolve it from the installed package instead, so the proof uses the same
 # hash-locked client everything else does.
-PY="$LIB/runtime/.venv/Scripts/python.exe"; [ -f "$PY" ] || PY="$LIB/runtime/.venv/bin/python"; [ -f "$PY" ] || PY=python
-CLIENT="$("$PY" -c 'import governed_core, os; print(os.path.join(governed_core.controls_dir(), "mcp_client.py"))' 2>/dev/null)"
-[ -f "$CLIENT" ] || { echo "FAIL | cannot resolve mcp_client.py from the pinned governed-core"; exit 1; }
+# Pick the interpreter by CAPABILITY, not by path. The previous version took
+# lib/runtime/.venv first because it exists - but that venv is the Lambda BUILD environment and
+# has no governed_core installed ("ModuleNotFoundError"), so CLIENT came back empty and this proof
+# aborted on 2026-09-10 (ben-fp7) even though the connector had deployed perfectly: SoR Lambda up,
+# gateway target attached, and the SoR answering an anonymous probe with 401. Existing is not the
+# same as being able to do the job; ask each candidate whether it can actually import the pinned
+# core, and use the one that answers yes for BOTH resolving and running the client.
+PY=""
+for CAND in "$LIB/runtime/.venv/Scripts/python.exe" "$LIB/runtime/.venv/bin/python" python; do
+  if [ -f "$CAND" ] || command -v "$CAND" >/dev/null 2>&1; then
+    C="$("$CAND" -c 'import governed_core, os; print(os.path.join(governed_core.controls_dir(), "mcp_client.py"))' 2>/dev/null | tr -d '\r')"
+    if [ -n "$C" ] && [ -f "$C" ]; then PY="$CAND"; CLIENT="$C"; break; fi
+  fi
+done
+[ -n "$PY" ] && [ -n "${CLIENT:-}" ] && [ -f "$CLIENT" ] || {
+  echo "FAIL | no interpreter on this machine can import the pinned governed-core (tried the runtime venv and system python)"; exit 1; }
 tok(){ aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id "$CLIENT_ID" \
         --auth-parameters "USERNAME=$1,PASSWORD=$2" --region "$REGION" --query 'AuthenticationResult.AccessToken' --output text | tr -d '\r'; }
 REV_U="$(awk -F'\t' '$3=="yes"{print $1; exit}' "$BUILD/users.tsv")"; REV_P="$(awk -F'\t' '$3=="yes"{print $2; exit}' "$BUILD/users.tsv")"
 OUT_U="$(awk -F'\t' '$3=="no"{print $1; exit}' "$BUILD/users.tsv")"; OUT_P="$(awk -F'\t' '$3=="no"{print $2; exit}' "$BUILD/users.tsv")"
 REV="$(tok "$REV_U" "$REV_P")"; OUT="$(tok "$OUT_U" "$OUT_P")"
-call(){ python "$CLIENT" "$GW_URL" "$1" "$2" "$3"; }
+call(){ "$PY" "$CLIENT" "$GW_URL" "$1" "$2" "$3"; }   # same interpreter that resolved CLIENT
 pass=0; fail=0
 
 echo "=== CONNECTOR PROOF ($SLUG): governed verify_source via AgentCore Identity outbound OAuth ($SOR_LABEL) ==="
