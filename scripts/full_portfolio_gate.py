@@ -812,9 +812,21 @@ def main():
             cst = {}
             try:
                 for ln in open(os.path.join(AGENT, "connector-state.env"), encoding="utf-8"):
-                    if "=" in ln:
-                        k, v = ln.strip().split("=", 1)
-                        cst[k] = v
+                    ln = ln.strip()
+                    if not ln or ln.startswith("#") or "=" not in ln:
+                        continue
+                    k, v = ln.split("=", 1)
+                    # connector-state.env is a SHELL file and its values are quoted - they have to
+                    # be, because SOR_LABEL is "MOCK-SOR (OAuth2, RS256/JWKS)" and bash cannot
+                    # source parentheses bare. This reader did not strip the quotes, so on the
+                    # 2026-09-10 ben-fp9 run SOR_URL came back as '"https://..."' WITH the quotes
+                    # and urlopen failed with 'unknown url type: "https', while PROVIDER compared
+                    # as '"ben-fp9-sor-oauth"' and never matched AWS. A regression I introduced by
+                    # fixing the writer without checking every reader of what it writes.
+                    v = v.strip()
+                    if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+                        v = v[1:-1]
+                    cst[k.strip()] = v
                 found["state_file"] = True
             except OSError:
                 # A missing state file means the deploy did not finish. It does NOT mean the deploy
