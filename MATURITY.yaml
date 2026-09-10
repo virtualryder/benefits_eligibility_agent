@@ -148,5 +148,6 @@ references:
   connector_taxonomy: "docs/CONNECTOR-MATURITY.md in slg-ai-agents"
   depth_evidence: docs/Benefits-AgentCore-Depth-Evidence.md
   architecture: docs/Aegis-Architecture-Verified.drawio
-  partner_brief: docs/Aegis-Partner-Brief.docx   # the PDF is rendered beside it, gitignored
+  partner_brief: docs/Aegis-Partner-Brief.docx   # PACK-scoped; the PDF beside it is gitignored
+  portfolio_brief: "AEGIS-PARTNER-BRIEF-2026-09-10.docx in the platform repo"  # the one a partner gets
   generators: docs/generators/                    # both artifacts are generated, not maintained
